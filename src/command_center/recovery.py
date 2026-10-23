@@ -39,7 +39,7 @@ def enter_recovery(store):
         for approval in s.query(Approval).all():
             approval.revoked = True
         for task in s.query(Task).all():
-            if task.state not in TERMINAL:
+            if task.state not in TERMINAL and task.state != "CANCEL_REQUESTED":
                 task.state = "RECONCILING"
         store.audit(s, "restored_execution_interlock", "recovery", epoch=control.epoch)
 

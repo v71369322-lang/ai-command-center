@@ -1,5 +1,13 @@
 # Cloud F1 evidence
 
+## Последующее ревью PR #8
+
+На ветке review после исправлений: **64 passed**, 80.53 s, clean-tree source
+`6855c6c1d982785fb11d161f8737690a8f743cdb`. Полный container smoke/restart/new work,
+runtime boundaries, isolated encrypted restore (9.72 s), Ruff/contracts/TS/Vite
+и security gates прошли. [Отчёт и границы независимости](REVIEW_PR8.md).
+Ниже сохранены прежние доказательства исходной ветки F1.
+
 Проверенный clean-tree код: `31d3f89aef1b887bc2567ec7a86d0708041df68d`.
 Команда: `F1_BUILD_CA_FILE=/etc/ssl/certs/ca-certificates.crt scripts/verify_cloud.sh`
 с установленным Chromium в разрешённой cloud-среде.

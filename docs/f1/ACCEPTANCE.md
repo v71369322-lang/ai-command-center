@@ -1,6 +1,6 @@
 # T01–T14: проверяемый статус F1
 
-Основание: [VALIDATION.md](VALIDATION.md), 60 тестов и завершённый контейнерный
+Основание: [VALIDATION.md](VALIDATION.md), 64 теста после ревью и завершённый контейнерный
 профиль. PASS относится только к описанной cloud-проверке. Непроверенные условия
 не считаются пройденными. Owner acceptance отсутствует.
 
@@ -19,7 +19,7 @@
 | T11 | Hash chain, app-role UPDATE denial, tamper/truncation against checkpoint | Независимая защищённая custody checkpoint |
 | T12 | AES-GCM, dump/restore, отдельный networkless PostgreSQL, old-backup interlock | Offsite custody, key recovery, WAL/PITR, полный RPO/RTO drill |
 | T13 | Auth/RBAC, CSP/no-store, chunked body bounds, actual loopback binding, mobile browser | VPN/HTTPS/MFA, внешняя проверка портов |
-| T14 | Ruff, TS/Vite, contracts, pinned/locked builds, 60 tests, security audits | Remote CI проверяется отдельно в PR; clean-host reproducibility и independent review |
+| T14 | Ruff, TS/Vite, contracts, pinned/locked builds, 64 tests, security audits | Remote CI проверяется отдельно в PR; clean-host reproducibility и independent review |
 
 Критическое нарушение блокирует приёмку. Непроверенный пункт не означает падение
 теста, но не считается PASS. Независимое review, внешние backup/checkpoint и
