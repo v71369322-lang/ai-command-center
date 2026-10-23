@@ -118,3 +118,7 @@ Admission: максимум 100 незавершённых задач, synthetic
 не начинает работу при свободном workspace disk <256 MiB. Это DERIVED cloud caps,
 не замена host quota/полноценного resource monitor. Worker dependency backoff bounded
 2–30 s; полноценный circuit breaker остаётся OPEN.
+
+Redis работает непривилегированно, `dir /tmp`, `save ""`, `appendonly no`:
+его файловая persistence намеренно отключена. Пересоздание Redis восстанавливает
+transport из PostgreSQL/Outbox и не зависит от старого RDB в `/data` образа.

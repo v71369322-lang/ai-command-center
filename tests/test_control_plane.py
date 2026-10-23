@@ -68,6 +68,8 @@ def test_T04_redis_crash_before_mark_and_recovery(store, queue):
 
 
 def test_T04_actual_redis_outage(store, queue):
+    assert queue.config_get('save')['save'] == ''
+    assert queue.config_get('dir')['dir'] == '/tmp'
     create(store)
     assert docker("stop", "acc-f1-redis-1").returncode == 0
     try:
