@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import timedelta
 import json
 from uuid import uuid4
@@ -8,7 +9,7 @@ from sqlalchemy import select, text
 
 from command_center.models import Approval, Control, Outbox, Task
 from command_center.recovery import dump_database, restore_database, seal, unseal, enter_recovery
-from command_center.store import Denied
+from command_center.store import Denied, Store
 from command_center.verifier import verify
 from command_center.worker import Runner, docker
 from conftest import wait_ready
@@ -20,6 +21,59 @@ def payload(kind="render", cost=0, dependency=None):
 
 def create(store, kind="render", cost=0, dependency=None):
     return store.create("owner", str(uuid4()), payload(kind, cost, dependency))
+
+
+@pytest.mark.parametrize('revoke', [False, True])
+def test_audit_repeated_cancel_keeps_running_task_pending(store, revoke):
+    task = store.claim(create(store, cost=100)['id'])
+    store.cancel('owner', task['id'])
+    store.cancel('owner', task['id'], revoke=revoke)
+    assert store.get(task['id'])['state'] == 'CANCEL_REQUESTED'
+    assert store.snapshot()['budget']['reserved'] == 100
+    assert store.claim(create(store)['id']) is None
+
+
+@pytest.mark.parametrize('kind', ['render', 'approved_render'])
+def test_audit_explicit_retry_after_stop_uses_current_epoch(store, kind):
+    task = create(store, kind)
+    if kind == 'approved_render':
+        store.approve('owner', task['id'], 1)
+    claimed = store.claim(task['id'])
+    store.abort(task['id'], claimed['fence'], 'verified_no_effect', True)
+    store.halt('owner')
+    state = store.snapshot()
+    store.resume('owner', state['epoch'], state['checkpoint_digest'])
+    retried = store.retry('owner', task['id'])
+    assert retried['epoch'] == store.snapshot()['epoch']
+    if kind == 'approved_render':
+        assert store.claim(task['id']) is None
+        store.approve('owner', task['id'], retried['version'])
+    assert store.claim(task['id']) is not None
+
+
+@pytest.mark.parametrize('operation', ['approve', 'claim', 'pulse', 'finish', 'retry'])
+def test_audit_changed_git_revision_cannot_reuse_task_authority(store, operation):
+    task = create(store, 'approved_render' if operation == 'approve' else 'render')
+    if operation in {'pulse', 'finish', 'retry'}:
+        task = store.claim(task['id'])
+    if operation == 'retry':
+        store.abort(task['id'], task['fence'], 'verified_no_effect', True)
+    other_revision = 'f' * 40 if store.settings.source_revision != 'f' * 40 else 'e' * 40
+    changed = Store(replace(store.settings, source_revision=other_revision))
+    try:
+        with pytest.raises(Denied, match='stale_task_revision'):
+            if operation == 'approve':
+                changed.approve('owner', task['id'], task['version'])
+            elif operation == 'claim':
+                changed.claim(task['id'])
+            elif operation == 'pulse':
+                changed.pulse(task['id'], task['fence'])
+            elif operation == 'finish':
+                changed.finish(task['id'], task['fence'], 'synthetic', '0' * 64)
+            else:
+                changed.retry('owner', task['id'])
+    finally:
+        changed.engine.dispose()
 
 
 def test_T01_real_pg_redis_executor_verifier_web_projection(store, queue, client, headers):
@@ -152,6 +206,27 @@ def test_T07_roles_and_forged_sender(client, headers):
     assert client.post(f"/api/tasks/{task['id']}/approve", json={"version": 1},
                        headers=headers["operator"]).status_code == 409
     assert client.post("/api/control/stop", headers=headers["operator"]).status_code == 409
+
+
+def test_audit_cross_origin_cannot_stop_without_bearer(client, store):
+    origin = {'Origin': 'https://attacker.invalid'}
+    response = client.post('/api/control/stop', headers=origin)
+    assert response.status_code == 401
+    assert 'access-control-allow-origin' not in response.headers
+    assert not store.snapshot()['halted']
+    preflight = client.options('/api/control/stop', headers={
+        **origin, 'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization'})
+    assert 'access-control-allow-origin' not in preflight.headers
+    assert 'access-control-allow-credentials' not in preflight.headers
+
+
+def test_audit_operator_cannot_cancel_owner_task(client, headers, store):
+    task = create(store)
+    for role in ('operator', 'agent'):
+        response = client.post(f"/api/tasks/{task['id']}/cancel", headers=headers[role])
+        assert response.status_code == 409
+        assert store.get(task['id'])['state'] == 'READY'
 
 
 def test_T08_prompt_injection_is_data_and_paths_rejected(client, headers):

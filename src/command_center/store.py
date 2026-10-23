@@ -69,6 +69,16 @@ class Store:
             raise Denied("task_not_found")
         return task
 
+    def check_task_revision(self, s, task):
+        # The first append-only creation event is the durable source pin. Do not
+        # infer consent for a new build from a mutable current process setting.
+        created = s.execute(select(Audit).where(
+            Audit.event['kind'].as_string() == 'task_created',
+            Audit.event['task_id'].as_string() == task.id
+        ).order_by(Audit.sequence).limit(1)).scalar_one_or_none()
+        if not created or created.event.get('revision') != self.settings.source_revision:
+            raise Denied('stale_task_revision')
+
     def create(self, actor, key, payload):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
@@ -114,6 +124,8 @@ class Store:
         with self.transaction() as s:
             control = s.get(Control, 1)
             task = self.task(s, task_id)
+            self.check_audit(s)
+            self.check_task_revision(s, task)
             if (control.halted or control.recovery or task.epoch != control.epoch
                     or task.version != version or task.state != "WAITING_APPROVAL"):
                 raise Denied("stale_or_ineligible_approval")
@@ -142,7 +154,7 @@ class Store:
             if approval:
                 approval.revoked = True
             if task.state not in TERMINAL:
-                task.state = "CANCEL_REQUESTED" if task.state in {"RUNNING", "VERIFYING", "RECONCILING"} else "CANCELLED"
+                task.state = "CANCEL_REQUESTED" if task.state in {"RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED"} else "CANCELLED"
                 task.version += 1
             self.audit(s, "approval_revoked" if revoke else "cancel_requested", actor, task.id)
             return self.view(task)
@@ -164,6 +176,7 @@ class Store:
             control = s.get(Control, 1)
             task = self.task(s, task_id)
             self.check_audit(s)
+            self.check_task_revision(s, task)
             if control.halted or control.recovery or task.epoch != control.epoch or task.state != "READY":
                 return None
             active = s.execute(select(Task).where(Task.state.in_(["RUNNING", "VERIFYING", "CANCEL_REQUESTED", "RECONCILING"]))).first()
@@ -205,6 +218,7 @@ class Store:
         with self.transaction() as s:
             self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
+            self.check_task_revision(s, task)
             if (control.halted or control.recovery or task.state != "RUNNING" or task.fence != fence
                     or task.epoch != control.epoch or task.lease_until <= self.now(s)):
                 return False
@@ -219,6 +233,7 @@ class Store:
         with self.transaction() as s:
             self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
+            self.check_task_revision(s, task)
             if (control.halted or control.recovery or task.fence != fence or task.state != "RUNNING"
                     or task.lease_until <= self.now(s) or task.epoch != control.epoch):
                 raise Denied("stale_result")
@@ -332,10 +347,13 @@ class Store:
             raise Denied("owner_required")
         with self.transaction() as s:
             task, control = self.task(s, task_id), s.get(Control, 1)
+            self.check_audit(s)
+            self.check_task_revision(s, task)
             if (control.halted or control.recovery or task.state != "FAILED" or task.reserved
                     or task.attempts >= self.settings.max_attempts or task.reason != "verified_no_effect"):
                 raise Denied("retry_not_safe")
             task.version += 1
+            task.epoch = control.epoch
             task.state = "WAITING_APPROVAL" if task.payload["kind"] == "approved_render" else "READY"
             if task.state == "READY":
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
