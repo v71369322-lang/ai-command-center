@@ -1,0 +1,16 @@
+// TEMPLATE ONLY: identifiers are placeholders, not accounts or working grants.
+// Review against provider schema and actual identity; do not enable Funnel.
+{
+  "groups": {
+    "group:f1-owner": ["__OWNER_IDENTITY__"],
+    "group:f1-auditor": ["__AUTHORIZED_CLOUD_IDENTITY__"]
+  },
+  "tagOwners": { "tag:acc-f1": ["group:f1-owner"] },
+  "acls": [
+    { "action": "accept", "src": ["group:f1-owner"], "dst": ["tag:acc-f1:443"] },
+    { "action": "accept", "src": ["group:f1-auditor"], "dst": ["tag:acc-f1:22"] }
+  ]
+}
+// No subnet router, exit node, wildcard admin, executor membership or CRM routes.
+// Missing rule is denial. Device posture/expiry/revocation and tests must be
+// configured with the actual account. Identity-provider MFA is NOT app MFA.

@@ -1,0 +1,15 @@
+# TEMPLATE ONLY; no installation or sshd reload performed.
+# Verify cloud-init/vendor Match blocks with sshd -T / -C before future application.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AllowUsers __DEDICATED_ADMIN_ACCOUNT__
+AllowAgentForwarding no
+AllowTcpForwarding no
+X11Forwarding no
+PermitTunnel no
+MaxAuthTries 3
+# Binding to VPN-only SSH is a LATER gate: preserve verified console recovery
+# and an existing working session until second-session key login is confirmed.
+# No wildcard sudo/docker-group access for executors or the AI developer.
