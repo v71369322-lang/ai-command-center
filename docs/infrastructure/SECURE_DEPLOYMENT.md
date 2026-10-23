@@ -28,7 +28,7 @@ Python/FastAPI, React/TS, PG, Redis; новые компоненты тольк�
 | Владелец | VPN + MFA + точные task/stop approvals | Раскрывать секреты в чат/Git |
 | Infrastructure admin | Отдельный SSH key, аудит, ограниченный sudo по точному этапу | Передавать admin credential агенту |
 | Control-plane service | PG app role, Redis, synthetic identities | Host Docker socket, sudo, admin DB, ключ backup |
-| Worker | Scoped PG/queue, typed broker requests | Rootful socket, произвольные Docker endpoints/flags, owner keys |
+| Worker | Отдельная PG run-role/узкие run procedures, queue, typed broker | Запись approvals/policy/grants, rootful socket, arbitrary Docker flags, owner keys |
 | Launch broker/rootless user | Только dedicated daemon, allowlisted operations | Sudo, host docker group, чужие homes, control-plane secrets |
 | Executor | Fixed image, stdin → bounded manifest, /work tmpfs | Сеть, SSH, socket, host mounts, privileged/caps, production credentials |
 | Deadline enforcer | Typed status/stop endpoint только known run IDs | Raw socket, start, grant/approval changes, arbitrary host commands |
@@ -52,6 +52,14 @@ Stop-only — ограничение endpoint для вызывающего, н�
 сам shim с socket полностью доверен в пределах dedicated rootless daemon.
 Нужны отдельный supervision и admin emergency path; нельзя обещать kill при
 неработающем runtime/host.
+
+Общий текущий `f1_app` у API/worker не обеспечивает независимую policy: владеющий
+его SQL credential может менять approvals/control. Для future broker gate нужны
+раздельные PG роли/процедуры: worker не пишет grants/approvals и не может создавать
+owner audit events; авторизация владельца пишет их через отдельный trusted path.
+Broker читает authoritative grants своим ограниченным credential, не доверяет
+заявлению worker. Audit actor выводится из доверенного пути/роли, не свободного
+поля сообщения. Эта миграция прав/adapter — часть G2, ещё не реализована.
 
 Broker не принимает Docker JSON/CLI, image URLs или произвольные пути.
 Запрос: task UUID/attempt/fence/epoch/source SHA/payload hash/approved image digest/
