@@ -1,5 +1,15 @@
 # Cloud F1 evidence
 
+## Полный аудит PR #8 + #9
+
+Clean-tree source `5133bd3e599c62e900bb83d1a8a101deeaceccf7`: **75 passed**, 73.79 s.
+Полный контейнерный профиль, restart/new work, isolated restore и runtime
+boundaries прошли. Ruff/contracts/TS/Vite и dependency/security gates: PASS.
+Девять новых regression cases сначала упали на исходной базе PR #9, затем прошли.
+Добавлены CSRF/CORS/IDOR и фактический browser XSS сценарий.
+Подробности и оценка готовности: [FULL_SYSTEM_AUDIT.md](FULL_SYSTEM_AUDIT.md).
+Это не независимая внешняя сертификация и не разрешение на VPS deployment.
+
 ## Последующее ревью PR #8
 
 На ветке review после исправлений: **64 passed**, 80.53 s, clean-tree source

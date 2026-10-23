@@ -69,9 +69,15 @@ cloud host не offsite drill. Реальных данных/провайдер�
 После этого добавлены API CSRF/CORS/IDOR проверки и усилен browser XSS сценарий.
 
 Финальный полный профиль: `F1_BUILD_CA_FILE=/etc/ssl/certs/ca-certificates.crt scripts/verify_cloud.sh`
-на clean tree. Его фактический результат дополняется после завершения, не
-переносится из прежних PR. Runtime evidence остаётся в ignored .runtime без
-публикации credentials/ключей/архивов.
+на clean tree `5133bd3e599c62e900bb83d1a8a101deeaceccf7`:
+**75 passed**, 73.79 s, 0 failed/errors/skips; одна Starlette/httpx deprecation
+warning. API/worker/PG/Redis/Outbox/approval/executor/verifier/web smoke,
+restart/persistence/cancellation/new work, isolated encrypted restore и runtime
+boundaries: PASS. Ruff/contracts/TS/Vite/locked builds/secret scan: PASS.
+pip-audit: 62 runtime/dev dependencies, 0 advisories; npm 0; Bandit 0 MEDIUM/HIGH,
+16 reviewed LOW. Результат не перенесён из прежних PR. Runtime evidence остаётся
+в ignored .runtime без публикации credentials/ключей/архивов. Последующий коммит
+изменяет только документационные доказательства; CI проверяет итоговый PR ref.
 
 ## Заключение перед VPS
 
