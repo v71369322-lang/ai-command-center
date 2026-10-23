@@ -10,6 +10,14 @@
   files-only не запускает команд и не публикует неизвестные поля/секреты.
 - Rootless launcher design/ACL/firewall placeholder checks; это не runtime tests.
 - Ruff `infra/vps`, `git diff --check`: PASS.
+- Дополнительный Bandit scan всего infra/vps завершился code1: HIGH нет,
+  три MEDIUM разобраны как configuration literals, а не исполняемые действия:
+  B108 — строка `/tmp` tmpfs-политики в validator и negative fixture в тесте;
+  B104 — строка uvicorn bind внутри контейнера при host publish127.0.0.1.
+  Эти места не создают tmp-файлы и не выполняют сетевой bind. LOW B404/B603 —
+  fixed local argv без shell; B101 — pytest assertions; B105 — имена mounted
+  secret bindings, не значения credentials. Findings не скрывались/не подавлялись;
+  scan не выдаётся за zero-findings PASS. Изменение этих мест требует нового review.
 - `validate.py compose.control-plane.json`: PASS_TEMPLATE_ONLY, deployable=false.
 - `--require-deployable`: ожидаемый отказ code2, gate сохранён.
 - Docker Compose `config --quiet` с публичным fake image digest и source fixture:
