@@ -1,0 +1,46 @@
+name: F1 synthetic verification
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: f1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Locked dependencies and static checks
+        run: |
+          python -m pip install uv==0.12.23
+          uv sync --frozen
+          .venv/bin/ruff check src tests scripts
+          .venv/bin/python scripts/export_contract.py --check
+          npm ci --prefix web
+          npm run --prefix web build
+          .venv/bin/playwright install --with-deps chromium
+      - name: Synthetic PostgreSQL Redis Docker tests
+        run: |
+          python scripts/bootstrap_secrets.py
+          export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
+          docker --host=unix:///var/run/docker.sock compose up -d db redis
+          docker --host=unix:///var/run/docker.sock build --build-arg F1_SOURCE_REVISION -f Dockerfile.executor -t acc-f1-executor:local .
+          scripts/cloud_test.sh
+      - name: Build application image
+        run: docker --host=unix:///var/run/docker.sock build --build-arg F1_SOURCE_REVISION="$(git rev-parse HEAD)" -t acc-f1-app:ci .
+      - name: Stop only owned synthetic services
+        if: always()
+        run: |
+          export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
+          docker --host=unix:///var/run/docker.sock compose stop

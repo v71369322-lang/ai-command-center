@@ -80,3 +80,14 @@ PG authoritative durable runtime/Redis transport, Git approved docs/contracts vs
 A01 historical ASSUMPTION не принят как complete acceptance: H-H11/H-I21 synthetic start approved, H-I03/H-I20/H-I23/H-I29 требуют full evidence и owner acceptance. Blanket derived «все OPEN блокируют всё до owner answer» не следует из H-J01; only genuine blocker CB01 — owner choice exact next implementation scope, separate programming authorization всё ещё нужна.
 
 Новых ASSUMPTION нет. Missing original transcripts не proof historical completeness и не автоматический запрет принять limited recovered baseline. Actual runtime/restore/CI/VPS/billing evidence отсутствует. [Owner handoff](history/stage-0c-5/OWNER_ACCEPTANCE_HANDOFF.md) не исполняемый stage prompt; работа останавливается.
+
+
+## Облачный F1: отдельное разрешение реализации
+
+Владелец текущим заданием разрешил облачный код/зависимости/тесты/коммиты/PR F1,
+без VPS/SSH/real APIs/paid resources/merge. Старые записи и статусы не переписаны.
+Технические выборы и численные caps [F1](f1/README.md) — DERIVED implementation
+profile, не OWNER_APPROVED_SUMMARY и не эксплуатационные характеристики VPS.
+[Оставшиеся gates](f1/ACCEPTANCE.md), [security](f1/SECURITY.md): offsite custody,
+watchdog/key recovery, launcher boundary, actual quotas, full fault/adversarial
+review, trusted CI и VPS audit/закрытый web/MFA остаются непроверенными.
