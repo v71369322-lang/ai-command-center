@@ -5,6 +5,7 @@ from pathlib import Path
 import socket
 import threading
 import time
+from uuid import uuid4
 
 from playwright.sync_api import sync_playwright
 import uvicorn
@@ -42,6 +43,13 @@ def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue):
             page.get_by_role('button', name='Войти / обновить', exact=True).click()
             page.get_by_role('heading', name='SUCCEEDED', exact=True).wait_for()
             assert page.get_by_text('- message: synthetic only', exact=False).count() >= 1
+            attack = '<img src=x onerror="window.f1Injected=true">'
+            malicious = store.create('owner', str(uuid4()), {
+                'kind': 'render', 'values': {'markup': attack}, 'cost': 0, 'dependency': None})
+            Runner(store).execute(store.claim(malicious['id']))
+            page.get_by_role('button', name='Войти / обновить', exact=True).click()
+            page.get_by_text('- markup: ' + attack, exact=False).wait_for()
+            assert page.evaluate('window.f1Injected === undefined')
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
             assert page.locator('img').count() == 0
             Path('.runtime').mkdir(exist_ok=True)

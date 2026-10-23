@@ -21,6 +21,13 @@
 12. Синтетические расходы не реальные деньги; hard ceiling/new commitment rules сохраняются.
 13. Docker launcher trusted, executor untrusted; authority launcher — явный gate VPS review.
 14. Critical failures или непроверенные обязательные gates блокируют полную приёмку.
+15. Первая append-only запись task_created связывает задачу с точной Git revision.
+    Approve/claim/pulse/finish/retry проверяют её под admission lock. После смены
+    revision нужны новая задача и, где требуется, новое approval; автоматическое
+    переутверждение старых задач запрещено. Отмена старой задачи остаётся доступной.
+16. Повторные cancel/revoke не переводят CANCEL_REQUESTED в terminal до сверки
+    остановки. Новый явно разрешённый retry FAILED/verified_no_effect использует
+    текущую epoch; cancelled/security-blocked/uncertain задачи так не возобновляются.
 
 ## Контракты
 
