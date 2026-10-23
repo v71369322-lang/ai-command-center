@@ -1,0 +1,23 @@
+# TEMPLATE ONLY. Never load remotely without console recovery, review and authorization.
+# Replace tokens AFTER read-only audit. Not a complete Docker forwarding policy.
+# Do not flush the host ruleset or delete provider/SSH recovery rules.
+table inet acc_f1_host {
+  chain input {
+    type filter hook input priority 0; policy drop;
+    iifname "lo" accept
+    ct state invalid drop
+    ct state established,related accept
+    ip protocol icmp accept
+    meta l4proto ipv6-icmp accept
+    # Tailscale direct transport only if actual configured port is verified:
+    udp dport __VERIFIED_VPN_UDP_PORT__ accept
+    # Admin ingress ONLY on VPN, with tailnet ACL and separate SSH keys:
+    iifname "tailscale0" tcp dport { 22, 443 } accept
+    # Optional temporary bootstrap rule for exact authorized cloud source IP:
+    # ip saddr __AUTHORIZED_BOOTSTRAP_IPV4__/32 tcp dport 22 accept
+  }
+}
+# Forwarding/Docker DNAT bypasses INPUT: a separately reviewed DOCKER-USER
+# (iptables backend) or equivalent nft forward policy is mandatory. Keep IPv6
+# consistent. Do not assume UFW/INPUT makes published containers private.
+# This template deliberately contains unresolved tokens; no apply helper exists.
