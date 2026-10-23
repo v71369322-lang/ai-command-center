@@ -203,6 +203,7 @@ class Store:
 
     def pulse(self, task_id, fence):
         with self.transaction() as s:
+            self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
             if (control.halted or control.recovery or task.state != "RUNNING" or task.fence != fence
                     or task.epoch != control.epoch or task.lease_until <= self.now(s)):
@@ -216,6 +217,7 @@ class Store:
 
     def finish(self, task_id, fence, artifact, artifact_hash):
         with self.transaction() as s:
+            self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
             if (control.halted or control.recovery or task.fence != fence or task.state != "RUNNING"
                     or task.lease_until <= self.now(s) or task.epoch != control.epoch):
@@ -236,7 +238,8 @@ class Store:
             if task.fence != fence or task.state in TERMINAL:
                 return
             if not stopped:
-                task.state = "RECONCILING"
+                if task.state != "CANCEL_REQUESTED":
+                    task.state = "RECONCILING"
                 control.halted = True
             elif task.state == "CANCEL_REQUESTED" or control.halted:
                 task.state = "CANCELLED"

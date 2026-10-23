@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select, text
 
 from command_center.models import Approval, Control, Outbox, Task
-from command_center.recovery import dump_database, restore_database, seal, unseal
+from command_center.recovery import dump_database, restore_database, seal, unseal, enter_recovery
 from command_center.store import Denied
 from command_center.verifier import verify
 from command_center.worker import Runner, docker
@@ -416,6 +416,41 @@ def test_T09_expired_cancel_stays_cancelled_after_reconcile(store):
     assert store.get(task['id'])['state'] == 'CANCELLED'
     with pytest.raises(Denied):
         store.retry('owner', task['id'])
+
+
+def test_T09_uncertain_stop_preserves_cancellation(store):
+    task = store.claim(create(store)['id'])
+    store.cancel('owner', task['id'])
+    store.abort(task['id'], task['fence'], 'stop_unconfirmed', False)
+    assert store.get(task['id'])['state'] == 'CANCEL_REQUESTED'
+    assert store.snapshot()['halted']
+    assert Runner(store).reconcile(store.get(task['id']))
+    assert store.get(task['id'])['state'] == 'CANCELLED'
+    with pytest.raises(Denied):
+        store.retry('owner', task['id'])
+
+
+def test_T12_restore_interlock_preserves_cancellation(store):
+    task = store.claim(create(store)['id'])
+    store.cancel('owner', task['id'])
+    enter_recovery(store)
+    assert store.get(task['id'])['state'] == 'CANCEL_REQUESTED'
+    assert Runner(store).reconcile(store.get(task['id']))
+    assert store.get(task['id'])['state'] == 'CANCELLED'
+
+
+@pytest.mark.parametrize('operation', ['pulse', 'finish'])
+def test_T11_corrupted_audit_cannot_accept_running_result(store, admin, operation):
+    task = store.claim(create(store)['id'])
+    with admin.engine.begin() as connection:
+        connection.execute(text("UPDATE audit SET digest=:value WHERE sequence=(SELECT max(sequence) FROM audit)"),
+                           {'value': '0' * 64})
+    with pytest.raises(Denied, match='audit_integrity_failure'):
+        if operation == 'pulse':
+            store.pulse(task['id'], task['fence'])
+        else:
+            store.finish(task['id'], task['fence'], 'synthetic artifact', '0' * 64)
+    assert store.get(task['id'])['state'] == 'RUNNING'
 
 
 def test_T07_non_ascii_identity_is_denied(client):
