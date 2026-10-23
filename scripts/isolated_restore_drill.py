@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import subprocess
 import time
 from uuid import uuid4
 
@@ -19,8 +18,7 @@ IMAGE = 'postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b7
 
 
 def run(*args, data=None):
-    result = subprocess.run(['docker', '--host=unix:///var/run/docker.sock', *args],
-                            input=data, capture_output=True, timeout=60)
+    result = docker(*args, input=data, timeout=60)
     if result.returncode:
         raise RuntimeError('isolated_drill_command_failed')
     return result.stdout
@@ -65,14 +63,13 @@ def main():
         parent = query('SELECT digest FROM audit ORDER BY sequence DESC LIMIT 1')
         event = {'kind': 'isolated_restore_interlock', 'actor': 'recovery', 'task_id': None,
                  'time': datetime.now(timezone.utc).isoformat(), 'revision': os.environ['F1_SOURCE_REVISION']}
-        event_literal = sql.Literal(canonical(event)).as_string()
-        hash_literal = sql.Literal(digest({'previous': parent, 'event': event})).as_string()
-        parent_literal = sql.Literal(parent).as_string()
-        query("BEGIN; UPDATE control SET halted=true,recovery=true,epoch=epoch+1; "
-              "UPDATE approvals SET revoked=true; "
-              "UPDATE tasks SET state='RECONCILING' WHERE state NOT IN "
-              "('SUCCEEDED','FAILED','CANCELLED','SECURITY_BLOCKED'); "
-              f"INSERT INTO audit(event,previous,digest) VALUES ({event_literal}::jsonb,{parent_literal},{hash_literal}); COMMIT;")
+        interlock = sql.SQL("BEGIN; UPDATE control SET halted=true,recovery=true,epoch=epoch+1; "
+                            "UPDATE approvals SET revoked=true; "
+                            "UPDATE tasks SET state='RECONCILING' WHERE state NOT IN "
+                            "('SUCCEEDED','FAILED','CANCELLED','SECURITY_BLOCKED'); "
+                            "INSERT INTO audit(event,previous,digest) VALUES ({}::jsonb,{},{}); COMMIT;")
+        query(interlock.format(sql.Literal(canonical(event)), sql.Literal(parent),
+                               sql.Literal(digest({'previous': parent, 'event': event}))).as_string())
         status = json.loads(query("SELECT json_build_object('halted',halted,'recovery',recovery) FROM control WHERE id=1"))
         if not status['halted'] or not status['recovery']:
             raise RuntimeError('isolated_restore_not_interlocked')

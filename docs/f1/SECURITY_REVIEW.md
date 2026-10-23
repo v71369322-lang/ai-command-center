@@ -19,6 +19,8 @@ reviewer. Независимый verifier результатов исполне�
 | Forecast не учитывался в отображаемом threshold | UI мог показывать 0 при budget restriction | Threshold по max(actual+reserved, forecast); regression test |
 | Audit denial блокировал async event loop | Риск задержки управляющих запросов | Offload в bounded thread pool; bounded HTTP rate state |
 | Worker получал owner/operator bearer secrets | Ненужные credentials у launcher | Worker не монтирует identities; API/agent boundaries сохранены |
+| Recovery CLI мог наследовать удалённый Docker context | Риск случайного обращения к другому daemon | Единый local_docker и shell wrapper: Unix socket, selectors удаляются, proxy/CA/registry сохраняются; regression без сетевого обращения |
+| В dev-lock использовался pytest 8.4.2 | Аудит выявил PYSEC-2026-1845 (дублированный advisory для одной уязвимости) | Обновлён pytest 9.1.1; аудит теперь охватывает runtime и dev dependency closure |
 
 ## Решения в пределах разрешения F1
 
@@ -33,6 +35,22 @@ reviewer. Независимый verifier результатов исполне�
 - Дополнительный restore drill использует другой контейнер PostgreSQL, tmpfs,
   network=none, без портов. Local trust включён только в disposable drill;
   primary PostgreSQL settings не меняются. Это не offsite disaster recovery.
+
+## Статический анализ: явная triage, без подавления результатов
+
+Bandit сохраняет полный JSON. MEDIUM/HIGH, ошибки scanner и новый неразобранный
+LOW rule блокируют verify_cloud.sh. Для текущих LOW rule выполнен review:
+
+- B404/B603/B607: argv-based subprocess без shell=True; команды локального Docker,
+  Git и security tools. Не исполняются команды/пути из недоверенных сообщений.
+  Endpoint фиксирован Unix socket; Docker PATH внутри worker — readonly image.
+- B110: отказ журналирования или недоступная PG в cleanup не создают разрешение
+  и не объявляют success; исполнение останавливается, evidence удерживается.
+- B105: boolean `admin_db_secret_mounted: False` — факт проверки mounts, не пароль.
+
+SQL interlock строится через psycopg.sql.SQL/Literal, не через конкатенацию
+неэкранированных данных. Полный набор LOW наблюдений не удаляется из отчёта.
+Это triage текущего кода, а не независимое security certification.
 
 ## Не закрывать без внешнего evidence
 

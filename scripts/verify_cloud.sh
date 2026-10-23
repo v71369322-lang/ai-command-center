@@ -12,14 +12,14 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 dkr() {
-    env -u DOCKER_HOST -u DOCKER_CONTEXT -u DOCKER_TLS -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
-        docker --host=unix:///var/run/docker.sock "$@"
+    scripts/docker_local.sh "$@"
 }
 cleanup() { dkr compose --profile worker stop > .runtime/stop.log 2>&1 || true; }
 trap cleanup EXIT
 .venv/bin/ruff check src tests scripts
 .venv/bin/python scripts/export_contract.py --check
 .venv/bin/python scripts/check_secrets.py
+.venv/bin/python scripts/security_checks.py
 git diff --check
 npm run --prefix web build
 dkr compose stop api worker > .runtime/pre-test-stop.log 2>&1 || true

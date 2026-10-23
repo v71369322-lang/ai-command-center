@@ -555,3 +555,19 @@ def test_T06_boolean_fence_cannot_forge_integer_fence(store):
     finally:
         store.settings = original
         docker('image', 'rm', image)
+
+
+def test_T08_docker_selectors_cannot_redirect_recovery(monkeypatch):
+    import subprocess
+    from command_center import local_docker
+    captured = {}
+    for name in local_docker.SELECTORS:
+        monkeypatch.setenv(name, 'untrusted-fixture')
+    def capture(command, **kwargs):
+        captured['command'] = command
+        captured['selectors_absent'] = all(name not in kwargs['env'] for name in local_docker.SELECTORS)
+        return subprocess.CompletedProcess(command, 0, stdout=b'', stderr=b'')
+    monkeypatch.setattr(local_docker.subprocess, 'run', capture)
+    local_docker.run('info')
+    assert captured['selectors_absent']
+    assert captured['command'] == ['docker', '--host=unix:///var/run/docker.sock', 'info']

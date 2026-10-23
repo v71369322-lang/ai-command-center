@@ -7,11 +7,11 @@ import os
 from pathlib import Path
 import re
 import secrets
-import subprocess
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .config import Settings
+from .local_docker import run as docker
 from .models import Approval, Control, Task
 from .store import Store, TERMINAL
 
@@ -45,9 +45,9 @@ def enter_recovery(store):
 
 
 def dump_database(container):
-    command = ["docker", "--host=unix:///var/run/docker.sock", "exec", container,
+    command = ["exec", container,
                "pg_dump", "--format=custom", "--no-owner", "--username=f1_admin", "--dbname=f1"]
-    result = subprocess.run(command, capture_output=True, timeout=60)
+    result = docker(*command, timeout=60)
     if result.returncode:
         raise RuntimeError("pg_dump_failed")
     if len(result.stdout) > 64 * 1024 * 1024:
@@ -58,13 +58,12 @@ def dump_database(container):
 def restore_database(container, target, dump, settings):
     if not re.fullmatch(r"f1_restore_[a-z0-9_]{1,40}", target):
         raise ValueError("Only a NEW f1_restore_* database is allowed; never overwrite f1")
-    prefix = ["docker", "--host=unix:///var/run/docker.sock", "exec", "-i", container]
-    created = subprocess.run(prefix + ["createdb", "-U", "f1_admin", target], capture_output=True, timeout=20)
+    prefix = ["exec", "-i", container]
+    created = docker(*prefix, "createdb", "-U", "f1_admin", target, timeout=20)
     if created.returncode:
         raise RuntimeError("restore_target_must_be_new")
-    restored = subprocess.run(prefix + ["pg_restore", "-U", "f1_admin", "-d", target,
-                                        "--exit-on-error", "--no-owner"], input=dump,
-                              capture_output=True, timeout=60)
+    restored = docker(*prefix, "pg_restore", "-U", "f1_admin", "-d", target,
+                      "--exit-on-error", "--no-owner", input=dump, timeout=60)
     if restored.returncode:
         raise RuntimeError("pg_restore_failed_target_quarantined")
     from dataclasses import replace

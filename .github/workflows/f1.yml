@@ -39,4 +39,4 @@ jobs:
         run: |
           export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
           export F1_DOCKER_GID="$(stat -c %g /var/run/docker.sock)"
-          docker --host=unix:///var/run/docker.sock compose --profile worker stop
+          scripts/docker_local.sh compose --profile worker stop

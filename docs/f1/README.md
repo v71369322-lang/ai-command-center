@@ -49,6 +49,8 @@ CANCEL_REQUESTED → CANCELLED; FAILED; RECONCILING. Проверка резул
 ## Быстрый запуск в разрешённой облачной среде
 
 Нужны Python 3.12, uv, Node 22/npm и Docker/Compose с доступным **локальным** daemon.
+Здесь «локальный» означает daemon разрешённой облачной среды Codex, не компьютер
+владельца. Компьютер, PowerShell и локальные файлы владельца не нужны.
 Команды запускают только собственный проект acc-f1. Не выполняйте команды тестов
 на базе с реальными данными: fixture намеренно очищает таблицы F1 и останавливает
 только контейнеры `acc-f1-db-1`/`acc-f1-redis-1`.
@@ -60,6 +62,7 @@ npm run --prefix web build
 .venv/bin/playwright install chromium
 python scripts/bootstrap_secrets.py
 export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
+export F1_DOCKER_GID="$(stat -c %g /var/run/docker.sock)"
 docker --host=unix:///var/run/docker.sock compose up -d db redis
 docker --host=unix:///var/run/docker.sock build --build-arg F1_SOURCE_REVISION -f Dockerfile.executor -t acc-f1-executor:local .
 scripts/cloud_test.sh
@@ -71,13 +74,25 @@ credentials; API не получает admin secret. Bootstrap schema выпол
 тестовым скриптом; API не создаёт таблицы. Это начальная schema 001, не framework
 безопасных последующих миграций.
 
-Для панели после build запустить Compose API и отдельный доверенный worker:
+Рекомендуемая полная проверка на чистом коммите — одна команда:
+
+```sh
+scripts/verify_cloud.sh
+```
+
+В managed cloud передать `F1_BUILD_CA_FILE=/etc/ssl/certs/ca-certificates.crt`
+и, при использовании отдельного browser cache, PLAYWRIGHT_BROWSERS_PATH.
+Проверяются locked dependencies, Ruff/contracts, security audits, TS/Vite,
+все pytest, отдельный restore container, контейнерные API/worker, restart и mounts.
+Cleanup останавливает только acc-f1, не удаляя volume БД.
+
+Для панели вне тестового прогона использовать два контейнерных build target:
 
 ```sh
 export F1_RUNTIME_UID="$(id -u)" F1_RUNTIME_GID="$(id -g)"
-docker --host=unix:///var/run/docker.sock compose build api
-docker --host=unix:///var/run/docker.sock compose up -d api
-scripts/run_worker.sh
+export F1_DOCKER_GID="$(stat -c %g /var/run/docker.sock)"
+scripts/docker_local.sh compose --profile worker build api worker
+scripts/docker_local.sh compose --profile worker up -d api worker
 ```
 
 Секреты bind-mounted Compose должны быть читаемы только выбранным runtime UID;
@@ -95,6 +110,10 @@ scripts/run_worker.sh
 Панель не публиковать в Интернет ради preview. Credential вводится защищённым
 способом в локальный browser; он остаётся в памяти страницы, не localStorage.
 Это синтетические identities, не реальный owner binding/MFA.
+
+Worker получает только db/redis secrets и socket локального Docker; identities
+в него не монтируются. Это доверенный launcher, не AI executor. Его полномочия
+daemon не объявляются безопасными для VPS без отдельного review.
 
 ## Проверки и завершение
 

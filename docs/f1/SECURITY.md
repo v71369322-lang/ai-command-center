@@ -41,9 +41,10 @@ H-I06/08/14/15/16/17/20. Реальные проекты не подключен
 3. Внешняя защищённая custody backup/checkpoints, retention/immutability,
    key recovery и независимый watchdog ещё не подключены. Локальная копия
    **не является offsite**. Новые услуги/права не приобретаются автоматически.
-4. Систематические adversarial tests, длительные resource испытания (короткие CPU/PID тесты уже выполнены),
-   rate-limit/circuit-breaker hardening, полное independent security review и независимое
-   review всего изменения не завершены. Это blockers приёмки, а не PASS.
+4. Конечный cloud fault/adversarial набор, HTTP rate bound, dependency audit,
+   критическое review и короткие CPU/PID тесты выполняются verify_cloud.sh.
+   Длительные resource испытания, полноценный circuit breaker и независимое
+   review всего изменения не завершены. Это не PASS вне проверенного профиля.
 5. Recovery interlock нельзя снять через обычный API. Процедура безопасного
    resumption после полного incident/restore требует дополнения и review;
    нельзя вручную снять halted/recovery ради прохождения теста.

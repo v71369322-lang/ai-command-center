@@ -11,17 +11,10 @@ import time
 import redis
 
 from .config import Settings
+from .local_docker import environment, run as docker
 from .models import Control
 from .store import Denied, Store
 from .verifier import verify
-
-
-def docker(*args, **kwargs):
-    env = dict(os.environ)
-    for name in ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"):
-        env.pop(name, None)
-    return subprocess.run(["docker", "--host=unix:///var/run/docker.sock", *args], env=env,
-                          capture_output=True, timeout=10, **kwargs)
 
 
 class Runner:
@@ -101,11 +94,8 @@ class Runner:
         try:
             with selectors.DefaultSelector() as selector:
                 args = self.command(name, image_id)
-                env = dict(os.environ)
-                for k in ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"):
-                    env.pop(k, None)
                 process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE, env=env)
+                                           stderr=subprocess.PIPE, env=environment())
                 process.stdin.write(json.dumps(job, ensure_ascii=False, separators=(",", ":")).encode())
                 process.stdin.close()
                 selector.register(process.stdout, selectors.EVENT_READ, "output")
