@@ -52,8 +52,16 @@ base `docs/stage-0c-5-master-plan-audit`. Ветка `review/f1-security-autonom
 на clean tree. Он включает Ruff/contracts/secret scan/Python+npm audit/Bandit,
 TS/Vite, locked builds, pytest, реальный API-worker smoke, restart/new work,
 изолированное восстановление и runtime inspect. Результат финального прогона
-добавляется в этот отчёт после фактического выполнения; прежний PASS PR #8
-не используется как PASS новых изменений.
+зафиксирован: **64 passed**, 0 failures/errors/skips, 80.53 s; одна нескрытая
+Starlette/httpx deprecation warning. Clean-tree revision:
+`6855c6c1d982785fb11d161f8737690a8f743cdb`.
+Контейнерный API/worker/approval/verifier/web smoke, restart/persistence/cancel/
+new work, runtime boundaries и encrypted isolated restore: **PASS**.
+Restore drill 9.72 s не доказывает offsite или RPO/RTO. Ruff, contracts, TS/Vite,
+container builds и secret scan: PASS. pip-audit: 62 runtime/dev dependencies,
+0 advisories; npm 0; Bandit 0 MEDIUM/HIGH, 16 reviewed LOW.
+Прежний PASS PR #8 не использован как PASS новых изменений. Документационный
+коммит после указанного source SHA не выдаётся за новый локальный code run.
 
 Новая норма владельца: [R-F1-AUTO-01](../requirements/AUTONOMOUS_EXECUTION.md).
 Диагностика подтверждений: [CLOUD_AUTONOMY.md](CLOUD_AUTONOMY.md).
