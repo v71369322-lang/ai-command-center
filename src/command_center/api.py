@@ -1,4 +1,5 @@
 import hmac
+import json
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,10 +7,13 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 
 from .config import Settings
+from .limits import RateLimit
 from .store import Denied, Store
 from .worker import broker
 
@@ -24,6 +28,8 @@ class Command(BaseModel):
     @field_validator("values")
     @classmethod
     def bounded_values(cls, values):
+        if len(json.dumps(values, ensure_ascii=False, separators=(",", ":")).encode()) > 7000:
+            raise ValueError("synthetic input byte limit")
         for key, value in values.items():
             if not re.fullmatch(r"[a-zA-Z0-9_]{1,32}", key) or len(value) > 128 or "\n" in value or "\r" in value:
                 raise ValueError("bounded single-line synthetic values required")
@@ -42,6 +48,10 @@ class ApprovalRequest(BaseModel):
     seconds: int = Field(default=120, ge=1, le=300, strict=True)
 
 
+class ErrorResponse(BaseModel):
+    detail: str
+
+
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
@@ -54,12 +64,22 @@ def create_app(settings=None):
         queue.close()
 
     app = FastAPI(title="AI Command Center — synthetic F1", version="0.1.0", lifespan=lifespan,
-                  docs_url=None, redoc_url=None)
+                  docs_url=None, redoc_url=None,
+                  responses={422: {"model": ErrorResponse, "description": "Invalid request; input is not echoed"},
+                             429: {"model": ErrorResponse, "description": "Bounded request rate exceeded"}})
     app.state.store = store
+    limiter = RateLimit()
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request, error):
+        from fastapi.responses import JSONResponse
+        # Never echo an invalid body's input values (which may contain secrets).
+        return JSONResponse(status_code=422, content={"detail": "invalid_request"})
 
     def record_denial(request, reason):
         supplied = request.headers.get("authorization", "").removeprefix("Bearer ")
-        actor = next((r for r, token in settings.identities.items() if hmac.compare_digest(supplied, token)), "unauthenticated")
+        actor = next((r for r, token in settings.identities.items()
+                      if hmac.compare_digest(supplied.encode(), token.encode())), "unauthenticated")
         try:
             with store.transaction() as session:
                 store.audit(session, "request_denied", actor, reason=reason)
@@ -70,13 +90,13 @@ def create_app(settings=None):
     async def http_error(request, error):
         from fastapi.responses import JSONResponse
         if error.status_code in {401, 403, 404}:
-            record_denial(request, "http_" + str(error.status_code))
+            await run_in_threadpool(record_denial, request, "http_" + str(error.status_code))
         return JSONResponse(status_code=error.status_code, content={"detail": error.detail})
 
     @app.exception_handler(Denied)
     async def denied_handler(request, error):
         from fastapi.responses import JSONResponse
-        record_denial(request, str(error))
+        await run_in_threadpool(record_denial, request, str(error))
         return JSONResponse(status_code=409, content={"detail": str(error)})
 
     @app.exception_handler(SQLAlchemyError)
@@ -86,6 +106,10 @@ def create_app(settings=None):
 
     @app.middleware("http")
     async def security_headers(request, call_next):
+        if not limiter.admit(request.client.host if request.client else "unknown"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=429, content={"detail": "rate_limited"},
+                                headers={"Retry-After": "60", "Cache-Control": "no-store"})
         size = request.headers.get("content-length")
         if size and (not size.isdigit() or int(size) > 8192):
             return Response(status_code=413)
@@ -108,8 +132,10 @@ def create_app(settings=None):
         if not authorization.startswith("Bearer "):
             raise HTTPException(401, "authentication_required")
         token = authorization[7:]
+        if len(token) > 256:
+            raise HTTPException(401, "invalid_identity")
         for role, expected in settings.identities.items():
-            if hmac.compare_digest(token, expected):
+            if hmac.compare_digest(token.encode(), expected.encode()):
                 return role
         raise HTTPException(401, "invalid_identity")
 

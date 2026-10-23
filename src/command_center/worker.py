@@ -106,7 +106,7 @@ class Runner:
                     env.pop(k, None)
                 process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE, env=env)
-                process.stdin.write(json.dumps(job).encode())
+                process.stdin.write(json.dumps(job, ensure_ascii=False, separators=(",", ":")).encode())
                 process.stdin.close()
                 selector.register(process.stdout, selectors.EVENT_READ, "output")
                 selector.register(process.stderr, selectors.EVENT_READ, "errors")
@@ -137,8 +137,14 @@ class Runner:
                 raw = buffers["output"].decode()
                 if process.wait(timeout=5) != 0:
                     raise Denied("executor_failed")
+                if not isolation_checked:
+                    metadata = docker("inspect", name)
+                    if metadata.returncode or not self.valid_isolation(json.loads(metadata.stdout)[0]):
+                        self.store.security_trip(task["id"], task["fence"])
+                        raise Denied("isolation_unconfirmed")
                 manifest = json.loads(raw)
-                if manifest["operation_id"] != task["id"] or manifest["fence"] != task["fence"]:
+                if (manifest["operation_id"] != task["id"] or type(manifest["fence"]) is not int
+                        or manifest["fence"] != task["fence"]):
                     raise Denied("forged_result")
                 artifact, checksum = verify(task["payload"], raw)
                 self.store.finish(task["id"], task["fence"], artifact, checksum)
@@ -188,7 +194,7 @@ def broker(settings):
 
 
 def main():
-    settings = Settings.load()
+    settings = Settings.load(identities_required=False)
     store, queue = Store(settings), broker(settings)
     runner = Runner(store)
     failures = 0

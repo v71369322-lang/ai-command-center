@@ -35,6 +35,7 @@ services:
   api:
     build:
       context: .
+      target: app
       args:
         F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
     image: acc-f1-app:local
@@ -51,6 +52,33 @@ services:
     secrets: [db_password, redis_password, identities]
     ports: ['127.0.0.1:8000:8000']
     networks: [control, access]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+  worker:
+    profiles: [worker]
+    build:
+      context: .
+      target: worker
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-worker:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    group_add: ["${F1_DOCKER_GID:?Local cloud socket group required}"]
+    environment:
+      <<: *app_env
+      DOCKER_CONFIG: /tmp/docker-client
+      F1_IDENTITIES_FILE: ''
+    secrets: [db_password, redis_password]
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    networks: [control]
     read_only: true
     tmpfs: ['/tmp:size=16m,mode=1777']
     cap_drop: [ALL]

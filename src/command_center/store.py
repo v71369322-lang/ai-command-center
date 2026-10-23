@@ -121,12 +121,14 @@ class Store:
             if old:
                 s.delete(old)
                 s.flush()
+            expires_at = self.now(s) + timedelta(seconds=seconds)
             s.add(Approval(task_id=task.id, task_version=task.version, payload_hash=task.payload_hash,
-                           epoch=control.epoch, expires_at=self.now(s) + timedelta(seconds=seconds),
+                           epoch=control.epoch, expires_at=expires_at,
                            used=False, revoked=False))
             task.state = "READY"
             s.add(Outbox(id=str(uuid4()), task_id=task.id))
-            self.audit(s, "approved", actor, task.id, version=version)
+            self.audit(s, "approved", actor, task.id, version=version,
+                       payload_hash=task.payload_hash, epoch=control.epoch, expires_at=expires_at.isoformat())
             return self.view(task)
 
     def cancel(self, actor, task_id, revoke=False):
@@ -252,8 +254,12 @@ class Store:
             expired = s.execute(select(Task).where(Task.state.in_(["RUNNING", "CANCEL_REQUESTED"]),
                                                    Task.lease_until <= self.now(s))).scalars().all()
             for task in expired:
-                task.state, task.reason = "RECONCILING", "expired_lease"
-                self.audit(s, "reconciliation_required", "worker", task.id, fence=task.fence)
+                # Cancellation is an irreversible intent, not a retryable run failure.
+                if task.state != "CANCEL_REQUESTED":
+                    task.state = "RECONCILING"
+                if task.reason != "expired_lease":
+                    self.audit(s, "reconciliation_required", "worker", task.id, fence=task.fence)
+                task.reason = "expired_lease"
             # Reconstruct lost transport at a bounded interval; never grow Outbox per poll.
             for task in s.execute(select(Task).where(Task.state == "READY")).scalars():
                 if task.dependency and self.task(s, task.dependency).state != "SUCCEEDED":
@@ -292,6 +298,15 @@ class Store:
             last = s.execute(select(Audit).order_by(Audit.sequence.desc()).limit(1)).scalar_one()
             if c.recovery or not c.halted or c.epoch != epoch or last.digest != checkpoint_digest:
                 raise Denied("stale_or_recovery_resume")
+            active = s.execute(select(Task).where(Task.state.in_([
+                "RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED", "SECURITY_BLOCKED"]))).first()
+            if active:
+                raise Denied("unreconciled_resume")
+            for task in s.execute(select(Task).where(Task.state.not_in(TERMINAL))).scalars():
+                task.state = "CANCELLED"
+                task.version += 1
+            for approval in s.execute(select(Approval)).scalars():
+                approval.revoked = True
             c.halted = False
             c.epoch += 1
             self.audit(s, "normal_stop_resumed", actor, epoch=c.epoch)
@@ -332,7 +347,8 @@ class Store:
 
     def check_audit(self, s, anchor=None):
         previous, seen = ZERO, False
-        for row in s.execute(select(Audit).order_by(Audit.sequence)).scalars():
+        for row in s.execute(select(Audit).order_by(Audit.sequence)
+                             .execution_options(yield_per=256)).scalars():
             if row.previous != previous or row.digest != digest({"previous": previous, "event": row.event}):
                 raise Denied("audit_integrity_failure")
             previous = row.digest
@@ -348,7 +364,7 @@ class Store:
         with self.transaction() as s:
             c = s.get(Control, 1)
             self.check_audit(s)
-            used = c.actual + c.reserved
+            used = max(c.actual + c.reserved, c.forecast)
             return {"halted": c.halted, "recovery": c.recovery, "epoch": c.epoch,
                     "checkpoint_digest": s.execute(select(Audit.digest).order_by(Audit.sequence.desc()).limit(1)).scalar_one(),
                     "budget": {"synthetic": True, "actual": c.actual, "reserved": c.reserved,

@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
+export F1_DB_USER=f1_app
+export F1_DOCKER_GID="$(stat -c %g /var/run/docker.sock)"
 export F1_DB_HOST="$(docker --host=unix:///var/run/docker.sock inspect acc-f1-db-1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')"
 export F1_DB_PORT=5432
 f1_redis_address="$(docker --host=unix:///var/run/docker.sock inspect acc-f1-redis-1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')"

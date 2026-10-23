@@ -1,6 +1,6 @@
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy import URL
@@ -18,10 +18,10 @@ def secret(name: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    database_url: str | URL
+    database_url: str | URL = field(repr=False)
     redis_url: str
-    redis_password: str
-    identities: dict[str, str]
+    redis_password: str = field(repr=False)
+    identities: dict[str, str] = field(repr=False)
     source_revision: str
     executor_image: str = "acc-f1-executor:local"
     lease_seconds: int = 15
@@ -29,11 +29,11 @@ class Settings:
     max_attempts: int = 2
 
     @classmethod
-    def load(cls):
-        identities = json.loads(secret("F1_IDENTITIES_FILE"))
-        if set(identities) != {"owner", "operator", "agent"}:
+    def load(cls, *, identities_required=True):
+        identities = json.loads(secret("F1_IDENTITIES_FILE")) if identities_required else {}
+        if identities_required and set(identities) != {"owner", "operator", "agent"}:
             raise RuntimeError("Exactly three synthetic role bindings required")
-        if any(len(v) < 32 for v in identities.values()) or len(set(identities.values())) != 3:
+        if identities_required and (any(len(v) < 32 for v in identities.values()) or len(set(identities.values())) != 3):
             raise RuntimeError("Distinct high-entropy role credentials required")
         revision = os.environ.get("F1_SOURCE_REVISION", "")
         if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):

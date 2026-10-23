@@ -403,3 +403,76 @@ def test_T04_effect_before_lost_commit_preserves_container_evidence(store, monke
             s.get(Task, task['id']).lease_until = store.now(s) - timedelta(seconds=1)
         store.recover()
         assert runner.reconcile(store.get(task['id']))
+
+
+def test_T09_expired_cancel_stays_cancelled_after_reconcile(store):
+    task = store.claim(create(store)['id'])
+    store.cancel('owner', task['id'])
+    with store.transaction() as s:
+        s.get(Task, task['id']).lease_until = store.now(s) - timedelta(seconds=1)
+    store.recover()
+    assert store.get(task['id'])['state'] == 'CANCEL_REQUESTED'
+    assert Runner(store).reconcile(store.get(task['id']))
+    assert store.get(task['id'])['state'] == 'CANCELLED'
+    with pytest.raises(Denied):
+        store.retry('owner', task['id'])
+
+
+def test_T07_non_ascii_identity_is_denied(client):
+    assert client.get('/api/state', headers={b'authorization': b'Bearer \xff'}).status_code == 401
+
+
+def test_T13_invalid_body_does_not_echo_input(client, headers):
+    response = client.post('/api/simulator/commands', json={'unexpected': 'sensitive-fixture'},
+                           headers={**headers['owner'], 'Idempotency-Key': 'invalid-body'})
+    assert response.status_code == 422
+    assert 'sensitive-fixture' not in response.text
+
+
+def test_T13_rate_bound(client):
+    for _ in range(60):
+        assert client.get('/openapi.json').status_code == 200
+    assert client.get('/openapi.json').status_code == 429
+
+
+def test_T13_rate_state_is_bounded():
+    from command_center.limits import RateLimit
+    limiter = RateLimit(capacity=1, period=10, clients=2)
+    assert limiter.admit('a', now=0)
+    assert not limiter.admit('a', now=1)
+    assert limiter.admit('a', now=11)
+    limiter.admit('b', now=11)
+    limiter.admit('c', now=11)
+    assert len(limiter.entries) == 2
+
+
+def test_T09_resume_requires_completed_reconciliation(store):
+    task = store.claim(create(store)['id'])
+    store.abort(task['id'], task['fence'], 'stop_unknown', False)
+    state = store.snapshot()
+    with pytest.raises(Denied, match='unreconciled_resume'):
+        store.resume('owner', state['epoch'], state['checkpoint_digest'])
+
+
+def test_T10_forecast_is_visible_and_restricts_spending(store):
+    with store.transaction() as s:
+        s.get(Control, 1).forecast = 900_000
+    assert store.snapshot()['budget']['threshold'] == 90
+    task = create(store, cost=1)
+    assert store.claim(task['id']) is None
+    assert store.get(task['id'])['reason'] == 'budget_limit'
+
+
+def test_T02_unicode_input_survives_bounded_executor_transport(client, headers, store):
+    body = {'kind': 'render', 'values': {str(i): '\U0001f600' * 64 for i in range(16)}}
+    response = client.post('/api/simulator/commands', json=body,
+                           headers={**headers['owner'], 'Idempotency-Key': 'unicode'})
+    assert response.status_code == 201
+    task = store.claim(response.json()['id'])
+    Runner(store).execute(task)
+    assert store.get(task['id'])['state'] == 'SUCCEEDED'
+
+
+def test_T07_settings_repr_does_not_expose_credentials(settings):
+    values = [settings.redis_password, *settings.identities.values(), settings.database_url.password]
+    assert not any(value in repr(settings) for value in values)
