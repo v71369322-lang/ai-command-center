@@ -571,3 +571,21 @@ def test_T08_docker_selectors_cannot_redirect_recovery(monkeypatch):
     local_docker.run('info')
     assert captured['selectors_absent']
     assert captured['command'] == ['docker', '--host=unix:///var/run/docker.sock', 'info']
+
+
+def test_T04_circuit_stops_retries_and_allows_one_probe():
+    from command_center.limits import CircuitBreaker
+    circuit = CircuitBreaker(threshold=2, cooldown=10)
+    assert circuit.admit(now=0)
+    circuit.failure(now=0)
+    assert circuit.admit(now=1)
+    circuit.failure(now=1)
+    assert not circuit.admit(now=10)
+    assert circuit.admit(now=11)
+    assert not circuit.admit(now=11)
+    circuit.failure(now=11)
+    assert not circuit.admit(now=20)
+    assert circuit.admit(now=21)
+    circuit.success()
+    assert circuit.admit(now=21)
+    assert circuit.failures == 0

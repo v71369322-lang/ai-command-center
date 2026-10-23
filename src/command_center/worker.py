@@ -12,6 +12,7 @@ import redis
 
 from .config import Settings
 from .local_docker import environment, run as docker
+from .limits import CircuitBreaker
 from .models import Control
 from .store import Denied, Store
 from .verifier import verify
@@ -188,7 +189,11 @@ def main():
     store, queue = Store(settings), broker(settings)
     runner = Runner(store)
     failures = 0
+    circuit = CircuitBreaker()
     while True:
+        if not circuit.admit():
+            time.sleep(1)
+            continue
         try:
             store.recover()
             for task in store.reconciliation_tasks():
@@ -202,9 +207,11 @@ def main():
                 if task:
                     runner.execute(task)
             failures = 0
+            circuit.success()
         except Exception:
             # Failure is reflected by PG readiness/expired lease, not a fabricated success.
             failures = min(failures + 1, 5)
+            circuit.failure()
             time.sleep(min(2 ** failures, 30))
         time.sleep(.2)
 

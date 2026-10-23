@@ -136,7 +136,9 @@ Outbox redelivery восстанавливается не чаще 5 s/task бе
 Admission: максимум 100 незавершённых задач, synthetic DB size cap 64 MiB; launcher
 не начинает работу при свободном workspace disk <256 MiB. Это DERIVED cloud caps,
 не замена host quota/полноценного resource monitor. Worker dependency backoff bounded
-2–30 s; полноценный circuit breaker остаётся OPEN.
+2–30 s; process-local circuit открывается после пяти последовательных ошибок
+на 30 s, затем разрешает один half-open probe с обязательной PG revalidation.
+Этот профиль не является distributed circuit breaker или provider availability SLA.
 
 Redis работает непривилегированно, `dir /tmp`, `save ""`, `appendonly no`:
 его файловая persistence намеренно отключена. Пересоздание Redis восстанавливает

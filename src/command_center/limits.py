@@ -21,3 +21,31 @@ class RateLimit:
             if len(self.entries) > self.clients:
                 self.entries.popitem(last=False)
             return allowed
+
+
+class CircuitBreaker:
+    """Single-worker dependency circuit with one bounded half-open probe."""
+    def __init__(self, threshold=5, cooldown=30):
+        self.threshold, self.cooldown = threshold, cooldown
+        self.failures = 0
+        self.state = 'CLOSED'
+        self.opens_until = 0
+
+    def admit(self, now=None):
+        now = time.monotonic() if now is None else now
+        if self.state == 'HALF_OPEN':
+            return False
+        if self.state == 'OPEN':
+            if now < self.opens_until:
+                return False
+            self.state = 'HALF_OPEN'
+        return True
+
+    def success(self):
+        self.failures, self.state = 0, 'CLOSED'
+
+    def failure(self, now=None):
+        now = time.monotonic() if now is None else now
+        self.failures = min(self.failures + 1, self.threshold)
+        if self.state == 'HALF_OPEN' or self.failures == self.threshold:
+            self.state, self.opens_until = 'OPEN', now + self.cooldown

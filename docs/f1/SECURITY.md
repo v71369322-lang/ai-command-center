@@ -43,7 +43,7 @@ H-I06/08/14/15/16/17/20. Реальные проекты не подключен
    **не является offsite**. Новые услуги/права не приобретаются автоматически.
 4. Конечный cloud fault/adversarial набор, HTTP rate bound, dependency audit,
    критическое review и короткие CPU/PID тесты выполняются verify_cloud.sh.
-   Длительные resource испытания, полноценный circuit breaker и независимое
+   Process-local circuit breaker проверен отдельно. Длительные resource испытания и независимое
    review всего изменения не завершены. Это не PASS вне проверенного профиля.
 5. Recovery interlock нельзя снять через обычный API. Процедура безопасного
    resumption после полного incident/restore требует дополнения и review;
