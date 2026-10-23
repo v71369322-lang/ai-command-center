@@ -38,6 +38,7 @@ dkr compose --profile worker up -d --no-build api worker
 .venv/bin/python scripts/container_smoke.py
 dkr compose --profile worker restart api worker
 .venv/bin/python scripts/container_smoke.py --check-persisted
+.venv/bin/python scripts/runtime_boundaries.py
 dkr image inspect acc-f1-app:local acc-f1-worker:local acc-f1-executor:local \
     --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' > .runtime/images.txt
 echo "Final cloud verification passed for $F1_SOURCE_REVISION"
