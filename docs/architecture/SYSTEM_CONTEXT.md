@@ -62,3 +62,16 @@ Capital Lab, CRM «Ваниль и Сахар» и CRM автосервиса н
 - H-C06/H-D08/H-D13: durable checkpoints/history/artifacts/status; перед retry/resume сверка actual agent/Git/external state; handoff передаёт task/versions/dependencies/permissions/tests/evidence/questions/next safe actions, не новые права.
 
 Это не новые развёрнутые сервисы или изменение модульного монолита. Primary project, incident policy, схемы graph/knowledge/handoff и adapter mechanisms — OPEN. Один тестовый исполнитель MVP и внешняя самостоятельность Capital Lab/CRM сохраняются; автосервис PAUSED. Доступа к купленному VPS, тестов консоли, deployments и paid provider calls в Stage 0C-2 нет.
+
+## Дополнение Stage 0C-3: health, policy и failure boundaries
+
+Источник [SRC-0C3](../history/stage-0c-3/SOURCE_PACKAGE.md) — OWNER_APPROVED_SUMMARY; [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md) и распределение по компонентам — DERIVED, не новые deployment decisions.
+
+- H-E01–H-E03/H-E07/H-E10: technical/business health различаются; adaptive polling/dedup/change detection, severity/urgency/confidence/impact и local quiet hours; verified evidence отдельно от forecasts/RCA hypotheses.
+- H-E12/H-E13: mobile-first health различает healthy/degraded/unknown/stale/paused/failed; incident card связан с exact incident/version/evidence/actions/approval/outcome. Семантика transitions/thresholds OPEN.
+- H-E09/H-F03/H-F05: watchdog/emergency alert вне primary failure domain; console emergency path; Telegram/web/monitoring/history/emergency продолжаются без AI. Второй постоянный VPS по умолчанию не требуется.
+- H-F04/H-F06: actual credentials/permissions контролирует независимая deterministic policy, unknown action blocked; внешние сообщения/файлы/sites/tools/repo — data с provenance, не authority для permission bypass.
+- H-F11/H-F12/H-F15: unique operations/durable journals/concurrency/versioning/leases/heartbeats, dependent pause при uncertain effect, reconnection reconciliation jobs/costs/permissions. Provider guarantees ограничивают stop/quarantine; immediate external kill не обещается.
+- H-F02/H-F10/H-F16: applicable localization/legal review, env/data isolation/synthetic default и exact CI/dependency/artifact provenance; никакие реальные customer data и production secrets сейчас не используются.
+
+[Infrastructure status](INFRASTRUCTURE_STATUS.md) сохранён без обновления фактов: VPS уже куплен по сообщению владельца, console impairment reported, readiness неизвестна. H-F14 требует preflight перед future server deployment/production, но **запрещает preflight и VPS access в Stage 0C-3**. Схема выше остаётся логической; isolation/policy/watchdog placement и backup topology не выбраны.

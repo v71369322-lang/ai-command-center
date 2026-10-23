@@ -50,3 +50,13 @@
 [U2-01–U2-13](history/stage-0c-2/CONFLICTS_AND_UNCERTAINTIES.md) отделяют утверждённые нормы от OPEN реализации: логический dependency graph/readiness, primary priority/approved incident policy, approval cards, provider capabilities, bounded repair/escalation, checkpoints, scoped worktrees/environments, trusted CI/provenance, controlled external tests и handoff. Не выбраны graph DB, queue library, CI/signature mechanism, AI reviewer/model, численные caps или форматы хранения/протоколов.
 
 D18–D29 сохраняют статус OPEN в части технических механизмов; новые обязанности не закрывают их автоматически. VPS остаётся уже купленным по сообщению владельца; технической проверки нет. Старые U 0C-1 не переписаны; предоставлена тема только 0C-2, дальнейшее задание 0C-3 отсутствует.
+
+## Дополнение Stage 0C-3
+
+[29 записей H-E/H-F](history/stage-0c-3/HISTORICAL_DECISION_REGISTER.md) — OWNER_APPROVED_SUMMARY из [SRC-0C3](history/stage-0c-3/SOURCE_PACKAGE.md), не ASSUMPTION. Relation categories/impact — DERIVED. Новых допущений нет; A01 остаётся непроверенным и не становится подтверждённым из-за synthetic default H-F10.
+
+[U3-01–U3-16](history/stage-0c-3/CONFLICTS_AND_UNCERTAINTIES.md) сохраняют OPEN: metric/incident state criteria, polling/dedup, remediation policy/real-change scope, exact budget accounting, localization/legal basis, offsite/recovery/test evidence, actual credential enforcement, provider fallback/stop guarantees, concurrency/lease mechanisms и parameters, exact provenance. Hard ceiling/70-90-100 controls и source-approved named mechanisms не оставлены вопросами; их concrete implementation/численные caps не выбраны.
+
+Численные RPO ≤15 минут/RTO ≤4 часов в baseline не найдены, только OPEN RPO/RTO. Conditional safeguard текущего source не задаёт новый target; такие previously discussed values при появлении источника — provisional feasibility targets, не tested operational performance. Не изобретены retry limits, TTL, retention или гарантии.
+
+D18–D29 не закрыты автоматически общим принципом. Не выбраны новый microservice или permanent second VPS по умолчанию. VPS purchase остаётся reported completed; console availability/configuration/readiness не проверены. Scope Stage 0C-3 — документация; тема 0C-4 и programming не разрешены.

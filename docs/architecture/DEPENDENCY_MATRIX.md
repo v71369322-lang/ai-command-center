@@ -31,3 +31,19 @@
 | Внешний API | H-D12; R46,R47 | Mocks/sandboxes where possible, отдельное real-call permission, rate limits/idempotency/reconciliation; пауза автосервиса сохраняется |
 
 [Полная сверка](../history/stage-0c-2/RECONCILIATION_MATRIX.md) охватывает все 26 пунктов, [impact](../history/stage-0c-2/IMPACT_REPORT.md) сопоставляет их с G1–G7. Никакой порядок этой таблицы не является разрешением S1–S6, real integrations или кода Stage 0C-2.
+
+## Дополнение Stage 0C-3: safety/recovery gates
+
+Нормы [SRC-0C3](../history/stage-0c-3/SOURCE_PACKAGE.md), ссылки [матрицы](../history/stage-0c-3/RECONCILIATION_MATRIX.md); эта группировка DERIVED, старые G1–G7 сохранены.
+
+| Перед чем | Нормативная зависимость H | Блокирующее условие / evidence |
+| --- | --- | --- |
+| Paid dispatch/fallback | H-E08,H-F01,H-F05 | Confirmed rights/data/budget, actual/reserved/forecast/delayed/unconfirmed accounting и essential protection; новые commitments требуют owner approval, ceiling не разрешение покупки |
+| Dangerous action/restore/resume | H-E04,H-E06,H-F03,H-F04,H-F07,H-F13 | Actual deterministic permission и exact current approval; unknown action blocked, prod restore/dangerous resume после compromise не автоматические |
+| Retry/continue/parallel write | H-E05,H-F08,H-F11,H-F12,H-F15 | Bounded controls, operation IDs/journal, revalidate versions, locks/equivalent concurrency/fencing where appropriate; unresolved dangerous effect блокирует dependents |
+| Completion/health report | H-E01–H-E03,H-E07,H-E10,H-E12,H-E13,H-F09 | Source/freshness/confidence/impact, no business-symptom = infra-outage shortcut, no agent-only completion |
+| Real-data flow | H-F02,H-F06,H-F10 | Applicable localization/legal/log/backup/task/API/transfer review и exact approval; synthetic default, no actual customer data в этом этапе |
+| Любой future server deployment/production use | H-F14,H-F16 | Separately authorized required-provider preflight/region/terms/data/cost и exact source/dependency/artifact evidence; preflight gate не откладывается только на G6 |
+| Operational recovery readiness | H-E06,H-E09,H-E11,H-F03,H-F05,H-F13 | Independent watchdog/alerts/console path, protected offsite logs/backups, tested restore evidence, authorized containment и independent controls during AI outage |
+
+Ни gate, ни слово tested не означают выполненную проверку. Все runtime/preflight/recovery/paid actions запрещены текущим заданием. Detailed mechanisms/численные лимиты — [OPEN U3](../history/stage-0c-3/CONFLICTS_AND_UNCERTAINTIES.md); [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md) сохраняет R34 и scope MVP. Permanent second VPS не default dependency.

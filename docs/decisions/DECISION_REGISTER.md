@@ -52,3 +52,11 @@ D05/R12 теперь читаются вместе с H-A07: policy layer нез
 D01–D30 и прежние H-A/H-B сохранены. Новые 26 индивидуальных OWNER_APPROVED_SUMMARY записей находятся в [историческом реестре 0C-2](../history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md), [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md) и [матрице](../history/stage-0c-2/RECONCILIATION_MATRIX.md). Package D использует supplied IDs H-C, Package E — H-D; они не являются прежним операционным Package C/OPS-C.
 
 D02 уточняется project graph/readiness/impact/primary priority, D05 — approval cards/risk, D09 — layered checks/independent AI review/bounded disagreements, D10 — provider capability differences, D12/D30 — exact staged releases/health/supply chain. D18–D29 не объявляются закрытыми: механизмы и [U2-01–U2-13](../history/stage-0c-2/CONFLICTS_AND_UNCERTAINTIES.md) остаются OPEN. Выбор graph DB, CI/signature format, provider/model, isolation и численных caps не произведён. Новых строк D нет.
+
+## Дополнение Stage 0C-3: supplied monitoring/audit decisions
+
+D01–D30 и их прежние статусы/строки не изменены. [Реестр H-E/H-F](../history/stage-0c-3/HISTORICAL_DECISION_REGISTER.md) содержит 13 monitoring и 16 approved audit-summary решений из [SRC-0C3](../history/stage-0c-3/SOURCE_PACKAGE.md); [матрица](../history/stage-0c-3/RECONCILIATION_MATRIX.md) связывает их с R/D/52 прежними H. Новых D нет.
+
+D13 уточнён H-F01 hard ceiling и действием 70/90/100, D05 — actual permissions/default deny (H-F04), D06 — localization/prompt injection/environment controls (H-F02/H-F06/H-F10), D08 — ambiguous operations/concurrency/leases (H-F11/H-F12/H-F15), D11/D26 — offsite backup/watchdog/console path/compromise response без default permanent second VPS, D30 — exact source/dependency/artifact provenance H-F16.
+
+Source-approved controls не равны выбору конкретных retry/TTL/RPO/RTO/retention значений, lock/secret/CI vendor или новой microservice architecture. D18–D29 не закрываются автоматически; [U3-01–U3-16](../history/stage-0c-3/CONFLICTS_AND_UNCERTAINTIES.md) отделяют нормы от деталей и evidence. Package G не является полным исходным аудитом или доказательством работоспособности.

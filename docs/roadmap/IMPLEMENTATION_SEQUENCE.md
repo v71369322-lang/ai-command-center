@@ -33,3 +33,11 @@ R распределены по [матрице G](../architecture/DEPENDENCY_MA
 Порядок S1–S6 не разрешён, implementation не начинается. [Impact](../history/stage-0c-2/IMPACT_REPORT.md) и дополнение [dependency matrix](../architecture/DEPENDENCY_MATRIX.md) — DERIVED связи будущих prerequisites, не новый утверждённый план. Key milestones/MVP/production требуют owner acceptance H-C12, production exact release и health — H-D09; текущего deployment разрешения нет.
 
 Ветка 0C-2 основана на 0C-1, PR в main наследует не объединённые PR #2/#3. Различие file counts по comparison bases объясняет [coverage report](../history/stage-0c-2/COVERAGE_REPORT.md). После документационного PR — остановка; [handoff 0C-3](../history/stage-0c-2/NEXT_PACKAGE_HANDOFF.md) не разрешает начало следующего этапа.
+
+## Разрешённый документальный Stage 0C-3
+
+Отдельный [SRC-0C3](../history/stage-0c-3/SOURCE_PACKAGE.md) разрешил Monitoring, Security & Recovery от `c8ebedaed996753e10e0c370cffe807b50908298`. Импортируются 29 individual H, сверка, impact, проверки Markdown и PR, **не S1–S6, preflight, VPS access или implementation**. Прежние тексты о ещё не заданном 0C-3 сохранены как historical state.
+
+H-F14 — gate перед любым future server deployment/production, не только перед G6; реальная проверка provider access/legal/region/cost сама требует отдельной авторизации и сейчас запрещена. H-E06/H-F03 planned recovery не tested recovery, production restore owner-approved, H-F16 release exact approved artifact. Эти нормы не являются планом запуска сервисов в этом задании.
+
+Новые scope/dependencies описаны как DERIVED в [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md); [coverage](../history/stage-0c-3/COVERAGE_REPORT.md) объясняет comparison bases. Main и PR #2/#3/#4 не меняются/не объединяются. После documentation-only PR — остановка; [handoff](../history/stage-0c-3/NEXT_PACKAGE_HANDOFF.md) не разрешает 0C-4 или programming.

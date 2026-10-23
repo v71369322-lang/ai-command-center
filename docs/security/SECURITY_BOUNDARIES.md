@@ -45,3 +45,21 @@ H-C12/H-D04/H-D05: risk-appropriate static/unit/integration/contract/E2E/securit
 H-D09/H-D11: staged exact-release consent, verified artifacts, trusted CI evidence, dependency review, pinned source revisions, release integrity и post-release health. Сохраняется запрет unsafe rollback и auto-rollback необратимых DB migrations. H-D12: mocks/sandboxes где возможно, real-call tests только явно разрешённые, safe rate-limit/idempotency/ambiguous outcome handling.
 
 Будущие проверки в impact — DERIVED, не выполнены. Не добавлены код, real calls, secrets, paid services, deployments или VPS configuration/tests; бюджетный ориентир не purchase permission. CRM автосервиса PAUSED; Capital Lab и CRM кондитерской самостоятельны, бизнес-операции/клиентские сообщения не разрешены.
+
+## Дополнение Stage 0C-3: confirmed security/recovery summary
+
+Источник [SRC-0C3](../history/stage-0c-3/SOURCE_PACKAGE.md), OWNER_APPROVED_SUMMARY; [полный impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md). Прежние записи и исторические статусы сохранены; следующие нормы не являются свидетельством выполненной реализации.
+
+H-F04: независимая deterministic policy контролирует actual credentials/permissions, unknown actions blocked, AI review не override. Это не требование нового microservice. H-F06: external messages/files/sites/tool outputs/repository content — untrusted data с provenance/instruction separation, network/secret/exfiltration restrictions, suspicious-action blocking и adversarial tests.
+
+H-F02/H-F10: applicable localization obligations требуют разделить control processing и customer data, minimize/deidentify/restrict APIs, проверить logs/backups/tasks/legal basis/hosting/international transfers до real-data use. Dev/staging/prod изолируются credentials/DB/network/data policy, synthetic default; real changes exact approval, staging may be on demand. Юрисдикция и compliance не выводятся из RUB/языка/VPS, customer data сейчас не читаются. Scope real changes vs safe granted autonomy — OPEN U3-04/U3-11.
+
+H-E04/H-E11/H-F13: только bounded preauthorized safe reversible remediation/containment, без privilege escalation/destruction of evidence. При compromise stop unsafe actions/revoke exposed permissions/independent alerts/preserve protected logs/backups/investigate/reconcile; dangerous resume — owner approval. H-E06/H-F03: protected offsite backups/tested restoration; production data/DB restore требует owner approval. Planned recovery не tested recovery, RPO/RTO performance не доказаны.
+
+H-E09/H-F03/H-F05/H-F15: watchdog/alert/console emergency path вне primary failure domain и без default second permanent VPS; Telegram/web/monitoring/history/emergency работают без AI. Jobs pause/reconcile, fallback лишь verified-compatible rights/data/budget; потеря control блокирует новые dangerous actions, bounded leases/heartbeat/expiry и supported stop/quarantine не гарантируют instant kill внешнего job.
+
+H-E05/H-F07/H-F08/H-F09/H-F11/H-F12: bounded dependency protection, pinned approved requirements/contracts/Git base с revalidation, не повышаемые AI limits, independent completion evidence, unique operations/idempotency where supported и concurrency/version/expiry/fencing controls. Ambiguous dangerous effect → pause dependents/reconcile, не blind retry/stale overwrite. Точные caps/TTL/ретенция/locking implementation не выбраны.
+
+H-E08/H-F01: hard ceiling 10 000 ₽/месяц без explicit approval на превышение, 70 warn/90 restrict optional/100 block new nonessential paid work, прежние warnings сохраняются. Essential security/monitoring/backups защищены, но silent exceed и new commitments даже ниже ceiling не разрешены. Forecast/delayed/unconfirmed accounting не игнорируются и не суммируются вымышленной формулой.
+
+H-F14/H-F16: перед future deployment/production отдельно разрешённый preflight required APIs/region/terms/legal/cost без prohibited circumvention; exact source/dependency pins/checksums/test-security/provenance, release only exact approved artifact, no unrestricted production release secrets у coding agents. Сейчас preflight/VPS access/deployment/paid actions запрещены; R34 о safe rollback и необратимых миграциях сохраняется.

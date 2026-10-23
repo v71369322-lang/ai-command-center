@@ -36,3 +36,13 @@ GAP04 касается задания U этапа 0B и остаётся OPEN: 
 GAP01/GAP02 теперь частично дополнены двумя тематическими пакетами (52 unique H records), не закрыты. Это не 52 уникальных исходных решения и не доля 52/128; R/D остаются агрегированными и не суммируются с H. Original transcripts/timestamps/IDs/approvals/alternatives/implementation evidence для новых 26 не переданы.
 
 GAP03/GAP04 по аудиту/источнику 0B не закрыты. GAP05–GAP07 по mechanisms/numerical limits/contracts/evidence остаются OPEN. GAP08 уточнён отдельным documentation-only заданием 0C-2, не разрешением S1–S6 или 0C-3. Старый отчёт 0C-1 U10 сохранён как исторический: тема 0C-2 теперь известна, тема 0C-3 нет. [OPS-C infrastructure status](architecture/INFRASTRUCTURE_STATUS.md) не менялся; VPS purchased, access impairment reported, no readiness evidence/access/configuration/deploy.
+
+## Прогресс Stage 0C-3
+
+[SRC-0C3](history/stage-0c-3/SOURCE_PACKAGE.md) содержит 13 H-E monitoring + 16 H-F approved audit-summary решений. [Register](history/stage-0c-3/HISTORICAL_DECISION_REGISTER.md), [matrix](history/stage-0c-3/RECONCILIATION_MATRIX.md), [coverage](history/stage-0c-3/COVERAGE_REPORT.md): 29/29 individual source/register/matrix, 2 CONFIRMS / 18 REFINES / 9 EXTENDS, 0 missing/exact duplicates/confirmed conflicts. 16 OPEN-групп U3-01–U3-16, 0 новых ASSUMPTION. Все 52 прежних H и R/D сохранены.
+
+GAP01/GAP02 частично дополнены тремя тематическими пакетами, всего 81 H record, не 81 уникальное оригинальное решение и не 81/128 coverage. Original transcripts/dates/IDs/alternatives/approval trails новых 29 отсутствуют. GAP03 теперь частично дополнен 16 owner-approved audit-summary решениями Package G, **но полный исходный аудит и execution evidence не получены**.
+
+GAP04 source 0B не восстановлен; GAP05–GAP07 уточнены нормами, но concrete mechanisms/численные limits/contracts/test evidence остаются OPEN. Из старого baseline по RPO/RTO найдены только OPEN упоминания, targets ≤15 min/≤4 h не найдены; условное правило нового source не устанавливает значения или гарантии. GAP08 получил ограниченную тему 0C-3, не разрешение кода/0C-4.
+
+[OPS-C status](architecture/INFRASTRUCTURE_STATUS.md) не менялся: VPS уже куплен по сообщению владельца, console impairment reported, readiness unknown. H-F14 preflight требуется перед future deployment, но в этом этапе **не разрешён**. Planned recovery/test requirement не operational proof; original A01 не подтверждён synthetic default H-F10.

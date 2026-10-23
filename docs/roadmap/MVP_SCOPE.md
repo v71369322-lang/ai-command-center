@@ -37,3 +37,13 @@ APPROVED: состав из U3 и ограничения 0A. [Полные фо�
 Нормативные ограничения H-C04/H-C05/H-C09/H-C12/H-D04/H-D05/H-D07 применяются к релевантной разрешённой реализации: readiness по prerequisites/evidence, no weakened repair criteria/tests, exact approvals, tiered checks, independent AI review significant и owner acceptance ключевых milestones/MVP/production. Самоотчёт агента или A01 не заменяет такую приёмку.
 
 Сохраняются один изолированный тестовый исполнитель, отсутствие complex multi-agent planning, trading, real autonomous CRM и полноценной аналитики. Project concurrency не означает подключение реальных проектов. Capital Lab/CRM кондитерской самостоятельны; автосервис PAUSED. Stage 0C-2 — только документация, без MVP implementation, VPS checks, real API calls или платных действий.
+
+## Сверка Stage 0C-3: monitoring/recovery constraints
+
+[Source](../history/stage-0c-3/SOURCE_PACKAGE.md), [29 H-E/H-F](../history/stage-0c-3/HISTORICAL_DECISION_REGISTER.md), [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md). Прежний MVP состав и R49 сохранены: один test executor, без полноценной analytics/trading/автономных real CRM/complex multi-agent planning. Новые dashboard/incident/functional-health возможности не включаются в MVP автоматически и не отменяются; scope allocation OPEN U3-16.
+
+Нормы actual deterministic permissions/default deny, data/environment isolation, hard spending ceiling, independent monitoring/emergency/AI-outage controls, bounded execution/leases/concurrency/reconciliation, versioned completion/release evidence и exact restore/dangerous approvals применяются к релевантной будущей разрешённой реализации. Неопределённый roadmap не делает их необязательными.
+
+Business-functional health не смешивается с infrastructure outage; unknown/stale/paused не healthy. Planned backups/recovery/preflight не являются tested restoration или readiness. Synthetic default H-F10 не закрывает A01 и не заменяет H-C12/H-F09 owner/evidence acceptance.
+
+VPS purchased/console impairment — owner-reported факты без readiness; preflight/access/customer data/implementation/paid actions Stage 0C-3 запрещены. Capital Lab/CRM кондитерской самостоятельны, CRM автосервиса PAUSED. Permanent second VPS не default MVP requirement; существенные новые расходы требуют разрешения независимо от ceiling.
