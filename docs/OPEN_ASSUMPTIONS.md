@@ -60,3 +60,13 @@ D18–D29 сохраняют статус OPEN в части техническ�
 Численные RPO ≤15 минут/RTO ≤4 часов в baseline не найдены, только OPEN RPO/RTO. Conditional safeguard текущего source не задаёт новый target; такие previously discussed values при появлении источника — provisional feasibility targets, не tested operational performance. Не изобретены retry limits, TTL, retention или гарантии.
 
 D18–D29 не закрыты автоматически общим принципом. Не выбраны новый microservice или permanent second VPS по умолчанию. VPS purchase остаётся reported completed; console availability/configuration/readiness не проверены. Scope Stage 0C-3 — документация; тема 0C-4 и programming не разрешены.
+
+## Дополнение Stage 0C-4
+
+[26 H-G/H-H](history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md) имеют OWNER_APPROVED_SUMMARY из [SRC-0C4](history/stage-0c-4/SOURCE_PACKAGE.md), не Codex assumption. Новых ASSUMPTION нет. Reconciliation/implementation interpretations DERIVED; concrete details — [OPEN U4-01–U4-16](history/stage-0c-4/CONFLICTS_AND_UNCERTAINTIES.md).
+
+Явные source-backed уточнения: H-H02 approximate 2–4 vCPU/4–8 GB/SSD planning target; H-H03 initial Ubuntu LTS/pinned Compose/security approach; H-H06 provisional RPO≤15min/RTO≤4h и WAL/PITR where feasible. Это не original deployed specs, выбранные concrete versions или proven guarantees. Current purchased configuration/provider/region/OS/security/billing/readiness неизвестны; FirstVDS Almaty/prices planning context не проверен как current fact.
+
+Старый D26/U3-07 теперь частично уточнён target values, но не feasibility/resources/measurement/drills. D18/D25 вопросы конкретных versions/secret mechanism также не закрываются initial family/broker-or-equivalent требованием. Никакого выбранного vendor/new microservice/второго VPS или read actual customer data.
+
+H-H11 прямо утверждает isolated synthetic E2E starting pattern; A01 sufficiency конкретного теста/готовности MVP этим не доказана, historical ASSUMPTION не переписан. KPI formulas/accounting/attribution/forecast methods, customer identities и Ytimes/storefront matching rules не изобретены. Исторические U/U2/U3 сохранены; дальнейшая тема 0C-5 не предоставлена.

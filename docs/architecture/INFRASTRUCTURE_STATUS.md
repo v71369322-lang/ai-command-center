@@ -15,3 +15,13 @@
 Прежние формулировки 0A о будущей инфраструктуре и запрете агенту покупать/настраивать VPS остаются историческими границами задания. Их нельзя использовать для классификации уже сообщённой покупки как ещё ожидающейся. D26 не закрыт: размещение, ресурсы, доступ, RPO/RTO и восстановление ещё не специфицированы. Фактическая/зарезервированная/неподтверждённая стоимость покупки и текущих обязательств неизвестна; суммы и бюджетное разрешение из Package C не выводятся.
 
 Новых подключений к VPS, проверок консоли, приобретений, платных вызовов и инфраструктурных действий в Stage 0C-1 нет. Следующее изменение состояния записывается отдельным обновлением с источником; текущее сообщение не следует молча заменять предположением об окончании maintenance.
+
+## Stage 0C-4: planning clarification, operational status unchanged
+
+Новый [SRC-0C4 section 2](../history/stage-0c-4/SOURCE_PACKAGE.md#operational-status) повторяет owner-reported purchase/console impairment и unverified exact configuration/accessibility/security posture/readiness/current billing. Все пять OPS-C rows выше сохранены с их original source/status; новых OPS-C и независимых технических проверок нет.
+
+[H-H02/H-H03](../history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md) задают **план**, не purchased spec: approximate 2–4 vCPU, 4–8 GB RAM, SSD; Ubuntu LTS/pinned Compose/security initial approach. FirstVDS Almaty configurations/prices — earlier planning context, не подтверждённые provider/region/plan/OS/price уже купленного VPS. Не заданы concrete image/release/pins/SSD capacity, current billing не оценён.
+
+[H-H06](../history/stage-0c-4/SOURCE_PACKAGE.md#h-h06) теперь явно указывает provisional design targets RPO≤15min/RTO≤4h и PG WAL/PITR where feasible, integrity checks/drills. Это уточняет прежнее OPEN об ориентирах планирования; фраза выше о невыбранных RPO/RTO сохранена как контекст 0C-1. D26 остаётся OPEN для scope/feasibility/resources/procedures/evidence; ни guarantee, ни tested restoration не заявлены.
+
+[Запрет stage access/preflight/resources/purchases](../history/stage-0c-4/SOURCE_PACKAGE.md#stage-prohibitions) действует. Не предполагается matching купленного сервера FirstVDS option или окончание maintenance. H-H04 сохраняет separation от CRM/Radmin; H-H09 не требует permanent second VPS автоматически. Никакого server/console/API preflight, настройки, price check или deployment в Stage 0C-4.

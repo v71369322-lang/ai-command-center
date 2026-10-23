@@ -75,3 +75,15 @@ Capital Lab, CRM «Ваниль и Сахар» и CRM автосервиса н
 - H-F02/H-F10/H-F16: applicable localization/legal review, env/data isolation/synthetic default и exact CI/dependency/artifact provenance; никакие реальные customer data и production secrets сейчас не используются.
 
 [Infrastructure status](INFRASTRUCTURE_STATUS.md) сохранён без обновления фактов: VPS уже куплен по сообщению владельца, console impairment reported, readiness неизвестна. H-F14 требует preflight перед future server deployment/production, но **запрещает preflight и VPS access в Stage 0C-3**. Схема выше остаётся логической; isolation/policy/watchdog placement и backup topology не выбраны.
+
+## Дополнение Stage 0C-4: future analytics и план инфраструктуры
+
+Источник [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md), OWNER_APPROVED_SUMMARY; [impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) и группировка DERIVED.
+
+- H-G01–H-G03/H-G05/H-G06/H-G08: fact/interpretation/recommendation разделены, versioned owner-approved KPI definitions и authoritative sources; causal claims/scenarios/backtesting/evaluation требуют evidence, без invented formulas/accuracy.
+- H-G09–H-G11: reconciled accounting/cohort/identity/marketing analytics с lawful/privacy/matching uncertainty и disclosure missing sources. [Offline Ytimes/storefront CRM double counting](../history/stage-0c-4/SOURCE_PACKAGE.md#confectionery-double-counting) запрещён; matching keys/правила не заданы.
+- H-G04/H-G07/H-G12/H-G13: shared mobile-first web/Telegram, 08:00/14:00/21:00 local под delivery policies, scoped evidence drill-down; ranked recommendations — proposed tasks, не изменение owner priorities или consent.
+- H-H01/H-H04/H-H13: hybrid persistent control VPS + isolated on-demand agents без home-PC runtime, modular-monolith stack/versioned interfaces, separate CRM/Radmin; convenience не причина новых infra services.
+- H-H02/H-H03/H-H05/H-H06: approximate sizing/Ubuntu LTS/pinned Compose/security/controlled secrets mechanism/provisional recovery — плановые нормы, не deployed components или verified server facts.
+
+Диаграмма выше остаётся логической: BI/warehouse/new secrets service/второй VPS не добавлены как выбранные сервисы. Полноценная analytics future scope за MVP, Capital Lab/CRM кондитерской standalone potential pilots, автосервис PAUSED. [Infrastructure status](INFRASTRUCTURE_STATUS.md) отделяет planning от owner-reported purchase/console impairment; current config/security/billing/readiness неизвестны. Ни preflight, ни actual integrations/data сейчас не разрешены.

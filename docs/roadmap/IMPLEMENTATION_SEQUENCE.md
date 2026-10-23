@@ -41,3 +41,13 @@ R распределены по [матрице G](../architecture/DEPENDENCY_MA
 H-F14 — gate перед любым future server deployment/production, не только перед G6; реальная проверка provider access/legal/region/cost сама требует отдельной авторизации и сейчас запрещена. H-E06/H-F03 planned recovery не tested recovery, production restore owner-approved, H-F16 release exact approved artifact. Эти нормы не являются планом запуска сервисов в этом задании.
 
 Новые scope/dependencies описаны как DERIVED в [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md); [coverage](../history/stage-0c-3/COVERAGE_REPORT.md) объясняет comparison bases. Main и PR #2/#3/#4 не меняются/не объединяются. После documentation-only PR — остановка; [handoff](../history/stage-0c-3/NEXT_PACKAGE_HANDOFF.md) не разрешает 0C-4 или programming.
+
+## Разрешённый документальный Stage 0C-4
+
+Отдельный [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md) разрешил Business Analytics & Infrastructure от exact `ef2ed801cc5760e9a700567958e5b8f1f9d2f863`: source/register/matrix/coverage/uncertainties/impact/handoff и documentation PR. Прежние фразы о ещё не заданном 0C-4 сохранены исторически; S1–S6/development/infra access/paid actions не разрешены.
+
+H-H11 задаёт isolated synthetic E2E как future initial validation; real projects/data — separate secured pilot authorization. Full analytics остаётся вне MVP. Capital Lab/CRM кондитерской — independent potential pilots, автосервис PAUSED. [Impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) задаёт DERIVED dependencies KPI/source/permission/feasibility, не implementation plan.
+
+H-H02/H-H03 initial sizing/OS family/security и H-H06 provisional RPO/RTO targets не означают server readiness или tested restoration. H-F14 preflight перед любым future deployment, H-H10 exact production release approval/health/safe rollback и no auto-reverse irreversible migrations сохраняются; preflight сейчас запрещён. [OPS-C](../architecture/INFRASTRUCTURE_STATUS.md) не проверяется.
+
+Ветка основана на 0C-3, PR в main наследует не объединённые #2/#3/#4/#5; [coverage](../history/stage-0c-4/COVERAGE_REPORT.md) различает file counts. После PR остановиться; [handoff](../history/stage-0c-4/NEXT_PACKAGE_HANDOFF.md) не разрешает 0C-5/software development.

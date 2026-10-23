@@ -63,3 +63,19 @@ H-E05/H-F07/H-F08/H-F09/H-F11/H-F12: bounded dependency protection, pinned appro
 H-E08/H-F01: hard ceiling 10 000 ₽/месяц без explicit approval на превышение, 70 warn/90 restrict optional/100 block new nonessential paid work, прежние warnings сохраняются. Essential security/monitoring/backups защищены, но silent exceed и new commitments даже ниже ceiling не разрешены. Forecast/delayed/unconfirmed accounting не игнорируются и не суммируются вымышленной формулой.
 
 H-F14/H-F16: перед future deployment/production отдельно разрешённый preflight required APIs/region/terms/legal/cost без prohibited circumvention; exact source/dependency pins/checksums/test-security/provenance, release only exact approved artifact, no unrestricted production release secrets у coding agents. Сейчас preflight/VPS access/deployment/paid actions запрещены; R34 о safe rollback и необратимых миграциях сохраняется.
+
+## Дополнение Stage 0C-4: analytics/pilot и planned infrastructure controls
+
+Источник [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md), OWNER_APPROVED_SUMMARY; [impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md). Все прежние deterministic policy/default deny, exact approvals, prompt-injection/data/env isolation, bounded execution/reconciliation и protected evidence требования сохраняются.
+
+H-G02/H-G03/H-G10/H-G12: authoritative KPI/source/version/freshness и privacy/lawful identity reconciliation, scoped evidence drill-down. [Ytimes/storefront note](../history/stage-0c-4/SOURCE_PACKAGE.md#confectionery-double-counting) запрещает double count; join/matching/blanket exclusion rules не выбраны, uncertain customers не verified. Analytics role/report не открывает customer databases или international transfers автоматически.
+
+H-G07/H-G13: recommendation/ranking не owner consent на outreach/spending/production/business action, positive forecast/ROI не permission. Ytimes/Bitrix24/VK/T-Invest/brokerage/customer/other production data не подключаются; no real customer data processing. Applicable localization/legal/log/backup/task/API review H-F02 сохраняется без вывода юрисдикции из planning Almaty/RUB.
+
+H-H03/H-H05: initial Ubuntu LTS/pinned Compose, SSH keys/restricted admin/firewall/HTTPS/MFA where appropriate/updates и least-privilege controlled secrets broker or equivalent — source-backed **future approach**, не current VPS security proof. Нет выбранного broker vendor, unrestricted VPS admin/release credentials или нового microservice; H-H04/H-H13 требуют CRM/Radmin separation и no convenience-only services.
+
+H-H06/H-H09/H-H10: protected offsite/PG WAL-PITR where feasible/integrity/drills, provisional RPO≤15min/RTO≤4h без гарантий, independent monitoring/emergency/recovery без automatic second permanent VPS. Production restore/dangerous resume exact approval сохраняются; irreversible DB migrations не auto-reverse.
+
+H-H07/H-H08: hard 10 000 ₽ ceiling/70-90-100 controls и essential protection без silent exceed, on-demand scope/time/cost/concurrency/cleanup; new commitments ниже потолка и additional permanent capacity owner-approved. H-H11: isolated synthetic E2E starting pattern, real projects/data только separate secured pilots. Это не scope expansion MVP и не acceptance evidence A01.
+
+[OPS-C status](../architecture/INFRASTRUCTURE_STATUS.md) остаётся owner-reported purchase/impaired console, current config/OS/provider/region/security/billing/readiness unverified. Никаких server/preflight/paid/real business actions или actual-data tests сейчас.

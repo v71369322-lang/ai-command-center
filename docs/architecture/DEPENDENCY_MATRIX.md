@@ -47,3 +47,18 @@
 | Operational recovery readiness | H-E06,H-E09,H-E11,H-F03,H-F05,H-F13 | Independent watchdog/alerts/console path, protected offsite logs/backups, tested restore evidence, authorized containment и independent controls during AI outage |
 
 Ни gate, ни слово tested не означают выполненную проверку. Все runtime/preflight/recovery/paid actions запрещены текущим заданием. Detailed mechanisms/численные лимиты — [OPEN U3](../history/stage-0c-3/CONFLICTS_AND_UNCERTAINTIES.md); [impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md) сохраняет R34 и scope MVP. Permanent second VPS не default dependency.
+
+## Дополнение Stage 0C-4: KPI, плановые ресурсы и pilot gates
+
+Нормы [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md), [матрица](../history/stage-0c-4/RECONCILIATION_MATRIX.md); связи ниже DERIVED. Старые G1–G7 сохранены, это не разрешение их реализовать.
+
+| До будущего шага | Source-backed предпосылка | Что нельзя подменить предположением |
+| --- | --- | --- |
+| KPI computation/report | H-G01–H-G06,H-G09–H-G12 | Owner-approved definitions/source/freshness/joins/reconciliation/accounting/privacy; Ytimes/storefront transactions не double count, uncertain identity не verified |
+| Initiative/action proposal | H-G07,H-G08,H-G13 | Hypothesis/baseline/effect/uncertainty и ranking не дают owner consent на spend/outreach/production |
+| Server deployment | H-H01–H-H05,H-H07,H-H13 + H-F14 | Approved plan/pins/cost/least privilege/separation и отдельно authorized preflight перед любым deployment, не current purchased readiness |
+| Recovery/release | H-H06,H-H09,H-H10 | Provisional RPO/RTO feasibility, integrity/drills/exact artifact/owner approval/health/compatible rollback; no auto-reverse irreversible migrations |
+| Agent dispatch/capacity | H-H08; R35–R40/H-F15 | Scope/time/cost/concurrency/cleanup/actual state; permanent extra capacity и commitments owner-approved |
+| Real project/data pilot | H-H11,H-H12 + H-F02/H-D12 | Synthetic initial validation, отдельное secured pilot/data/API permission; не inherited authority из analytics report |
+
+FirstVDS planning context не подтверждает actual provider/resources/price. WAL/PITR where feasible не доказательство восстановления, broker/equivalent не выбранный service. [Impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) и [OPEN U4](../history/stage-0c-4/CONFLICTS_AND_UNCERTAINTIES.md) раскрывают недостающие contracts/evidence. Stage 0C-4 запрещает server/preflight/paid/real integration действия.

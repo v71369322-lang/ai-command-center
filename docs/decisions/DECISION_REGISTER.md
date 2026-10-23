@@ -60,3 +60,11 @@ D01–D30 и их прежние статусы/строки не изменен
 D13 уточнён H-F01 hard ceiling и действием 70/90/100, D05 — actual permissions/default deny (H-F04), D06 — localization/prompt injection/environment controls (H-F02/H-F06/H-F10), D08 — ambiguous operations/concurrency/leases (H-F11/H-F12/H-F15), D11/D26 — offsite backup/watchdog/console path/compromise response без default permanent second VPS, D30 — exact source/dependency/artifact provenance H-F16.
 
 Source-approved controls не равны выбору конкретных retry/TTL/RPO/RTO/retention значений, lock/secret/CI vendor или новой microservice architecture. D18–D29 не закрываются автоматически; [U3-01–U3-16](../history/stage-0c-3/CONFLICTS_AND_UNCERTAINTIES.md) отделяют нормы от деталей и evidence. Package G не является полным исходным аудитом или доказательством работоспособности.
+
+## Дополнение Stage 0C-4: analytics и infrastructure planning
+
+D01–D30 и их строки/статусы сохранены. [Новые H-G/H-H](../history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md) из [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md) связаны с R/D/H в [матрице](../history/stage-0c-4/RECONCILIATION_MATRIX.md); новых D не создаётся.
+
+D14 получает future KPI/provenance/forecast/accounting/cohort/marketing requirements, не analytics MVP authorization. D18/D26 частично уточнены H-H02/H-H03 approximate sizing/initial Ubuntu LTS/pinned Compose/security подходом, не concrete versions или purchased spec. D26/U3-07 теперь имеют source-backed provisional RPO≤15min/RTO≤4h и WAL/PITR where feasible (H-H06), но feasibility/restoration evidence OPEN.
+
+D25 получает controlled secrets broker **или equivalent mechanism** H-H05, не выбранный vendor/new standalone service; D03/H-H13 modular monolith и запрет convenience-only infra additions сохраняются. D13/H-F01/H-H07 — hard ceiling, историческое «ориентир» не permission. D29/A01 уточнены approved synthetic starting pattern H-H11, без утверждения полноты acceptance. Все остальные конкретные choices/evidence остаются [OPEN U4](../history/stage-0c-4/CONFLICTS_AND_UNCERTAINTIES.md).

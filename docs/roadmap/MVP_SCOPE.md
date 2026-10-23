@@ -47,3 +47,13 @@ APPROVED: состав из U3 и ограничения 0A. [Полные фо�
 Business-functional health не смешивается с infrastructure outage; unknown/stale/paused не healthy. Planned backups/recovery/preflight не являются tested restoration или readiness. Synthetic default H-F10 не закрывает A01 и не заменяет H-C12/H-F09 owner/evidence acceptance.
 
 VPS purchased/console impairment — owner-reported факты без readiness; preflight/access/customer data/implementation/paid actions Stage 0C-3 запрещены. Capital Lab/CRM кондитерской самостоятельны, CRM автосервиса PAUSED. Permanent second VPS не default MVP requirement; существенные новые расходы требуют разрешения независимо от ceiling.
+
+## Сверка Stage 0C-4: future analytics ≠ MVP expansion
+
+[Source](../history/stage-0c-4/SOURCE_PACKAGE.md), [26 records](../history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md), [impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md). Полноценная business analytics R42/R43/D14 остаётся вне MVP по R49. H-G01–H-G13 описывают future capabilities; общие ограничения facts/evidence/permissions действуют и в MVP. Импорт не включает BI/cohorts/marketing/real sources в MVP. Базовые reports/evidence/owner control сохраняются без выдуманных KPI formulas.
+
+H-H11 теперь прямо owner-approved: начинать validation с isolated synthetic E2E. Это начальный pattern, не доказательство достаточности конкретного A01 scenario или готовности MVP. Real projects/data только отдельно authorized secured pilots, после нужных policy/data/API checks, не в Stage 0C-4.
+
+One test executor и no complex multi-agent planning/trading/autonomous real CRM сохраняются. Capital Lab/CRM кондитерской — separate potential future pilots, не internal modules; автосервис PAUSED. Ни Ytimes/Bitrix24/VK/T-Invest/brokerage/customer connections, ни business production modifications не разрешены.
+
+H-H02/H-H03 initial sizing/Ubuntu/Compose/security — planning; H-H06 RPO/RTO provisional, не SLA/performance. Не появляется обязательный второй VPS или broker standalone service. Hard ceiling и new commitment approvals неизменны. Никаких implementation, server access/preflight/deployment/paid actions; следующие feature phases/acceptance — OPEN U4, не автоматический переход roadmap.

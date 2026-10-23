@@ -83,3 +83,13 @@ P0 — обязательное ограничение либо условие M
 R35/D13 исторически используют «ориентир»; актуальная норма H-F01 — hard ceiling 10 000 ₽/месяц без explicit owner approval на превышение, не разрешение purchases ниже потолка. R39 warnings 70/90/100 сохраняются и дополняются restrict optional at 90 / block new nonessential paid work at 100; essential protection не разрешает silent exceed. R36 unconfirmed costs не заменяются forecasts/delayed billing, accounting relation OPEN.
 
 R12/R13/R14/R17/R19 уточнены actual deterministic credentials/default deny, risk approvals и untrusted data controls; R21/R22 — operation IDs/concurrency/leases/reconciliation; R28/R30–R32 — offsite/tested restoration/independent emergency/compromise response без false instant-stop guarantee; R18/R20 — synthetic default и applicable localization review; R23/R25/R33/R51 — exact pinned source/dependencies/artifact evidence. Production restore/dangerous resume требуют owner approval. [Impact](../history/stage-0c-3/SECURITY_AND_RECOVERY_IMPACT.md) и будущие проверки DERIVED, не выполнены; A01 не подтверждено.
+
+## Дополнение Stage 0C-4: Business Analytics & Infrastructure
+
+Строки R01–R51 и их historical status сохранены. [SRC-0C4](../history/stage-0c-4/SOURCE_PACKAGE.md), [26 H-G/H-H](../history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md) и [матрица](../history/stage-0c-4/RECONCILIATION_MATRIX.md) добавляют OWNER_APPROVED_SUMMARY с DERIVED cross-references, не новые R.
+
+R42/R43 уточняются versioned owner-approved KPI definitions/provenance, no invalid joins/double count, evidence/correlation/causality, scenario/backtest/evaluation, accounting/cohorts/marketing и scoped drill-down. Section-2 [Ytimes/storefront note](../history/stage-0c-4/SOURCE_PACKAGE.md#confectionery-double-counting) обязателен без invented matching rules или verified identity. Это future analytics, не MVP expansion/real integration permission.
+
+R01/R09 получают source-backed **planning** targets H-H02/H-H03: approximate 2–4 vCPU, 4–8 GB RAM, SSD; Ubuntu LTS/pinned Compose/security initial approach. Purchased provider/region/plan/OS/config не подтверждены. R31/R32/D26 теперь имеют H-H06 provisional RPO≤15min/RTO≤4h и WAL/PITR where feasible, не tested guarantees; production restore/irreversible migration boundaries сохраняются. R35/D13 «ориентир» читается по актуальному H-F01/H-H07 hard ceiling, не разрешению purchases.
+
+H-H11 owner-approved starting validation — isolated synthetic E2E; A01 о достаточности конкретного сценария/готовности MVP не доказано. [Impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) и будущие проверки DERIVED, не выполнены.

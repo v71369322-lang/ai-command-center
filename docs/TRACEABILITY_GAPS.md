@@ -46,3 +46,13 @@ GAP01/GAP02 частично дополнены тремя тематическ�
 GAP04 source 0B не восстановлен; GAP05–GAP07 уточнены нормами, но concrete mechanisms/численные limits/contracts/test evidence остаются OPEN. Из старого baseline по RPO/RTO найдены только OPEN упоминания, targets ≤15 min/≤4 h не найдены; условное правило нового source не устанавливает значения или гарантии. GAP08 получил ограниченную тему 0C-3, не разрешение кода/0C-4.
 
 [OPS-C status](architecture/INFRASTRUCTURE_STATUS.md) не менялся: VPS уже куплен по сообщению владельца, console impairment reported, readiness unknown. H-F14 preflight требуется перед future deployment, но в этом этапе **не разрешён**. Planned recovery/test requirement не operational proof; original A01 не подтверждён synthetic default H-F10.
+
+## Прогресс Stage 0C-4
+
+[SRC-0C4](history/stage-0c-4/SOURCE_PACKAGE.md), [register](history/stage-0c-4/HISTORICAL_DECISION_REGISTER.md), [matrix](history/stage-0c-4/RECONCILIATION_MATRIX.md), [coverage](history/stage-0c-4/COVERAGE_REPORT.md): 13 H-G + 13 H-H = 26/26, 8 CONFIRMS/10 REFINES/8 EXTENDS, 0 missing/exact duplicates/confirmed conflicts. 16 OPEN groups U4-01–U4-16, 0 новых ASSUMPTION.
+
+81 прежний H и history packages сохранены; теперь 107 H records, не доказанное число уникальных original decisions и не fabricated percentage unavailable register. R/D/OPS-C строки/исторические статусы не изменены. Source section 2 operational/access/Ytimes-storefront constraints имеют anchors и отдельные supplemental links, не фиктивные дополнительные H.
+
+GAP01–GAP04 по original transcripts/IDs/dates/approval trails/full register/audit/source 0B не закрыты. GAP05–GAP07 получают explicit planning norms H-H02/H-H03 и **provisional** RPO≤15min/RTO≤4h H-H06, но concrete versions/actual spec/legal/data matching/feasibility/restore evidence OPEN. Прежний 0C-3 поиск корректен для его baseline; новый source даёт targets, не retrospective guarantee.
+
+H-H11 owner-backed synthetic starting pattern не превращает A01 в acceptance proof. [OPS-C](architecture/INFRASTRUCTURE_STATUS.md) всё ещё reported purchased/impaired console, unverified config/security/readiness/current billing; FirstVDS planning context не actual provider selection. GAP08 получил отдельное documentation-only задание 0C-4, не 0C-5/development/server/preflight permission.
