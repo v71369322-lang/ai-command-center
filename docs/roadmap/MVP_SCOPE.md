@@ -57,3 +57,13 @@ H-H11 теперь прямо owner-approved: начинать validation с iso
 One test executor и no complex multi-agent planning/trading/autonomous real CRM сохраняются. Capital Lab/CRM кондитерской — separate potential future pilots, не internal modules; автосервис PAUSED. Ни Ytimes/Bitrix24/VK/T-Invest/brokerage/customer connections, ни business production modifications не разрешены.
 
 H-H02/H-H03 initial sizing/Ubuntu/Compose/security — planning; H-H06 RPO/RTO provisional, не SLA/performance. Не появляется обязательный второй VPS или broker standalone service. Hard ceiling и new commitment approvals неизменны. Никаких implementation, server access/preflight/deployment/paid actions; следующие feature phases/acceptance — OPEN U4, не автоматический переход roadmap.
+
+## Stage 0C-5: полная owner acceptance MVP
+
+[H-I02/H-I03/H-I14/H-I20/H-I23/H-I29](../history/stage-0c-5/SOURCE_PACKAGE.md) сохраняют минимальный complete control plane: Telegram/mobile web/API-orchestrator/PG/durable queue/один isolated test executor/history/approvals/budget/monitoring, **один owner**, без real projects.
+
+Final MVP acceptance — не только R48 happy path: independently verified result/synchronized web/durable state/errors/timeouts/retries/restarts/permissions/stale approvals/budgets/backup-recovery/monitoring/isolation/security/kill-switch evidence и final owner acceptance. Critical failures/failed acceptance блокируют progression/dependents. Backup/recovery evidence не откладывается после final MVP acceptance; go-live/production artifact approval отдельно.
+
+PostgreSQL authoritative, Redis transport not sole truth; no exactly-once external effects. Web MFA/verified Telegram binding/critical step-up обязательны в applicable real interface scope. Initial synthetic F1 [proposal](../history/stage-0c-5/MASTER_PLAN_IMPACT.md) с fixtures/stub не live AI/MFA proof и не complete MVP; A01 sufficient-test assumption не переопределяет H-I03.
+
+Full analytics/complex multi-agent orchestration не default MVP. H-I21 tentative read-only Capital Lab после synthetic/individual approval, CRM кондитерской may follow; автосервис PAUSED. [Audit](../history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) ready for owner review, но implementation/operations не разрешены.

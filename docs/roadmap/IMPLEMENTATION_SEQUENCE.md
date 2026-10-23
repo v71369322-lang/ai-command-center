@@ -51,3 +51,15 @@ H-H11 задаёт isolated synthetic E2E как future initial validation; real
 H-H02/H-H03 initial sizing/OS family/security и H-H06 provisional RPO/RTO targets не означают server readiness или tested restoration. H-F14 preflight перед любым future deployment, H-H10 exact production release approval/health/safe rollback и no auto-reverse irreversible migrations сохраняются; preflight сейчас запрещён. [OPS-C](../architecture/INFRASTRUCTURE_STATUS.md) не проверяется.
 
 Ветка основана на 0C-3, PR в main наследует не объединённые #2/#3/#4/#5; [coverage](../history/stage-0c-4/COVERAGE_REPORT.md) различает file counts. После PR остановиться; [handoff](../history/stage-0c-4/NEXT_PACKAGE_HANDOFF.md) не разрешает 0C-5/software development.
+
+## Stage 0C-5: master reconciliation, future stages не разрешены
+
+[Source H-I/H-J](../history/stage-0c-5/SOURCE_PACKAGE.md) разрешил только documentation/architectural audit. Прежние statements о невыданном 0C-5 сохраняются исторически; current assignment не programming/go-live/server/preflight authority.
+
+H-I01/H-I28: короткие adaptive vertical slices, outcomes/dependencies/estimated ranges/confidence по actual evidence; values не выдумываются, material changes owner-approved. G1–G7 capability table не mandatory waterfall; [F1–F6 proposal](../history/stage-0c-5/MASTER_PLAN_IMPACT.md) DERIVED, не официальные approved stage numbers. F1 potentially local synthetic до restored VPS access, только после exact owner scope и separate programming/local-services authorization.
+
+[Ledger](../history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) различает CB01, SG01–SG08, NB01–NB03, ME01–ME03. D18–D29 OPEN не закрыты, но все не global pre-authorization blockers. Owner не нужно сейчас выбирать future CRM matching/provider/VPS implementation детали для limited offline slice.
+
+H-I03/H-I20/H-I23/H-I29: happy-path S5 не final MVP; restore/monitoring/security/budget/fault evidence и final owner acceptance обязательны. H-I12 exact release/CI/staging/migration checks/health, H-F14 separately authorized preflight before any deployment, H-I16 provisional recovery/owner prod restore и R34 no irreversible migration auto-reverse сохраняются.
+
+[Final audit](../history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) ready for owner review, [Russian handoff](../history/stage-0c-5/OWNER_ACCEPTANCE_HANDOFF.md) предлагает один первый вопрос при review. После PR — STOP, никакой следующий этап или prompt template не исполняется.

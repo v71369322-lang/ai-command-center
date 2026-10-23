@@ -87,3 +87,15 @@ Capital Lab, CRM «Ваниль и Сахар» и CRM автосервиса н
 - H-H02/H-H03/H-H05/H-H06: approximate sizing/Ubuntu LTS/pinned Compose/security/controlled secrets mechanism/provisional recovery — плановые нормы, не deployed components или verified server facts.
 
 Диаграмма выше остаётся логической: BI/warehouse/new secrets service/второй VPS не добавлены как выбранные сервисы. Полноценная analytics future scope за MVP, Capital Lab/CRM кондитерской standalone potential pilots, автосервис PAUSED. [Infrastructure status](INFRASTRUCTURE_STATUS.md) отделяет planning от owner-reported purchase/console impairment; current config/security/billing/readiness неизвестны. Ни preflight, ни actual integrations/data сейчас не разрешены.
+
+## Stage 0C-5: authoritative state, owner identity и evidence
+
+[Source](../history/stage-0c-5/SOURCE_PACKAGE.md), [matrix](../history/stage-0c-5/RECONCILIATION_MATRIX.md); source-backed нормы отделены от DERIVED группировки:
+
+- H-I04/H-I05: structured monorepo с logical orchestrator/API/Telegram/web/infra/migrations/tests, approved modular-monolith stack; не отдельные microservices.
+- H-I06/H-I11: PostgreSQL authoritative durable runtime tasks/runs/approvals/dependencies/audit/journals/evidence; Redis только work transport, Git для approved requirements/decisions/contracts/docs. IDs/leases/crash reconciliation, no exactly-once external promise.
+- H-I07/H-I19: scoped provider start/status/events/artifacts/results/stop/reconciliation/capabilities, versioned OpenAPI/queue contracts и compatibility; unsupported provider semantics не выдумываются.
+- H-I13/H-I14: redacted structured logs/metrics/trace IDs всей цепочки и mobile visibility; one-owner MVP, secure web MFA, verified Telegram binding, critical step-up, exact approval params/version/expiry.
+- H-I08/H-I15/H-I17: scoped temp credentials/evidence-before-cleanup, rotation/revoke/proxy where necessary, multi-level kill switches с protected monitoring/backups/audit; no real brokerage trading credentials у coding agents.
+
+Конкретные module/data schemas, protocols/providers/products и versions остаются OPEN у [stage gates](../history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md). Схема выше логическая, не реализация. [Master impact](../history/stage-0c-5/MASTER_PLAN_IMPACT.md) показывает possible future offline slice без VPS, но сейчас никакой coding/service/provider/server action не разрешён.

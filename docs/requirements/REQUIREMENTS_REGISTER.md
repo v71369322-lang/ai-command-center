@@ -93,3 +93,13 @@ R42/R43 уточняются versioned owner-approved KPI definitions/provenance
 R01/R09 получают source-backed **planning** targets H-H02/H-H03: approximate 2–4 vCPU, 4–8 GB RAM, SSD; Ubuntu LTS/pinned Compose/security initial approach. Purchased provider/region/plan/OS/config не подтверждены. R31/R32/D26 теперь имеют H-H06 provisional RPO≤15min/RTO≤4h и WAL/PITR where feasible, не tested guarantees; production restore/irreversible migration boundaries сохраняются. R35/D13 «ориентир» читается по актуальному H-F01/H-H07 hard ceiling, не разрешению purchases.
 
 H-H11 owner-approved starting validation — isolated synthetic E2E; A01 о достаточности конкретного сценария/готовности MVP не доказано. [Impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) и будущие проверки DERIVED, не выполнены.
+
+## Дополнение Stage 0C-5: master plan и acceptance boundaries
+
+Все R01–R51 и historical статусы сохранены; [31 H-I/H-J](../history/stage-0c-5/HISTORICAL_DECISION_REGISTER.md), [SRC-0C5](../history/stage-0c-5/SOURCE_PACKAGE.md), [матрица](../history/stage-0c-5/RECONCILIATION_MATRIX.md) добавляют source-backed нормы без новых R.
+
+H-I03/H-I20/H-I23/H-I29 уточняют R06/R25/R31/R48: final MVP acceptance требует independent result/synchronized state/persistence/errors/timeouts/retries/restarts/permissions/approvals/budgets/restore/monitoring evidence и owner acceptance. Happy-path S5 или A01 не complete MVP, backup/recovery evidence не откладывается за final acceptance.
+
+H-I06/H-I11 уточняют R09/R11/R29: durable runtime tasks/approvals/audit/journals/dependencies/evidence в PostgreSQL, Redis transport не sole truth; Git хранит approved docs/requirements/decisions/contracts. No exactly-once external promises. H-I14: one-owner MVP, secure web MFA, verified Telegram binding/critical step-up и exact parameters/version/expiry; методы gate-specific OPEN.
+
+[Final audit](../history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) исправляет только DERIVED blanket blocking/waterfall/A01 interpretations; строки R/D не переписаны, proposed checks не выдаются за actual test evidence. Реализация не разрешена.

@@ -62,3 +62,20 @@
 | Real project/data pilot | H-H11,H-H12 + H-F02/H-D12 | Synthetic initial validation, отдельное secured pilot/data/API permission; не inherited authority из analytics report |
 
 FirstVDS planning context не подтверждает actual provider/resources/price. WAL/PITR where feasible не доказательство восстановления, broker/equivalent не выбранный service. [Impact](../history/stage-0c-4/ANALYTICS_AND_INFRASTRUCTURE_IMPACT.md) и [OPEN U4](../history/stage-0c-4/CONFLICTS_AND_UNCERTAINTIES.md) раскрывают недостающие contracts/evidence. Stage 0C-4 запрещает server/preflight/paid/real integration действия.
+
+## Stage 0C-5: vertical slices и дифференцированные gates
+
+[H-I01/H-I03/H-I20/H-I28/H-I29/H-J01](../history/stage-0c-5/SOURCE_PACKAGE.md) уточняют план: short vertical validation, failed acceptance/critical failures block dependents, final MVP требует полного evidence. Старые G1–G7 — DERIVED capability dependencies, не требование сначала закончить отдельные крупные subsystems.
+
+| Future boundary | Canonical outstanding item | Необходимая граница |
+| --- | --- | --- |
+| Authorization первого implementation scope | CB01 | Owner выбирает exact scope/acceptance/permissions; отдельная programming authorization, не текущий documentation task |
+| Local persistent contracts/slice | SG01 | Concrete pins/schema/OpenAPI/events/operation-reconciliation; PG durable authority/Redis transport, Git docs links |
+| Actual owner channels/critical action | SG02 | Web MFA/Telegram binding/step-up/current exact approval/default deny |
+| Live executor/paid dispatch/cancel | SG03,SG04,SG08 | Provider capabilities/isolation/temporary credentials/evidence preservation/leases/budgets/protected essentials/kill boundaries |
+| Final MVP/production | SG05,SG06 | Restore/fault/security/budget/monitoring/runbook/provenance evidence; owner acceptance и exact go-live/release; H-F14 before any server deployment |
+| Real read-only pilot/expansion | SG07 | Separate owner project/data/API permission, predefined success metrics, no unauthorized actions/leaks/breaches/critical failures |
+
+[Ledger](../history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) классифицирует все D18–D29 без изменения OPEN статуса. Global блокировка первого separately authorized offline slice вопросами actual VPS/pilot matching rules не следует из approved norms. [F1–F6 proposal](../history/stage-0c-5/MASTER_PLAN_IMPACT.md) DERIVED и не начат; fixture-only F1 не final MVP.
+
+Unrestored VPS access ME02 не блокирует проектирование/код future local synthetic task при separate grant, но server/preflight/production остаются запрещёнными до своих gates. Никаких dependency/service/container/code actions в текущем этапе нет.

@@ -68,3 +68,11 @@ D01–D30 и их строки/статусы сохранены. [Новые H-
 D14 получает future KPI/provenance/forecast/accounting/cohort/marketing requirements, не analytics MVP authorization. D18/D26 частично уточнены H-H02/H-H03 approximate sizing/initial Ubuntu LTS/pinned Compose/security подходом, не concrete versions или purchased spec. D26/U3-07 теперь имеют source-backed provisional RPO≤15min/RTO≤4h и WAL/PITR where feasible (H-H06), но feasibility/restoration evidence OPEN.
 
 D25 получает controlled secrets broker **или equivalent mechanism** H-H05, не выбранный vendor/new standalone service; D03/H-H13 modular monolith и запрет convenience-only infra additions сохраняются. D13/H-F01/H-H07 — hard ceiling, историческое «ориентир» не permission. D29/A01 уточнены approved synthetic starting pattern H-H11, без утверждения полноты acceptance. Все остальные конкретные choices/evidence остаются [OPEN U4](../history/stage-0c-4/CONFLICTS_AND_UNCERTAINTIES.md).
+
+## Дополнение Stage 0C-5: source-backed уточнения и gate-specific OPEN
+
+D01–D30 сохранены. [H-I01–H-I30/H-J01](../history/stage-0c-5/HISTORICAL_DECISION_REGISTER.md) из [SRC-0C5](../history/stage-0c-5/SOURCE_PACKAGE.md) задают vertical slices/monorepo, PG authoritative durability/Redis transport, Git-vs-PG responsibility, provider capabilities/OpenAPI/events/traceability, web MFA/owner binding/step-up и полную owner acceptance. Concrete schema/queue/auth/CI/secret/provider versions/mechanisms не выбраны.
+
+[Audit ledger](../history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) сопоставляет **каждый D18–D29** своему SG/NB/ME, сохраняя OPEN. Исторический blanket «всё блокирует реализацию до ответа владельца» был DERIVED: не все later pilot/VPS/analytics choices блокируют separately authorized offline slice. Новый H-J01 требует эскалировать only genuine blocking choices по одному; material architectural choices всё ещё owner-approved.
+
+D29 high-level acceptance уточнена H-I03/H-I20/H-I23/H-I29, но actual test/CI/restore/go-live evidence нет. RPO/RTO provisional, hard ceiling unchanged, original transcripts/full original audit missing. [Ready for owner review](../history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) не D-status closure, architecture freeze или programming authorization.

@@ -70,3 +70,13 @@ D18–D29 не закрыты автоматически общим принци
 Старый D26/U3-07 теперь частично уточнён target values, но не feasibility/resources/measurement/drills. D18/D25 вопросы конкретных versions/secret mechanism также не закрываются initial family/broker-or-equivalent требованием. Никакого выбранного vendor/new microservice/второго VPS или read actual customer data.
 
 H-H11 прямо утверждает isolated synthetic E2E starting pattern; A01 sufficiency конкретного теста/готовности MVP этим не доказана, historical ASSUMPTION не переписан. KPI formulas/accounting/attribution/forecast methods, customer identities и Ytimes/storefront matching rules не изобретены. Исторические U/U2/U3 сохранены; дальнейшая тема 0C-5 не предоставлена.
+
+## Stage 0C-5: известные нормы и later implementation details
+
+[31 H-I/H-J](history/stage-0c-5/HISTORICAL_DECISION_REGISTER.md) OWNER_APPROVED_SUMMARY, не предположения. [Final audit](history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) DERIVED, [ledger](history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) не закрывает D18–D29 без evidence: классифицирует по scope/gate.
+
+PG authoritative durable runtime/Redis transport, Git approved docs/contracts vs PG runtime evidence, mandatory secure web MFA/owner binding/step-up, versioned OpenAPI/events, short vertical slices и full MVP/operational acceptance теперь явно source-backed. Concrete versions/queue/state schema/auth/secret/provider/CI/retention/TTL/limits/legal pilot details остаются SG/NB/ME. No exactly-once external guarantee; RPO/RTO всё ещё provisional.
+
+A01 historical ASSUMPTION не принят как complete acceptance: H-H11/H-I21 synthetic start approved, H-I03/H-I20/H-I23/H-I29 требуют full evidence и owner acceptance. Blanket derived «все OPEN блокируют всё до owner answer» не следует из H-J01; only genuine blocker CB01 — owner choice exact next implementation scope, separate programming authorization всё ещё нужна.
+
+Новых ASSUMPTION нет. Missing original transcripts не proof historical completeness и не автоматический запрет принять limited recovered baseline. Actual runtime/restore/CI/VPS/billing evidence отсутствует. [Owner handoff](history/stage-0c-5/OWNER_ACCEPTANCE_HANDOFF.md) не исполняемый stage prompt; работа останавливается.

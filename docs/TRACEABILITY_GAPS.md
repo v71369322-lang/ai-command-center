@@ -56,3 +56,13 @@ GAP04 source 0B не восстановлен; GAP05–GAP07 уточнены н
 GAP01–GAP04 по original transcripts/IDs/dates/approval trails/full register/audit/source 0B не закрыты. GAP05–GAP07 получают explicit planning norms H-H02/H-H03 и **provisional** RPO≤15min/RTO≤4h H-H06, но concrete versions/actual spec/legal/data matching/feasibility/restore evidence OPEN. Прежний 0C-3 поиск корректен для его baseline; новый source даёт targets, не retrospective guarantee.
 
 H-H11 owner-backed synthetic starting pattern не превращает A01 в acceptance proof. [OPS-C](architecture/INFRASTRUCTURE_STATUS.md) всё ещё reported purchased/impaired console, unverified config/security/readiness/current billing; FirstVDS planning context не actual provider selection. GAP08 получил отдельное documentation-only задание 0C-4, не 0C-5/development/server/preflight permission.
+
+## Stage 0C-5: current audit, не доказательство original completeness
+
+[SRC-0C5](history/stage-0c-5/SOURCE_PACKAGE.md), [31 records](history/stage-0c-5/HISTORICAL_DECISION_REGISTER.md), [matrix](history/stage-0c-5/RECONCILIATION_MATRIX.md), [coverage](history/stage-0c-5/COVERAGE_REPORT.md): 30 H-I + 1 H-J, 31 exact mappings, 5 CONFIRMS/18 REFINES/8 EXTENDS, 0 missing/exact duplicates/confirmed owner conflicts. Prior 107 и все packages preserved; now 138 supplied H, не exact original count/процент unavailable register.
+
+[Final audit](history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) оценивает всю доступную базу и готов для owner review с gaps. GAP01–GAP04 original transcripts/IDs/dates/approval trails/register/исходный historical audit/0B source не закрыты новым available-document audit. Это разные объекты evidence, не fabricated восстановление оригинала.
+
+GAP05–GAP07 нормализованы в [15 classified items](history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md): 1 CB/8 SG/3 NB/3 ME, не сумма старых U. PG durability/Git-vs-PG responsibility/web MFA/verified binding/OpenAPI/events/pilot read-only path source-backed, но concrete schema/versions/methods/evidence OPEN.
+
+A01 и DERIVED G-order/blanket-OPEN blocking уточнены без перезаписи historical statuses. GAP08 теперь имеет только documentation/audit 0C-5 scope; exact next implementation envelope/authorization отсутствует. OPS-C file не менялся, no actual tests/readiness/evidence/current billing. Никаких новых ASSUMPTION/permissions.

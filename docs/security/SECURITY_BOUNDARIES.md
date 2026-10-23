@@ -79,3 +79,17 @@ H-H06/H-H09/H-H10: protected offsite/PG WAL-PITR where feasible/integrity/drills
 H-H07/H-H08: hard 10 000 ₽ ceiling/70-90-100 controls и essential protection без silent exceed, on-demand scope/time/cost/concurrency/cleanup; new commitments ниже потолка и additional permanent capacity owner-approved. H-H11: isolated synthetic E2E starting pattern, real projects/data только separate secured pilots. Это не scope expansion MVP и не acceptance evidence A01.
 
 [OPS-C status](../architecture/INFRASTRUCTURE_STATUS.md) остаётся owner-reported purchase/impaired console, current config/OS/provider/region/security/billing/readiness unverified. Никаких server/preflight/paid/real business actions или actual-data tests сейчас.
+
+## Stage 0C-5: master security и operational acceptance
+
+[Source H-I/H-J](../history/stage-0c-5/SOURCE_PACKAGE.md), [final audit](../history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md). Все прежние hard budget/owner approvals/localization/prompt-injection/least-privilege/isolation/reconciliation constraints сохраняются.
+
+H-I14 уточняет one-owner MVP, extensible RBAC, **mandatory secure web MFA**, verified Telegram owner binding, appropriate critical step-up, exact action/parameters/version/expiry. Это не утверждение auth provider/protocol; SG02 должен закрыть concrete policy до реальных owner channels. Unknown action blocked, fixture auth не MFA/binding evidence.
+
+H-I08/H-I15/H-I17: temp scoped credentials/network/files/API/Git isolation, preserve artifacts/evidence до disposal, secrets вне Git/ordinary tasks, rotation/emergency revoke/API proxying where needed; no real brokerage trading credentials coding agents. Kill switches на task/agent/project/unsafe-op уровнях сохраняют essential monitoring/backups/audit; dangerous resume owner-approved, no unsupported immediate external kill.
+
+H-I06/H-I11: durable records PG authoritative, Redis не sole truth, unique ops/leases/crash/external reconcile; no exactly-once promise. H-I12/H-I16/H-I20/H-I23: CI/staging/compatible migrations/backup-key-config recovery/fault injection/security/restore/runbooks/watchdog/cost audit и exact production/go-live approval. Key recovery не означает помещать key material в Git/task packets; RPO/RTO provisional, production restore approval, no irreversible DB auto-reverse.
+
+H-I21/H-I22: synthetic first, later tentative Capital Lab read-only pilot лишь individually owner-approved; CRM может следовать, автосервис PAUSED. Pilot metrics до запуска, zero unauthorized actions/leaks/budget breaches/unresolved critical failures, autonomy expansion owner-approved. Никаких real integrations/customer/brokerage/provider/server/preflight/paid actions сейчас.
+
+[Classified ledger](../history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) не снимает guards: later methods OPEN, обязательные нормы уже source-backed. Actual CI/security/restore/operational performance evidence отсутствует; documentation review не программирование/расходы/deployment permission.
