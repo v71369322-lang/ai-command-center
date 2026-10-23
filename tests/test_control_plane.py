@@ -476,3 +476,82 @@ def test_T02_unicode_input_survives_bounded_executor_transport(client, headers, 
 def test_T07_settings_repr_does_not_expose_credentials(settings):
     values = [settings.redis_password, *settings.identities.values(), settings.database_url.password]
     assert not any(value in repr(settings) for value in values)
+
+
+def test_T04_actual_pg_loss_during_executor_run(store, admin):
+    from concurrent.futures import ThreadPoolExecutor
+    from dataclasses import replace
+    import time
+    from sqlalchemy.exc import SQLAlchemyError
+    image = 'acc-f1-pg-loss-fixture:local'
+    builder = 'acc-f1-pg-loss-build-' + uuid4().hex
+    assert docker('create', '--name', builder, 'acc-f1-executor:local').returncode == 0
+    try:
+        assert docker('commit', '--change', 'ENTRYPOINT ["python","-I","-c","import time; time.sleep(20)"]',
+                      builder, image).returncode == 0
+    finally:
+        docker('rm', builder)
+    original = store.settings
+    store.settings = replace(original, executor_image=image)
+    task = create(store, 'approved_render', cost=100)
+    store.approve('owner', task['id'], 1)
+    claimed = store.claim(task['id'])
+    runner = Runner(store)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(runner.execute, claimed)
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                state = docker('inspect', runner.name(claimed), '--format', '{{.State.Running}}')
+                if state.returncode == 0 and state.stdout.strip() == b'true':
+                    break
+                time.sleep(.1)
+            else:
+                raise AssertionError('container_never_started')
+            assert docker('stop', 'acc-f1-db-1').returncode == 0
+            try:
+                with pytest.raises(SQLAlchemyError):
+                    future.result(timeout=15)
+                state = docker('inspect', runner.name(claimed), '--format', '{{.State.Running}}')
+                assert state.returncode == 0 and state.stdout.strip() == b'false'
+            finally:
+                assert docker('start', 'acc-f1-db-1').returncode == 0
+                wait_ready(lambda: store.get(task['id'])['state'] == 'RUNNING')
+        with admin.transaction() as s:
+            s.get(Task, task['id']).lease_until = admin.now(s) - timedelta(seconds=1)
+        store.recover()
+        assert store.snapshot()['budget']['reserved'] == 100
+        assert runner.reconcile(store.get(task['id']))
+        assert store.retry('owner', task['id'])['state'] == 'WAITING_APPROVAL'
+        assert store.claim(task['id']) is None
+    finally:
+        store.settings = original
+        docker('start', 'acc-f1-db-1')
+        docker('rm', '--force', runner.name(claimed))
+        docker('image', 'rm', image)
+
+
+def test_T06_boolean_fence_cannot_forge_integer_fence(store):
+    from dataclasses import replace
+    image = 'acc-f1-forged-fence-fixture:local'
+    builder = 'acc-f1-forged-fence-build-' + uuid4().hex
+    program = ("import json,sys; job=json.load(sys.stdin); "
+               "print(json.dumps({'operation_id':job['operation_id'],'fence':True,"
+               "'markdown':'# Synthetic result\\n\\n- example: synthetic\\n'}))")
+    assert docker('create', '--name', builder, 'acc-f1-executor:local').returncode == 0
+    try:
+        entrypoint = 'ENTRYPOINT ' + json.dumps(['python', '-I', '-c', program])
+        assert docker('commit', '--change', entrypoint, builder, image).returncode == 0
+    finally:
+        docker('rm', builder)
+    original = store.settings
+    store.settings = replace(original, executor_image=image)
+    try:
+        claimed = store.claim(create(store)['id'])
+        with pytest.raises(Denied, match='forged_result'):
+            Runner(store).execute(claimed)
+        assert store.get(claimed['id'])['state'] == 'FAILED'
+        assert store.get(claimed['id'])['artifact'] is None
+    finally:
+        store.settings = original
+        docker('image', 'rm', image)

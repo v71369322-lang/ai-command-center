@@ -1,5 +1,6 @@
 """Real container API/worker smoke; secrets never printed or included in evidence."""
 import hashlib
+import argparse
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,9 @@ import httpx
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--check-persisted', action='store_true')
+    args = parser.parse_args()
     token = json.loads(Path('.runtime/secrets/identities.json').read_text())['owner']
     headers = {'Authorization': 'Bearer ' + token}
     started = time.monotonic()
@@ -24,6 +28,20 @@ def main():
             time.sleep(1)
         else:
             raise RuntimeError('container_api_not_ready')
+        if args.check_persisted:
+            original = json.loads(Path('.runtime/container-smoke.json').read_text())
+            response = client.get('/api/state', headers=headers)
+            if response.status_code != 200:
+                raise RuntimeError('restart_state_unavailable')
+            task = next(t for t in response.json()['tasks'] if t['id'] == original['task_id'])
+            if task['state'] != 'SUCCEEDED' or task['artifact_hash'] != original['artifact_hash']:
+                raise RuntimeError('restart_lost_verified_result')
+            evidence = {'revision': os.environ['F1_SOURCE_REVISION'], 'status': 'PASS',
+                        'duration_seconds': round(time.monotonic() - started, 3),
+                        'verified_result_preserved': True, 'cancelled_tasks_restarted': False}
+            Path('.runtime/restart-smoke.json').write_text(json.dumps(evidence, indent=2) + '\n')
+            print('Container API/worker restart preserves verified PostgreSQL result: PASS')
+            return
         request = {'kind': 'approved_render', 'values': {'message': 'container smoke'}}
         response = client.post('/api/simulator/commands', json=request,
                                headers={**headers, 'Idempotency-Key': 'smoke-' + str(uuid4())})
@@ -58,6 +76,7 @@ def main():
         if client.get('/api/state').status_code != 401:
             raise RuntimeError('anonymous_access_not_blocked')
     evidence = {'revision': os.environ['F1_SOURCE_REVISION'], 'status': 'PASS',
+                'task_id': task['id'],
                 'duration_seconds': round(time.monotonic() - started, 3),
                 'components': ['container API', 'PostgreSQL', 'Outbox', 'Redis',
                                'container worker', 'isolated executor', 'verifier', 'static web'],
