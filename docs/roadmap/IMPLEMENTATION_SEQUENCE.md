@@ -25,3 +25,11 @@ R распределены по [матрице G](../architecture/DEPENDENCY_MA
 Сведения [о купленном VPS](../architecture/INFRASTRUCTURE_STATUS.md) не являются выполнением S6 или разрешением настройки. Новые функции ассистента ещё не распределены по этапам (OPEN U09); текущий порядок не используется для их исключения или автоматического включения в MVP.
 
 Следующий вход и точные темы сверки описаны в [handoff](../history/stage-0c-1/NEXT_PACKAGE_HANDOFF.md). После документационного PR работа останавливается до следующего задания владельца.
+
+## Разрешённый документальный Stage 0C-2
+
+Получено отдельное задание [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md): восстановить Project Management & Autonomous Development на базе коммита 0C-1 `301b07de174ad0da049813a24ede64dc3f4a04d0`. Прежние фразы о невыданном 0C-2 сохранены как историческое состояние; новое разрешение касается только 26 индивидуальных записей, сверки, impact, проверок документации и PR.
+
+Порядок S1–S6 не разрешён, implementation не начинается. [Impact](../history/stage-0c-2/IMPACT_REPORT.md) и дополнение [dependency matrix](../architecture/DEPENDENCY_MATRIX.md) — DERIVED связи будущих prerequisites, не новый утверждённый план. Key milestones/MVP/production требуют owner acceptance H-C12, production exact release и health — H-D09; текущего deployment разрешения нет.
+
+Ветка 0C-2 основана на 0C-1, PR в main наследует не объединённые PR #2/#3. Различие file counts по comparison bases объясняет [coverage report](../history/stage-0c-2/COVERAGE_REPORT.md). После документационного PR — остановка; [handoff 0C-3](../history/stage-0c-2/NEXT_PACKAGE_HANDOFF.md) не разрешает начало следующего этапа.

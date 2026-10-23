@@ -28,3 +28,11 @@ A01 (ASSUMPTION): синтетической задачи без клиентс�
 GAP04 касается задания U этапа 0B и остаётся OPEN: сохранение текста нового источника SRC-0C1 не восстанавливает старый первоисточник. GAP05–GAP07 сохраняются в части механизмов/доказательств. GAP06 частично уточнён H-B03/H-B04 (local quiet hours и report times), но timezone, доставка и прочие численные цели остаются OPEN. Для GAP08 получено точное документальное задание 0C-1, а не разрешение S1–S6 или 0C-2.
 
 [Покрытие](history/stage-0c-1/COVERAGE_REPORT.md): 26/26 пунктов этого пакета, 0 пропусков, 0 точных дубликатов, 0 подтверждённых конфликтов, 12 групп OPEN. 51 агрегированное R и 30 D не равны числу исторических решений. [Package C](architecture/INFRASTRUCTURE_STATUS.md) — одно отдельное обновление состояния с пятью положениями; в 26 и в счёт архитектурных утверждений не включается. Новых ASSUMPTION нет; прежнее A01 остаётся непроверенным.
+
+## Прогресс Stage 0C-2
+
+[SRC-0C2](history/stage-0c-2/SOURCE_PACKAGE.md) добавляет supplied Packages D/E: H-C01–H-C13 и H-D01–H-D13. [Register](history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md), [matrix](history/stage-0c-2/RECONCILIATION_MATRIX.md) и [coverage](history/stage-0c-2/COVERAGE_REPORT.md): 26/26 индивидуально, 4 CONFIRMS, 14 REFINES, 8 EXTENDS, 0 missing/exact duplicates/confirmed conflicts. 13 групп OPEN U2-01–U2-13 и 0 новых ASSUMPTION.
+
+GAP01/GAP02 теперь частично дополнены двумя тематическими пакетами (52 unique H records), не закрыты. Это не 52 уникальных исходных решения и не доля 52/128; R/D остаются агрегированными и не суммируются с H. Original transcripts/timestamps/IDs/approvals/alternatives/implementation evidence для новых 26 не переданы.
+
+GAP03/GAP04 по аудиту/источнику 0B не закрыты. GAP05–GAP07 по mechanisms/numerical limits/contracts/evidence остаются OPEN. GAP08 уточнён отдельным documentation-only заданием 0C-2, не разрешением S1–S6 или 0C-3. Старый отчёт 0C-1 U10 сохранён как исторический: тема 0C-2 теперь известна, тема 0C-3 нет. [OPS-C infrastructure status](architecture/INFRASTRUCTURE_STATUS.md) не менялся; VPS purchased, access impairment reported, no readiness evidence/access/configuration/deploy.

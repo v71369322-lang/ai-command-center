@@ -29,3 +29,11 @@ APPROVED: состав из U3 и ограничения 0A. [Полные фо�
 Восстановленные функции assistant (scheduling/reminders/proactivity, quiet hours 23:00–08:00 local, отчёты 08:00/14:00/21:00 local, versioned project knowledge, voice, safe attachments, ideas capture) не имели полной спецификации в baseline 0B. Их исторический статус OWNER_APPROVED_SUMMARY сохранён. Размещение в MVP/после MVP — OPEN U09; это задание не включает их автоматически в MVP и не отменяет их. Нельзя считать quiet hours или время отчётов неутверждёнными только потому, что timezone и delivery details ещё OPEN U03.
 
 Обязательны одинаковое состояние incidents/history в двух интерфейсах (H-B10), план по verified progress и ресурсам без вытеснения приоритетов идеями (H-B11/H-B12), краткие actionable reports со ссылками на evidence (H-B13). Критерии реализации уточняются отдельным заданием. Stage 0C-1 не разрешает приложение, paid services или infrastructure.
+
+## Сверка Stage 0C-2: принятие результата и границы автономности
+
+[Источник SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md), [26 записей H-C/H-D](../history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md), [impact](../history/stage-0c-2/IMPACT_REPORT.md). Прежняя таблица состава MVP и R49 сохранены. Новые исторические возможности project manager/model selection/reviewer orchestration/handoff не добавляются автоматически в MVP и не отменяются; scope allocation — OPEN U2-13, решение владельца.
+
+Нормативные ограничения H-C04/H-C05/H-C09/H-C12/H-D04/H-D05/H-D07 применяются к релевантной разрешённой реализации: readiness по prerequisites/evidence, no weakened repair criteria/tests, exact approvals, tiered checks, independent AI review significant и owner acceptance ключевых milestones/MVP/production. Самоотчёт агента или A01 не заменяет такую приёмку.
+
+Сохраняются один изолированный тестовый исполнитель, отсутствие complex multi-agent planning, trading, real autonomous CRM и полноценной аналитики. Project concurrency не означает подключение реальных проектов. Capital Lab/CRM кондитерской самостоятельны; автосервис PAUSED. Stage 0C-2 — только документация, без MVP implementation, VPS checks, real API calls или платных действий.

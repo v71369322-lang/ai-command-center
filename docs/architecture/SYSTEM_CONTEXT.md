@@ -51,3 +51,14 @@ Capital Lab, CRM «Ваниль и Сахар» и CRM автосервиса н
 - H-B05/H-B06/H-B10/H-B13: структурированные задачи и знания с provenance/approval status; единое состояние включает incidents/history; краткие отчёты ведут к фактическим доказательствам.
 
 Схема выше остаётся логической. Размещение policy layer, хранилище знаний, контракты данных и реализация новых каналов ввода OPEN, не добавлены на схему как развёрнутые компоненты. [Статус VPS](INFRASTRUCTURE_STATUS.md): уже куплен по сообщению владельца; доступ к консоли временно нарушен; настройка и deployment Stage 0C не разрешены, readiness не проверена.
+
+## Дополнение Stage 0C-2: логические обязанности
+
+Источник — [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md), OWNER_APPROVED_SUMMARY; [impact](../history/stage-0c-2/IMPACT_REPORT.md) и распределение по прежним компонентам — DERIVED.
+
+- H-C01–H-C04/H-C07/H-C13: один явно выделенный primary priority при bounded concurrency, AI PM для roadmap/milestones/risks/acceptance, living versioned knowledge, readiness по actual prerequisites/approvals/evidence, dependency graph с блокировкой invalidated/unverified predecessors и controlled impact analysis.
+- H-C08–H-C10: только approved incident policy допускает permitted priority changes при verified critical incidents; risk-based exact consent показывается interactive cards с action/scope/risk/expected effects/relevant versions/expiry. Card не заменяет H-A07 policy enforcement.
+- H-C11/H-D01/H-D02: гибридный execution сохраняется; выбор модели/провайдера учитывает quality/capability/safety/cost/availability в подтверждённых permissions/limits. Resume/stop/event/artifact capabilities не считаются одинаковыми.
+- H-C06/H-D08/H-D13: durable checkpoints/history/artifacts/status; перед retry/resume сверка actual agent/Git/external state; handoff передаёт task/versions/dependencies/permissions/tests/evidence/questions/next safe actions, не новые права.
+
+Это не новые развёрнутые сервисы или изменение модульного монолита. Primary project, incident policy, схемы graph/knowledge/handoff и adapter mechanisms — OPEN. Один тестовый исполнитель MVP и внешняя самостоятельность Capital Lab/CRM сохраняются; автосервис PAUSED. Доступа к купленному VPS, тестов консоли, deployments и paid provider calls в Stage 0C-2 нет.

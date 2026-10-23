@@ -42,3 +42,11 @@
 Уточнение области «VPS и восстановление»: [Package C](architecture/INFRASTRUCTURE_STATUS.md) сообщает, что VPS уже куплен. Покупка не является pending/предположением; неизвестны технические детали, доступность и readiness. Формулировка 0A о выборе/настройке сохраняет исторический контекст и не отменяет этот новый сообщённый факт. Конфигурация и deployment Stage 0C не разрешены.
 
 Точные тихие часы 23:00–08:00 local и ежедневные отчёты 08:00/14:00/21:00 local утверждены сводкой (H-B03/H-B04); неизвестны timezone владельца и правила configurable delivery. UTC окружения не выбирается вместо local time. D18–D29 не закрываются фактом получения сводки; задан только документальный подэтап 0C-1.
+
+## Дополнение Stage 0C-2
+
+Новые [26 исторических записей H-C/H-D](history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md) имеют OWNER_APPROVED_SUMMARY из [SRC-0C2](history/stage-0c-2/SOURCE_PACKAGE.md), не ASSUMPTION. Новых допущений — 0. A01 остаётся непроверенным и не может ослабить tiered acceptance H-C12, layered checks H-D04 или independent AI review H-D05.
+
+[U2-01–U2-13](history/stage-0c-2/CONFLICTS_AND_UNCERTAINTIES.md) отделяют утверждённые нормы от OPEN реализации: логический dependency graph/readiness, primary priority/approved incident policy, approval cards, provider capabilities, bounded repair/escalation, checkpoints, scoped worktrees/environments, trusted CI/provenance, controlled external tests и handoff. Не выбраны graph DB, queue library, CI/signature mechanism, AI reviewer/model, численные caps или форматы хранения/протоколов.
+
+D18–D29 сохраняют статус OPEN в части технических механизмов; новые обязанности не закрывают их автоматически. VPS остаётся уже купленным по сообщению владельца; технической проверки нет. Старые U 0C-1 не переписаны; предоставлена тема только 0C-2, дальнейшее задание 0C-3 отсутствует.

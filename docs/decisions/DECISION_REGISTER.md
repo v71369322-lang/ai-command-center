@@ -46,3 +46,9 @@ D18–D29 не имеют выбранного варианта, владель�
 Таблица D01–D30 выше сохранена как baseline 0B. [Исторический реестр H](../history/stage-0c-1/HISTORICAL_DECISION_REGISTER.md) отдельно учитывает 13+13 пунктов A/B со статусом OWNER_APPROVED_SUMMARY из [SRC-0C1](../history/stage-0c-1/SOURCE_PACKAGE.md). H — ID восстановления, не исходные исторические номера. [Матрица](../history/stage-0c-1/RECONCILIATION_MATRIX.md) сохраняет связи с D/R и отмечает подтверждения, уточнения и расширения без дублирования решений.
 
 D05/R12 теперь читаются вместе с H-A07: policy layer независим и детерминирован, AI не может его обходить. D11 дополнен H-A10: критические monitoring/emergency controls/audit history/backups не зависят от доступности AI-провайдеров. Механизмы D18–D29 остаются OPEN; историческая сводка не выбирает их за владельца. Новые D в 0C-1 не создаются. Package C вынесен в [операционное состояние](../architecture/INFRASTRUCTURE_STATUS.md), не в архитектурный счётчик.
+
+## Дополнение Stage 0C-2: решения H-C/H-D
+
+D01–D30 и прежние H-A/H-B сохранены. Новые 26 индивидуальных OWNER_APPROVED_SUMMARY записей находятся в [историческом реестре 0C-2](../history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md), [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md) и [матрице](../history/stage-0c-2/RECONCILIATION_MATRIX.md). Package D использует supplied IDs H-C, Package E — H-D; они не являются прежним операционным Package C/OPS-C.
+
+D02 уточняется project graph/readiness/impact/primary priority, D05 — approval cards/risk, D09 — layered checks/independent AI review/bounded disagreements, D10 — provider capability differences, D12/D30 — exact staged releases/health/supply chain. D18–D29 не объявляются закрытыми: механизмы и [U2-01–U2-13](../history/stage-0c-2/CONFLICTS_AND_UNCERTAINTIES.md) остаются OPEN. Выбор graph DB, CI/signature format, provider/model, isolation и численных caps не произведён. Новых строк D нет.

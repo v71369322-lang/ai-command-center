@@ -16,3 +16,18 @@
 Это матрица пакетов, а не замена построчным зависимостям R. Каждый R покрыт пакетом. D18–D29 блокируют соответствующую реализацию до ответа владельца; предложенные проверки в R детализируются до начала исполнения. POST не является автоматическим продолжением MVP.
 
 Критический порядок: G0 → G1 → G2 → G3 → G4 → G5 → G6. Проектирование UI возможно после G2, но сквозная приёмка требует G3. Независимый мониторинг, аварийный доступ, копии и происхождение артефактов должны быть проверены до production, даже если сквозной тест уже успешен.
+
+## Дополнение Stage 0C-2: readiness, execution и evidence
+
+Источник — [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md); связи ниже — DERIVED. Старые G1–G7 не изменены. H-C07 утверждает граф проектных зависимостей, но G-матрица поставки не является его реализацией.
+
+| Зависимая область | Нормативная предпосылка H | Что требуется до дальнейшего безопасного шага |
+| --- | --- | --- |
+| Запуск/перепланирование | H-C01,H-C04,H-C07,H-C08,H-C13 | Actual readiness, valid approvals/evidence и predecessors; invalidation блокирует downstream; priority exceptions только в incident policy |
+| Платный provider dispatch | H-C11,H-D02; R35–R40 | Подтверждённые permissions/capabilities и допустимый резерв/лимит; availability не разрешает покупку |
+| Resume/retry/handoff | H-C06,H-D06,H-D07,H-D08,H-D13 | Durable history и сверка agent/Git/external state; bounded verification/escalation и context package без расширения прав |
+| Приёмка significant change/MVP | H-C12,H-D04,H-D05 | Risk-appropriate deterministic checks плюс independent AI review significant; owner acceptance key milestone/MVP |
+| Выпуск | H-D09,H-D11; R34 | Pinned revision, dependency review, trusted CI/build evidence, exact release consent, health и безопасная совместимость rollback |
+| Внешний API | H-D12; R46,R47 | Mocks/sandboxes where possible, отдельное real-call permission, rate limits/idempotency/reconciliation; пауза автосервиса сохраняется |
+
+[Полная сверка](../history/stage-0c-2/RECONCILIATION_MATRIX.md) охватывает все 26 пунктов, [impact](../history/stage-0c-2/IMPACT_REPORT.md) сопоставляет их с G1–G7. Никакой порядок этой таблицы не является разрешением S1–S6, real integrations или кода Stage 0C-2.

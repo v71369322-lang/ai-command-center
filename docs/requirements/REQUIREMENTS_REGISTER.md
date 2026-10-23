@@ -69,3 +69,9 @@ P0 — обязательное ограничение либо условие M
 Строки R01–R51, их ID и предложенные критерии выше не изменены. Источник [SRC-0C1](../history/stage-0c-1/SOURCE_PACKAGE.md) добавляет 26 отдельных OWNER_APPROVED_SUMMARY-записей [H](../history/stage-0c-1/HISTORICAL_DECISION_REGISTER.md). [Матрица](../history/stage-0c-1/RECONCILIATION_MATRIX.md) указывает частичное покрытие и отсутствующие аспекты; ссылка на соседний R не объявляет новое содержание полностью покрытым.
 
 В частности, R12/R14 ограничены H-A05–H-A07/H-B01/H-B07; R11/R23/R25 связаны H-A08/H-A09; R28/R30–R32 дополнены H-A10/H-A11. Решения владельца имеют приоритет над DERIVED-проверками и A01. Новые R и фиктивная декомпозиция до 128 не создаются; для новых функций ассистента этап и полные критерии ещё OPEN. Это документальная сверка, не выполнение требований.
+
+## Дополнение Stage 0C-2: Project Management & Autonomous Development
+
+Строки R01–R51 сохранены без изменений. [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md) содержит 26 supplied OWNER_APPROVED_SUMMARY решений H-C/H-D, [реестр](../history/stage-0c-2/HISTORICAL_DECISION_REGISTER.md) и [матрица](../history/stage-0c-2/RECONCILIATION_MATRIX.md) дают точные R/D/H связи. R04/R05/R07/R08 дополнены primary priority, readiness/evidence, graph/invalidation и impact analysis; R12/R13 — interactive cards и exact consent; R24–R27/R51 — provider capabilities, tiered checks, independent AI review, bounded repair/escalation и supply-chain evidence.
+
+Ссылки не означают, что R полностью покрывали новые уточнения. Новых R и новых критериев с ложным APPROVED implementation статусом нет. [Impact](../history/stage-0c-2/IMPACT_REPORT.md) и проверки — DERIVED; A01 не переопределяет H-C12/H-D04/H-D05. Документационный импорт не свидетельство реализации.

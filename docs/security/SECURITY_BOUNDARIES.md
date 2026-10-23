@@ -31,3 +31,17 @@ H-A07 делает policy layer независимым и детерминиро
 H-B08 применяет аутентификацию и те же правила согласований к Telegram voice; транскрипция сама по себе не даёт разрешения на опасное действие. H-B09 требует безопасной обработки screenshots, PDF, spreadsheets и attachments. Конкретные парсеры, модель доверия, хранение и провайдер транскрипции не выбраны.
 
 H-A08/H-A09 требуют атрибуции, долговечности записей и сквозной связи доказательств. H-A10 требует независимости critical monitoring/emergency controls/audit history/backups от AI providers, в дополнение к ранее указанной независимости от сервера. Предлагаемые проверки отсутствия AI override и отказа AI providers — DERIVED; они не выполнялись. Открытые детали: [U02,U04–U07](../history/stage-0c-1/CONFLICTS_AND_UNCERTAINTIES.md).
+
+## Дополнение Stage 0C-2: autonomous development controls
+
+Источник [SRC-0C2](../history/stage-0c-2/SOURCE_PACKAGE.md), OWNER_APPROVED_SUMMARY; [матрица](../history/stage-0c-2/RECONCILIATION_MATRIX.md), [impact](../history/stage-0c-2/IMPACT_REPORT.md). Граница safe reversible self-repair (H-C05/H-D07) не позволяет ослаблять требования, tests, budgets, permissions, acceptance или обходить approvals. H-D06 требует bounded verification/escalation разногласий; бесконечный debate loop и self-authorized safety-limit changes запрещены.
+
+H-C08 допускает priority changes только для verified critical incidents в уже approved incident policy. Норма не отменяет owner priorities H-B11/H-B12, exact consent H-C09 и deterministic policy H-A07. H-C10 approval cards явно показывают action, scope, risk, expected effects, relevant versions, expiry; unanswered card не является согласием.
+
+H-D03/H-D10 требуют scoped file/API/network/credentials и dedicated Git branches/worktrees; агенты не получают unrestricted VPS admin, production DB, cross-project credentials или unrelated data. AGENTS.md не отменяется: additional worktree сейчас не запрошен и не создаётся. Точная технология изоляции OPEN.
+
+H-C12/H-D04/H-D05: risk-appropriate static/unit/integration/contract/E2E/security checks; significant changes имеют независимое AI code review дополнительно к deterministic tests; key milestones/MVP/production принимаются владельцем. AI review не является owner consent или доказательством всех проверок.
+
+H-D09/H-D11: staged exact-release consent, verified artifacts, trusted CI evidence, dependency review, pinned source revisions, release integrity и post-release health. Сохраняется запрет unsafe rollback и auto-rollback необратимых DB migrations. H-D12: mocks/sandboxes где возможно, real-call tests только явно разрешённые, safe rate-limit/idempotency/ambiguous outcome handling.
+
+Будущие проверки в impact — DERIVED, не выполнены. Не добавлены код, real calls, secrets, paid services, deployments или VPS configuration/tests; бюджетный ориентир не purchase permission. CRM автосервиса PAUSED; Capital Lab и CRM кондитерской самостоятельны, бизнес-операции/клиентские сообщения не разрешены.
