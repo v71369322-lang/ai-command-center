@@ -1,40 +1,31 @@
 # T01–T14: проверяемый статус F1
 
-См. [границы](SECURITY.md), [запуск](README.md), [restore](RECOVERY.md).
-Результаты конкретного прогона — [VALIDATION](VALIDATION.md). Статусы ниже
-разделяют пройденный cloud subset и **ещё не пройденную полную приёмку группы**.
-Никакой pending пункт не считается PASS. Owner F1 acceptance отсутствует.
+Основание: [VALIDATION.md](VALIDATION.md), 60 тестов и завершённый контейнерный
+профиль. PASS относится только к описанной cloud-проверке. Непроверенные условия
+не считаются пройденными. Owner acceptance отсутствует.
 
-| Группа | Cloud-проверка | Статус полной группы / остаток |
+| Группа | Cloud-проверка: ПРОЙДЕНО | Остаток / НЕ ПРОВЕРЕНО |
 | --- | --- | --- |
-| T01 | API simulator → real PG/Outbox → Redis → Docker executor → independent verifier → shared API projection | ПРОЙДЕНО в cloud, включая Chromium 390px; целевой закрытый доступ отдельно T13 |
-| T02 | Верный/поддельный/oversized результат, digest и реальный Docker-run | ПРОЙДЕНО для фиксированного JSON→Markdown адаптера; не real AI |
-| T03 | Новый Store/process connection читает durable состояние; PG restart сохраняет задачи | ПРОЙДЕНО для cloud-сценариев; не VPS crash/power loss |
-| T04 | Реальные stop/start PG и Redis, crash after publish до PG mark, lease/reconciliation | НЕ ПРОВЕРЕНО полностью: вся crash-window матрица и длительные disconnect tests |
-| T05 | Idempotency conflict, concurrent claim, lost queue recovery, bounded Outbox rows | ПРОЙДЕНО для cloud-сценариев; exactly-once не обещается |
-| T06 | Однократность, expiry/revoke/params/version/epoch; stale callbacks | ПРОЙДЕНО для synthetic identities; не real accounts/MFA |
-| T07 | Agent/operator deny, forged sender, known-secret rejection, attributable denial | ПРОЙДЕНО для synthetic roles; независимое security review ожидается |
-| T08 | Фактические UID/rootfs/network/mount/capability границы; path/unknown action/prompt injection | НЕ ПРОВЕРЕНО полностью: полномочия trusted Docker launcher и полноценный adversarial review |
-| T09 | Pending cancel, реальный running-container cancel, stop/точный resume без revival | ПРОЙДЕНО для cloud-сценариев; disaster recovery resume отдельно заблокирован |
-| T10 | Реальные OOM/file/tmpfs limits; измеренная CPU/PID изоляция; бюджет/attempt/step/admission bounds | НЕ ПРОВЕРЕНО полностью: quota хоста и полный resource exhaustion |
-| T11 | Hash chain, app DB UPDATE denial, tamper/truncation against checkpoint | НЕ ПРОВЕРЕНО полностью: независимая защищённая custody checkpoint |
-| T12 | Настоящий pg_dump/pg_restore, AES-GCM corruption rejection, old-backup interlock | НЕ ПРОВЕРЕНО полностью: offsite custody, key recovery, WAL/PITR, полный RPO/RTO drill |
-| T13 | Auth/RBAC, CSP/no-store, body-size including chunked; loopback configuration | НЕ ПРОВЕРЕНО полностью: VPN/HTTPS/MFA и внешняя проверка портов; мобильный browser проверен |
-| T14 | Ruff, TS/Vite, locked dependencies, container build, pytest, pinned image/action refs | НЕ ПРОВЕРЕНО полностью: remote trusted CI outcome, reproducibility across clean hosts, independent review |
+| T01 | Simulator → API → PG/Outbox → Redis → executor → verifier → web; Chromium 390px | Целевой закрытый доступ на VPS |
+| T02 | JSON→Markdown, hashes, forged/oversized result, строгий тип fencing | Реальный AI намеренно вне F1 |
+| T03 | Durable state, PG restart, API/worker restart и новая задача | VPS power loss |
+| T04 | PG loss во время executor, Redis restart, publish/crash window, reconciliation, bounded backoff/circuit breaker | Все crash windows и длительные outages не доказаны |
+| T05 | Duplicate/conflict, concurrent claim, fencing, lost queue recovery, Outbox replay | Exactly-once внешние эффекты не обещаются |
+| T06 | Exact action/version/hash/epoch, expiry/revoke, одноразовость, forged/stale denial | Реальные аккаунты/MFA |
+| T07 | Synthetic owner/operator/agent RBAC, forged sender, secret rejection, denial audit | Независимое review кода |
+| T08 | UID/rootfs/network/mount/capability; path/unknown action/prompt injection; API без socket | Trusted launcher имеет Docker socket; VPS boundary и independent adversarial review |
+| T09 | Pending/running cancel, expired lease cancellation, stop/resume, отсутствие revival после restart | Disaster resumption не разрешён |
+| T10 | CPU/PID/OOM/file/tmpfs ограничения, admission/step/attempt/rate/budget bounds | Host quota и полное resource exhaustion VPS |
+| T11 | Hash chain, app-role UPDATE denial, tamper/truncation against checkpoint | Независимая защищённая custody checkpoint |
+| T12 | AES-GCM, dump/restore, отдельный networkless PostgreSQL, old-backup interlock | Offsite custody, key recovery, WAL/PITR, полный RPO/RTO drill |
+| T13 | Auth/RBAC, CSP/no-store, chunked body bounds, actual loopback binding, mobile browser | VPN/HTTPS/MFA, внешняя проверка портов |
+| T14 | Ruff, TS/Vite, contracts, pinned/locked builds, 60 tests, security audits | Remote CI проверяется отдельно в PR; clean-host reproducibility и independent review |
 
-Критические нарушения блокируют приёмку. «Не проверено полностью» не означает,
-что тест падал: это отсутствие требуемого полного доказательства. Если тест
-упадёт, статус его поднабора — НЕ ПРОЙДЕНО до исправления и повторной проверки.
+Критическое нарушение блокирует приёмку. Непроверенный пункт не означает падение
+теста, но не считается PASS. Независимое review, внешние backup/checkpoint и
+watchdog, целевой закрытый доступ и host isolation остаются gates.
+RPO ≤15 минут/RTO ≤4 часов — предварительные цели, не гарантии.
 
-## Оставшиеся blockers
-
-- Независимое review значимого изменения и trusted CI evidence.
-- Полные fault/adversarial/mobile-browser/resource suites.
-- Разрешённая независимая custody backup/checkpoints и key recovery, watchdog.
-- Проверенные recovery-resumption runbook и resource/rate/circuit hardening.
-- На VPS: отдельные разрешения, host-key/access, audit, launcher boundary,
-  actual quotas, закрытый web/MFA, offsite restore и owner acceptance.
-
-Обычные коммиты/тесты/исправления внутри текущего облачного этапа разрешены;
-SSH, реальные системы/данные, новые платные обязательства, merge и следующие
-этапы не разрешены. Полная приёмка F1 не объявлена.
+VPS audit/развёртывание требуют отдельных разрешений. SSH, реальные данные/API,
+новые платные обязательства, merge и следующий этап не разрешены.
+Окончательное завершение F1 подтверждает владелец явно.

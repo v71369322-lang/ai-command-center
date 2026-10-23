@@ -1,37 +1,46 @@
 # Cloud F1 evidence
 
-## Подтверждённый результат
+Проверенный clean-tree код: `31d3f89aef1b887bc2567ec7a86d0708041df68d`.
+Команда: `F1_BUILD_CA_FILE=/etc/ssl/certs/ca-certificates.crt scripts/verify_cloud.sh`
+с установленным Chromium в разрешённой cloud-среде.
 
-Последний завершённый cloud run: **47 passed, 0 failed, 0 errors, 0 skipped**,
-47.699 s; JUnit timestamp `2026-10-23T14:59:46.662005+00:00`.
-Одна deprecation warning Starlette/httpx; это не failed test.
-Прогон выполнен на рабочем дереве после исправления non-root Redis. Он не
-выдаётся за финальный clean-tree CI конкретного итогового SHA.
+- **60 passed**, 0 failed/errors/skipped, **66.33 s**.
+- Одна Starlette/httpx deprecation warning, не скрыта.
+- Ruff, OpenAPI drift check, TypeScript/Vite, locked container builds: PASS.
+- Compose API + worker + PostgreSQL + Redis + Outbox + approval + изолированный
+  executor + независимый verifier + web: PASS.
+- Restart API/worker: сохранённый результат, отменённая задача без запуска,
+  выполнение новой задачи после перезапуска: PASS.
+- Runtime inspect: non-root, read-only rootfs, capability drop, loopback API,
+  API без Docker socket, worker без owner identities: PASS.
+- Зашифрованный backup → отдельный PostgreSQL container с network=none →
+  recovery interlock и audit verification: PASS, **6.788 s**.
+  Это не offsite drill и не доказательство RPO/RTO.
+- pip-audit: **62 runtime/dev dependencies, 0 advisories**; npm audit: **0**.
+- Bandit: **0 MEDIUM/HIGH**, 16 разобранных LOW; причины в
+  [SECURITY_REVIEW.md](SECURITY_REVIEW.md). Snapshot advisories не гарантирует
+  отсутствия уязвимостей.
 
-Implementation: `d5463efcd97fbc22a24eb38dc73ec11e8919516c`.
-Redis fix и дополнительные regression assertions:
-`093f0cdccc56c309464ccbd7e67d1b11148429ec`.
-Последующий финальный прогон был прерван; успешный container smoke для последнего
-коммита **не подтверждён**. Файла `.runtime/container-smoke.json` нет.
+Образы: immutable IDs, OCI revision совпадает с проверенным SHA.
 
-Проверены реальные PostgreSQL/Redis, отдельные Docker executor runs, verifier,
-Chromium 390px, отмена/timeout, CPU/PID/memory/file/tmpfs ограничения, lease/fencing,
-подтверждения, аудит и отдельный pg_dump/pg_restore. Детали — tests/ и
-[матрица T01–T14](ACCEPTANCE.md), которая сохраняет незакрытые полные группы.
+| Компонент | Image ID |
+| --- | --- |
+| API | `sha256:ec52db3d1cbfc96fa5e07fa6d94d265856da95735e8a1a5daecd83007e379f15` |
+| Worker | `sha256:5b8dfd9f490695b1226885f7a5631e45c79a17ed88d8c30279f61deedcd4b392` |
+| Executor | `sha256:eb6f15fdddb8f84d102fca690b535ad2e7c74c5a1b1ccb726dac0755f46ee4f4` |
 
-Ruff, TypeScript/Vite build, contract drift check и проверка tracked files на
-текущие runtime credentials проходили. npm audit: 0 известных advisories;
-pip-audit: 25 runtime dependencies, 0 известных advisories. Это snapshot баз
-advisories, не гарантия отсутствия уязвимостей; dev Python dependencies не входят
-в этот pip-audit snapshot.
+JSON/JUnit/логи хранятся в ignored `.runtime/`; ключи, архивы и credentials
+не публикуются. Повторный запуск создаёт свои доказательства. GitHub Actions
+использует тот же профиль; его итог проверяется отдельно в
+[PR №8](https://github.com/v71369322-lang/ai-command-center/pull/8).
+Документационный коммит после указанного SHA не выдаётся за локально
+повторно протестированный код.
 
-## Что ещё выполнить в этой ветке
+[T01–T14](ACCEPTANCE.md) разделяет cloud-профиль и полную приёмку.
+Независимое review кода, защищённая независимая custody checkpoint/offsite backup,
+key recovery, watchdog, VPN/HTTPS/MFA, VPS audit/quotas не подтверждены.
+Trusted launcher имеет локальный Docker socket: это не доказательство
+безопасного размещения на общем VPS. RPO/RTO остаются предварительными целями.
 
-1. Собрать оба образа с `F1_SOURCE_REVISION=$(git rev-parse HEAD)`.
-2. Повторить scripts/cloud_test.sh на clean tree, включая новые Redis assertions.
-3. Проверить Compose API image + отдельный worker + static web как один запуск.
-4. Приложить trusted CI outcome и независимое review; обновить этот evidence.
-5. Не закрывать внешние custody/VPN/MFA/VPS gates по локальному успеху.
-
-SSH/VPS/реальные API/клиентские данные/платные ресурсы/merge не использовались.
-Полная приёмка F1 и owner acceptance отсутствуют.
+SSH/VPS, реальные API/данные, новые платные ресурсы и merge не использовались.
+F1 не объявляется принятым владельцем или полным MVP.
