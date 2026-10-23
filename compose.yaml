@@ -1,0 +1,106 @@
+name: acc-f1
+services:
+  db:
+    image: postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
+    environment:
+      POSTGRES_DB: f1
+      POSTGRES_USER: f1_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+    secrets: [db_admin_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [control]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U f1_admin -d f1']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+  redis:
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    working_dir: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    image: redis:7-bookworm@sha256:44960b3100c48159a66d28c18b0588c193492e25f7551d60e51dd464fc3eca5b
+    command: [sh, /redis.sh]
+    secrets: [redis_password]
+    volumes: [./deploy/redis.sh:/redis.sh:ro]
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+  api:
+    build:
+      context: .
+      target: app
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-app:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    command: [uvicorn, command_center.api:create_app, --factory, --host, 0.0.0.0, --port, '8000', --no-access-log]
+    environment: &app_env
+      F1_DB_USER: f1_app
+      F1_DB_HOST: db
+      F1_DB_PASSWORD_FILE: /run/secrets/db_password
+      F1_REDIS_URL: redis://redis:6379/0
+      F1_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      F1_IDENTITIES_FILE: /run/secrets/identities
+      F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    secrets: [db_password, redis_password, identities]
+    ports: ['127.0.0.1:8000:8000']
+    networks: [control, access]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+  worker:
+    profiles: [worker]
+    build:
+      context: .
+      target: worker
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-worker:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    group_add: ["${F1_DOCKER_GID:?Local cloud socket group required}"]
+    environment:
+      <<: *app_env
+      DOCKER_CONFIG: /tmp/docker-client
+      F1_IDENTITIES_FILE: ''
+    secrets: [db_password, redis_password]
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+networks:
+  access: {}
+  control:
+    internal: true
+volumes:
+  pgdata:
+secrets:
+  db_admin_password:
+    file: ./.runtime/secrets/db_admin_password
+  db_password:
+    file: ./.runtime/secrets/db_password
+  redis_password:
+    file: ./.runtime/secrets/redis_password
+  identities:
+    file: ./.runtime/secrets/identities.json
