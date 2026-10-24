@@ -16,6 +16,16 @@ def require(result):
     return result.stdout
 
 
+def observed_active(task_id, fence):
+    # Docker's Running flag can precede the broker's verified ACTIVE checkpoint.
+    probe = ('import os,sys;from command_center.runtime_ledger import RuntimeLedger;'
+             'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);'
+             'r=l.get(sys.argv[1],int(sys.argv[2]));'
+             'print(int(r["observed"] and r["phase"]=="ACTIVE" and l.watchdog_ready()))')
+    result = docker('exec', 'acc-f1-watchdog-1', 'python', '-c', probe, task_id, str(fence))
+    return result.returncode == 0 and result.stdout.strip() == b'1'
+
+
 def main():
     builder = 'acc-f1-kill-drill-' + uuid4().hex
     image = 'acc-f1-kill-drill:' + uuid4().hex
@@ -40,7 +50,8 @@ def main():
                 if task['state'] == 'RUNNING':
                     name = f"acc-f1-{task_id}-{task['fence']}"
                     check = docker('inspect', name)
-                    if check.returncode == 0 and json.loads(check.stdout)[0]['State']['Running']:
+                    if (check.returncode == 0 and json.loads(check.stdout)[0]['State']['Running']
+                            and observed_active(task_id, task['fence'])):
                         break
                 time.sleep(1)
             else:
@@ -51,12 +62,17 @@ def main():
                 state = client.get('/api/state').json()
                 task = next(t for t in state['tasks'] if t['id'] == task_id)
                 events = [e['event'] for e in state['events']]
-                if (task['state'] == 'FAILED' and state['halted'] and state['budget']['reserved'] == 0
-                        and any(e['kind'] == 'watchdog_stop' for e in events)):
+                if (task['state'] in {'FAILED', 'CANCELLED'} and state['halted'] and state['budget']['reserved'] == 0
+                        and any(e['kind'] == 'watchdog_stop' and e.get('task_id') == task_id
+                                and e.get('confirmed') is True for e in events)):
                     break
                 time.sleep(1)
             else:
+                print(json.dumps({'drill_state': task['state'], 'reason': task['reason'],
+                                  'halted': state['halted'], 'reserved': state['budget']['reserved'],
+                                  'watchdog_events': [e for e in events if e['kind'] == 'watchdog_stop']}))
                 raise RuntimeError('independent_watchdog_did_not_stop')
+            stopped_state = task['state']
             if docker('inspect', name).returncode == 0:
                 raise RuntimeError('orphan_container_remains')
             os.environ.pop('F1_EXECUTOR_IMAGE', None)
@@ -65,7 +81,7 @@ def main():
             resumed = client.post('/api/control/resume', json={'epoch': state['epoch'], 'checkpoint_digest': state['checkpoint_digest']})
             if resumed.status_code != 200:
                 raise RuntimeError('post_drill_resume_denied')
-            if next(t for t in client.get('/api/state').json()['tasks'] if t['id'] == task_id)['state'] != 'FAILED':
+            if next(t for t in client.get('/api/state').json()['tasks'] if t['id'] == task_id)['state'] != stopped_state:
                 raise RuntimeError('failed_run_automatically_resumed')
         Path('.runtime/hardening-smoke.json').write_text(json.dumps({
             'revision': os.environ['F1_SOURCE_REVISION'], 'worker_sigkill': True,
