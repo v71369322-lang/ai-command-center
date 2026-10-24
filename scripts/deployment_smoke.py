@@ -26,7 +26,13 @@ class CloudEngine:
         args = [f'--user={os.getuid()}:{os.getgid()}' if v == '--user=0:0' else v for v in args]
         result = docker(*args, input=data, timeout=timeout)
         if result.returncode:
-            raise RuntimeError('cloud_deployment_drill_command_failed:' + args[0])
+            diagnostic = next((code for token, code in [
+                (b'Connection refused', 'database_tcp_not_ready'),
+                (b'Permission denied', 'private_file_permission'),
+                (b'No space left', 'cloud_disk_full'),
+                (b'password authentication failed', 'database_binding_rejected')]
+                if token in result.stderr), 'redacted_runtime_failure')
+            raise RuntimeError('cloud_deployment_drill_command_failed:' + args[0] + ':' + diagnostic)
         return result.stdout
 
     def json(self, *args):

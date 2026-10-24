@@ -68,6 +68,9 @@ def render(base, m):
             service['image'] = m['database_image']
             service['volumes'] = [{'type': 'volume', 'source': 'pgdata', 'target': '/var/lib/postgresql/data'}]
             service['mem_limit'] = '1g'
+            # initdb's temporary server accepts Unix sockets but not TCP; schema
+            # initialization runs in a separate container and needs actual TCP.
+            service['healthcheck']['test'] = ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U f1_admin -d f1']
             continue
         # UID 0 *inside the control user's rootless namespace* is the unprivileged
         # host control UID, so 0600 bind secrets remain readable without widening ACLs.
