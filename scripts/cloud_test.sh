@@ -11,5 +11,6 @@ export F1_DB_PASSWORD_FILE="$PWD/.runtime/secrets/db_password"
 export F1_REDIS_PASSWORD_FILE="$PWD/.runtime/secrets/redis_password"
 export F1_IDENTITIES_FILE="$PWD/.runtime/secrets/identities.json"
 F1_DB_USER=f1_admin F1_DB_PASSWORD_FILE="$PWD/.runtime/secrets/db_admin_password" \
+F1_RUNTIME_PASSWORD_FILE="$PWD/.runtime/secrets/db_runtime_password" \
 F1_APP_PASSWORD_FILE="$PWD/.runtime/secrets/db_password" .venv/bin/python -m command_center.admin
 .venv/bin/pytest -q --tb=short --junitxml=.runtime/test-results.xml "$@"

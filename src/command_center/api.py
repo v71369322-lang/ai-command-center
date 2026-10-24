@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,6 +16,7 @@ from .config import Settings
 from .limits import RateLimit
 from .store import Denied, Store
 from .worker import broker
+from .owner_auth import OwnerAuth
 
 
 class Command(BaseModel):
@@ -52,9 +53,15 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
+class AssertionRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    assertion: str = Field(min_length=32, max_length=7000)
+
+
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
+    owner_auth = OwnerAuth(store)
     queue = broker(settings)
 
     @asynccontextmanager
@@ -128,7 +135,9 @@ def create_app(settings=None):
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    def identity(authorization: str = Header(default="")):
+    def identity(request: Request, authorization: str = Header(default="")):
+        if settings.auth_mode == 'oidc':
+            return owner_auth.authenticate(request)
         if not authorization.startswith("Bearer "):
             raise HTTPException(401, "authentication_required")
         token = authorization[7:]
@@ -143,6 +152,42 @@ def create_app(settings=None):
         if role == "agent":
             raise HTTPException(403, "role_forbidden")
         return role
+
+    @app.get('/api/auth/mode')
+    def auth_mode():
+        return {'mode': settings.auth_mode, 'identity_provider_configured': owner_auth.trusted(),
+                'production_access_verified': False}
+
+    @app.post('/api/auth/exchange')
+    def exchange(body: AssertionRequest, request: Request, response: Response):
+        if request.url.scheme != 'https':
+            raise HTTPException(403, 'https_required')
+        if request.headers.get('origin') not in {None, settings.web_origin}:
+            raise HTTPException(403, 'origin_rejected')
+        token, csrf, seconds = owner_auth.exchange(body.assertion)
+        response.set_cookie(owner_auth.cookie, token, max_age=seconds, secure=True, httponly=True, samesite='strict', path='/')
+        return {'csrf_token': csrf, 'expires_in': seconds}
+
+    @app.post('/api/auth/logout')
+    def logout(request: Request, response: Response, role=Depends(identity)):
+        if settings.auth_mode != 'oidc' or role != 'owner':
+            raise HTTPException(403, 'owner_session_required')
+        owner_auth.revoke(request.cookies.get(owner_auth.cookie))
+        response.delete_cookie(owner_auth.cookie, secure=True, httponly=True, samesite='strict', path='/')
+        return {'revoked': True}
+
+    @app.get('/api/auth/csrf')
+    def session_csrf(request: Request, role=Depends(identity)):
+        if settings.auth_mode != 'oidc' or role != 'owner':
+            raise HTTPException(403, 'owner_session_required')
+        return {'csrf_token': owner_auth.csrf(request.cookies.get(owner_auth.cookie, ''))}
+
+    @app.post('/api/auth/revoke-all')
+    def revoke_sessions(role=Depends(identity)):
+        if settings.auth_mode != 'oidc' or role != 'owner':
+            raise HTTPException(403, 'owner_required')
+        owner_auth.revoke(all_sessions=True)
+        return {'revoked': True}
 
     @app.get("/api/state")
     def state(role=Depends(human)):

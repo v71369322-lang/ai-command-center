@@ -8,7 +8,7 @@ from command_center.worker import docker
 
 def main():
     evidence = {'revision': os.environ['F1_SOURCE_REVISION'], 'status': 'PASS'}
-    for service in ('api', 'worker'):
+    for service in ('api', 'worker', 'runtime-broker', 'watchdog'):
         result = docker('inspect', 'acc-f1-' + service + '-1')
         if result.returncode:
             raise RuntimeError('missing_runtime_container')
@@ -24,11 +24,17 @@ def main():
             ports = info['NetworkSettings']['Ports'].get('8000/tcp') or []
             if '/var/run/docker.sock' in mounts or not ports or any(p['HostIp'] != '127.0.0.1' for p in ports):
                 raise RuntimeError('api_runtime_exposed')
-        elif '/run/secrets/identities' in mounts or '/var/run/docker.sock' not in mounts:
-            raise RuntimeError('worker_credential_boundary_mismatch')
+        elif service == 'worker':
+            if any(p in mounts for p in ('/run/secrets/identities', '/var/run/docker.sock',
+                                        '/run/secrets/db_password', '/run/secrets/db_runtime_password')):
+                raise RuntimeError('worker_credential_boundary_mismatch')
+            if docker('exec', 'acc-f1-worker-1', 'sh', '-c', 'command -v docker').returncode == 0:
+                raise RuntimeError('worker_contains_docker_cli')
+        elif '/var/run/docker.sock' not in mounts or '/run/secrets/identities' in mounts:
+            raise RuntimeError('trusted_runtime_boundary_mismatch')
         evidence[service] = {'image_id': info['Image'], 'non_root': True, 'read_only_root': True,
                              'admin_db_secret_mounted': False,
-                             'docker_socket_mounted': service == 'worker',
+                             'docker_socket_mounted': service in {'runtime-broker', 'watchdog'},
                              'owner_credentials_mounted': service == 'api'}
     Path('.runtime/container-boundaries.json').write_text(json.dumps(evidence, indent=2) + '\n')
     print('Runtime API/worker permissions, secret mounts and loopback binding: PASS')

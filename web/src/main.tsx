@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import './style.css';
 type Task = {id:string; state:string; version:number; fence:number; attempts:number; payload_hash:string; artifact:string|null; artifact_hash:string|null; reason:string|null; payload:unknown};
@@ -6,14 +6,19 @@ type State = {epoch:number;checkpoint_digest:string;halted:boolean; recovery:boo
 function App(){
  const [token,setToken]=useState(''); const [state,setState]=useState<State|null>(null);
  const [error,setError]=useState(''); const [health,setHealth]=useState<unknown>(null);
+ const [mode,setMode]=useState('synthetic'); const [csrf,setCsrf]=useState('');
+ const generation=useRef(0);
+ useEffect(()=>{fetch('/api/auth/mode').then(r=>r.json()).then(v=>setMode(v.mode)).catch(()=>setMode('unknown'))},[]);
  async function request(path:string,body?:unknown){
-  const res=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
+  const res=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:{...(mode==='synthetic'?{Authorization:'Bearer '+token}:{}),'X-CSRF-Token':csrf,'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await res.json(); if(!res.ok)throw new Error(data.detail||'Запрос отклонён'); return data;
  }
- async function refresh(){try{setState(await request('state'));setHealth(await request('health'));setError('')}catch(e){setError(String(e));setState(null)}}
- async function action(path:string,body:unknown={}){try{await request(path,body);await refresh()}catch(e){setError(String(e))}}
+ async function refresh(){const current=generation.current;try{const next=await request('state');const status=await request('health');const proof=mode==='oidc'&&!csrf?await request('auth/csrf'):null;if(current===generation.current){setState(next);setHealth(status);if(proof)setCsrf(proof.csrf_token);setError('')}}catch(e){if(current===generation.current){setError(String(e));setState(null)}}}
+ async function exchange(){try{const result=await request('auth/exchange',{assertion:token});generation.current++;setToken('');setCsrf(result.csrf_token);setError('Сессия создана. Обновите состояние.')}catch(e){setError(String(e))}}
+ async function logout(){generation.current++;setToken('');setState(null);setHealth(null);if(mode==='oidc'){try{await request('auth/logout',{})}catch{setError('Серверный отзыв не подтверждён; сессия может оставаться активной.')}}setCsrf('')}
+ async function action(path:string,body:unknown={}){const current=generation.current;try{await request(path,body);if(current===generation.current)await refresh()}catch(e){if(current===generation.current)setError(String(e))}}
  return <main><header><p className="label">AI COMMAND CENTER</p><h1>Тестовый контур F1</h1><p>Только синтетические данные. Не полный MVP.</p></header>
- <section><h2>Закрытый доступ</h2><label>Тестовый credential<input type="password" autoComplete="off" value={token} onChange={e=>setToken(e.target.value)}/></label><p>Credential хранится только в памяти страницы. Реальная MFA здесь не подтверждена.</p><button onClick={refresh}>Войти / обновить</button><button onClick={()=>{setToken('');setState(null);setHealth(null)}}>Выйти</button></section>
+ <section><h2>Закрытый доступ</h2><label>{mode==='synthetic'?'Тестовый credential':'Подписанное MFA-подтверждение тестового IdP'}<input type="password" autoComplete="off" value={token} onChange={e=>{generation.current++;setToken(e.target.value);setState(null);setHealth(null)}}/></label><p>{mode==='synthetic'?'Только синтетическая аутентификация. Реальная MFA не подтверждена.':'Адаптер IdP. Реальный провайдер и production-доступ ещё не подключены.'}</p>{mode==='oidc'&&<button onClick={exchange}>Создать защищённую сессию</button>}<button onClick={refresh}>Войти / обновить</button><button onClick={logout}>Выйти</button></section>
  {error&&<p role="alert" className="error">{error}</p>}
  {state&&<><section><h2>Управление</h2><p>{state.halted?'Запуски остановлены':state.recovery?'Требуется сверка восстановления':'Контур допускает синтетические задачи'}</p>
  <button onClick={()=>action('simulator/commands',{kind:'render',values:{message:'synthetic only'}})}>Создать безопасную задачу</button>

@@ -10,36 +10,75 @@ import time
 
 import redis
 
-from .config import Settings
 from .local_docker import environment, run as docker
 from .limits import CircuitBreaker
 from .models import Control
-from .store import Denied, Store
+from .store import Denied
 from .verifier import verify
 
 
 class Runner:
-    def __init__(self, store):
+    def __init__(self, store, runtime=None, limits=None, ledger=None):
         self.store = store
+        self.runtime, self.limits, self.ledger = runtime, limits, ledger
+        self.launch_attempted = False
+
+    def docker(self, *args, **kwargs):
+        return (self.runtime.call if self.runtime else docker)(*args, **kwargs)
+
+    def started(self, task):
+        if self.ledger:
+            self.ledger.phase(task['id'], task['fence'], 'ACTIVE')
+
+    def spawn(self, task, args):
+        def launch():
+            self.launch_attempted = True
+            return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, env=environment())
+        if not self.ledger:
+            return launch()
+        with self.ledger.launch_lock():
+            record = self.ledger.get(task['id'], task['fence'])
+            if record['phase'] != 'INTENT' or record['deadline'] <= time.time() or not self.ledger.watchdog_ready(self.limits.watchdog_seconds):
+                raise Denied('runtime_grant_revoked')
+            process = launch()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                result = self.docker('inspect', self.name(task))
+                if result.returncode == 0:
+                    if not self.valid_isolation(json.loads(result.stdout)[0], self.limits):
+                        self.store.security_trip(task['id'], task['fence'])
+                        break
+                    self.started(task)
+                    return process
+                if process.poll() is not None:
+                    break
+                time.sleep(.05)
+            process.kill()
+            process.wait(timeout=5)
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close()
+            self.ledger.phase(task['id'], task['fence'], 'UNCERTAIN')
+            raise Denied('launch_outcome_unconfirmed')
 
     @staticmethod
     def name(task):
         return f"acc-f1-{task['id']}-{task['fence']}"
 
     def stop(self, name):
-        result = docker("rm", "--force", name)
-        check = docker("inspect", name)
+        result = self.docker("rm", "--force", name)
+        check = self.docker("inspect", name)
         # A failed inspect alone is not evidence of absence (daemon may be down).
-        healthy = docker("info", "--format", "{{.ServerVersion}}")
+        healthy = self.docker("info", "--format", "{{.ServerVersion}}")
         return healthy.returncode == 0 and check.returncode != 0 and (
             result.returncode == 0 or b"No such container" in result.stderr)
 
     def quiesce(self, name):
-        stopped = docker("stop", "--time", "2", name)
-        info = docker("inspect", name, "--format", "{{.State.Running}}")
+        stopped = self.docker("stop", "--time", "2", name)
+        info = self.docker("inspect", name, "--format", "{{.State.Running}}")
         if info.returncode == 0:
             return info.stdout.strip() == b"false"
-        return (b"No such container" in stopped.stderr and docker("info", "--format", "{{.ServerVersion}}").returncode == 0)
+        return (b"No such container" in stopped.stderr and self.docker("info", "--format", "{{.ServerVersion}}").returncode == 0)
 
     @staticmethod
     def command(name, image_id):
@@ -55,25 +94,26 @@ class Runner:
                 "--interactive", image_id]
 
     @staticmethod
-    def valid_isolation(info):
+    def valid_isolation(info, limits=None):
         h, c = info["HostConfig"], info["Config"]
         return (h["NetworkMode"] == "none" and h["ReadonlyRootfs"] and not h["Privileged"]
                 and h["CapDrop"] == ["ALL"] and not h.get("CapAdd")
                 and "no-new-privileges:true" in h["SecurityOpt"]
                 and c["User"] == "65532:65532" and not info["Mounts"]
-                and h["Memory"] == 128 * 1024 * 1024 and h["NanoCpus"] == 500_000_000
-                and h["PidsLimit"] == 32 and not h.get("Binds")
+                and h["Memory"] == (limits.memory_mib if limits else 128) * 1024 * 1024
+                and h["NanoCpus"] == int((limits.cpu if limits else .5) * 1_000_000_000)
+                and h["PidsLimit"] == (limits.pids if limits else 32) and not h.get("Binds")
                 and not any(value.startswith("F1_") for value in c["Env"]))
 
     def execute(self, task):
         name = self.name(task)
-        if shutil.disk_usage(".").free < 256 * 1024 * 1024:
+        if shutil.disk_usage(".").free < (self.limits.min_free_mib if self.limits else 256) * 1024 * 1024:
             self.store.abort(task["id"], task["fence"], "host_disk_low", True)
             return
         if not self.store.pulse(task["id"], task["fence"]):
             self.store.abort(task["id"], task["fence"], "admission_revoked", True)
             return
-        image = docker("image", "inspect", self.store.settings.executor_image, "--format", "{{json .}}")
+        image = self.docker("image", "inspect", self.store.settings.executor_image, "--format", "{{json .}}")
         if image.returncode:
             self.store.abort(task["id"], task["fence"], "verified_no_effect", True)
             return
@@ -95,27 +135,42 @@ class Runner:
         try:
             with selectors.DefaultSelector() as selector:
                 args = self.command(name, image_id)
-                process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE, env=environment())
+                if self.runtime:
+                    args[1] = '--host=' + self.runtime.endpoint
+                if self.limits:
+                    for option, value in {'--cpus': self.limits.cpu, '--memory': str(self.limits.memory_mib) + 'm',
+                                          '--memory-swap': str(self.limits.memory_mib) + 'm',
+                                          '--pids-limit': self.limits.pids,
+                                          '--ulimit': f'fsize={self.limits.file_kib * 1024}:{self.limits.file_kib * 1024}',
+                                          '--tmpfs': f'/work:rw,noexec,nosuid,nodev,size={self.limits.disk_mib}m,uid=65532,gid=65532,mode=0700'}.items():
+                        args[args.index(option) + 1] = str(value)
+                    position = args.index('--log-opt')
+                    args[position + 1] = f'max-size={self.limits.log_mib}m'
+                    args[position + 3] = f'max-file={self.limits.log_files}'
+                process = self.spawn(task, args)
                 process.stdin.write(json.dumps(job, ensure_ascii=False, separators=(",", ":")).encode())
                 process.stdin.close()
                 selector.register(process.stdout, selectors.EVENT_READ, "output")
                 selector.register(process.stderr, selectors.EVENT_READ, "errors")
                 buffers = {"output": bytearray(), "errors": bytearray()}
-                deadline = time.monotonic() + self.store.settings.timeout_seconds
+                deadline = time.monotonic() + (self.limits.wall_seconds if self.limits else self.store.settings.timeout_seconds)
                 isolation_checked = False
                 while selector.get_map() or process.poll() is None:
+                    if self.ledger and (not self.ledger.watchdog_ready(self.limits.watchdog_seconds) or
+                                        self.ledger.get(task['id'], task['fence'])['phase'] != 'ACTIVE'):
+                        raise Denied('watchdog_or_runtime_authority_lost')
                     if time.monotonic() > deadline:
                         raise Denied("timeout")
                     if process.poll() is None and not self.store.pulse(task["id"], task["fence"]):
                         raise Denied("permission_or_lease_lost")
                     if not isolation_checked:
-                        metadata = docker("inspect", name)
+                        metadata = self.docker("inspect", name)
                         if metadata.returncode == 0:
-                            if not self.valid_isolation(json.loads(metadata.stdout)[0]):
+                            if not self.valid_isolation(json.loads(metadata.stdout)[0], self.limits):
                                 self.store.security_trip(task["id"], task["fence"])
                                 raise Denied("isolation_policy_mismatch")
                             isolation_checked = True
+                            self.started(task)
                     for key, _ in selector.select(.2):
                         chunk = os.read(key.fd, 8192)
                         if not chunk:
@@ -123,16 +178,17 @@ class Runner:
                             key.fileobj.close()
                             continue
                         buffers[key.data].extend(chunk)
-                        if len(buffers[key.data]) > 65536:
+                        if len(buffers[key.data]) > (self.limits.output_kib * 1024 if self.limits else 65536):
                             raise Denied("output_limit")
                 raw = buffers["output"].decode()
                 if process.wait(timeout=5) != 0:
                     raise Denied("executor_failed")
                 if not isolation_checked:
-                    metadata = docker("inspect", name)
-                    if metadata.returncode or not self.valid_isolation(json.loads(metadata.stdout)[0]):
+                    metadata = self.docker("inspect", name)
+                    if metadata.returncode or not self.valid_isolation(json.loads(metadata.stdout)[0], self.limits):
                         self.store.security_trip(task["id"], task["fence"])
                         raise Denied("isolation_unconfirmed")
+                    self.started(task)
                 manifest = json.loads(raw)
                 if (manifest["operation_id"] != task["id"] or type(manifest["fence"]) is not int
                         or manifest["fence"] != task["fence"]):
@@ -185,9 +241,12 @@ def broker(settings):
 
 
 def main():
-    settings = Settings.load(identities_required=False)
-    store, queue = Store(settings), broker(settings)
-    runner = Runner(store)
+    # Scheduler has Redis + scoped Unix RPC only. No PG credentials or Docker socket.
+    from .broker_client import BrokerClient
+    client = BrokerClient.from_env()
+    queue = redis.Redis.from_url(os.environ.get('F1_REDIS_URL', 'redis://redis:6379/0'),
+                                 password=open(os.environ['F1_REDIS_PASSWORD_FILE']).read().strip(),
+                                 decode_responses=True, socket_timeout=2, socket_connect_timeout=2)
     failures = 0
     circuit = CircuitBreaker()
     while True:
@@ -195,17 +254,18 @@ def main():
             time.sleep(1)
             continue
         try:
-            store.recover()
-            for task in store.reconciliation_tasks():
-                if task["state"] in {"RECONCILING", "CANCEL_REQUESTED"}:
-                    runner.reconcile(task)
-            store.dispatch(queue)
             event = queue.rpop("f1:work")
             if event:
                 message = json.loads(event)
-                task = store.claim(message["task_id"])
-                if task:
-                    runner.execute(task)
+                run = client.request({'action': 'submit', 'task_id': message['task_id'],
+                                      'revision': os.environ['F1_SOURCE_REVISION']})
+                if run.get('fence'):
+                    while True:
+                        status = client.request({'action': 'heartbeat', 'task_id': message['task_id'],
+                                                 'fence': run['fence']})
+                        if status['phase'] in {'DONE', 'UNCERTAIN'}:
+                            break
+                        time.sleep(.25)
             failures = 0
             circuit.success()
         except Exception:
