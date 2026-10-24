@@ -2,12 +2,25 @@
 
 Implementation is in progress; no actual VPS has been contacted or changed.
 
-* 34 new release-policy/failure tests passed locally; one existing upstream
+* 37 new release-policy/failure tests passed locally; one existing upstream
   Starlette/httpx deprecation warning.
 * Ruff and unchanged OpenAPI contract check passed.
-* New container deployment/restore/recreate smoke and pinned Ubuntu 24.04
-  prerequisite probe are implemented but have not yet completed execution.
-* Full regression, dependency/security audit and final-SHA CI remain pending.
+* 32 existing infrastructure tests passed separately (not overlapping these 37).
+* Pinned Ubuntu 24.04 image installed prerequisite packages and passed the
+  networkless read-only OS inventory. This does not prove systemd/rootless.
+* Intermediate locked dependency/security audit passed: 64 Python dependencies,
+  zero known Python/npm advisories, zero MEDIUM/HIGH Bandit findings; 49 reviewed
+  LOW findings. Final-SHA checks remain pending.
+* New container smoke is NOT yet passing end to end. Failures exposed early PG
+  Unix-only readiness, loopback forwarding and cloud namespace/proxy differences.
+  Fixes are checkpointed; the latest run reached synthetic task admission but
+  did not obtain SUCCEEDED. More task-reason diagnostics and a test-only executor
+  scope adapter are added for continuation. Backup/restore/recreate success is
+  not claimed from this failing run.
+* Full regression was interrupted after cloud VFS disk pressure and while test
+  causes were being corrected. Only owned dangling project images and explicit
+  unused project build records were removed; no security/disk guard was lowered.
+  A fresh full regression and final-SHA CI are required before removing draft.
 * Existing F2.2 test results are historical evidence, not proof of F2.3.
 
 The production deployment controller has no rootful fallback. The separate

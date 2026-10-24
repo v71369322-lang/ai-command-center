@@ -39,6 +39,15 @@ class CloudEngine:
         return json.loads(self.run(*args))
 
 
+class CloudExecution(CloudEngine):
+    def run(self, *args, **kwargs):
+        # The cloud lab shares one daemon; production uses a dedicated execution
+        # daemon and checks ALL of it. Scope this test adapter to F1 executors.
+        if args == ('ps', '-aq'):
+            args = (*args, '--filter', 'label=acc.scope=f1')
+        return super().run(*args, **kwargs)
+
+
 def require(condition):
     if not condition:
         raise ValueError('cloud_deployment_expectation_failed')
@@ -96,7 +105,7 @@ def main():
             next(v for v in service['volumes'] if v['target'] == '/var/run/docker.sock')['source'] = '/var/run/docker.sock'
     p['services']['api']['ports'][0]['published'] = '18000'
     atomic_json(root / 'compose.json', p)
-    deployment = Deployment({'manifest': m, 'compose': production}, root, engine, engine)
+    deployment = Deployment({'manifest': m, 'compose': production}, root, engine, CloudExecution())
     try:
         deployment.compose('up', '-d', '--no-build', '--pull', 'never', '--wait', 'db', 'redis')
         deployment.tool('from command_center.admin import main;main()')
@@ -116,6 +125,8 @@ def main():
         def succeeded():
             value = json.loads(deployment.tool('import json;from command_center.config import Settings;'
                 'from command_center.store import Store;print(json.dumps(Store(Settings.load()).get(' + repr(task['id']) + ')))'))
+            if value['state'] in {'FAILED', 'CANCELLED', 'SECURITY_BLOCKED', 'RECONCILING'}:
+                raise ValueError('synthetic_task_' + value['state'] + ':' + str(value['reason']))
             require(value['state'] == 'SUCCEEDED')
             require(bool(value['artifact_hash']))
             return value
