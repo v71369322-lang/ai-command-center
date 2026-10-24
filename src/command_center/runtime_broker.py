@@ -22,8 +22,8 @@ from .worker import Runner, broker
 
 class Request(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    action: Literal['submit', 'heartbeat', 'status']
-    task_id: UUID
+    action: Literal['submit', 'heartbeat', 'status', 'worker_online']
+    task_id: UUID | None = None
     revision: str | None = Field(default=None, pattern='^[a-f0-9]{40}$')
     fence: int = Field(default=0, ge=0, strict=True)
 
@@ -76,6 +76,13 @@ class RuntimeBroker:
                 self.ledger.phase(task['id'], task['fence'], 'UNCERTAIN')
 
     def request(self, message):
+        if message.action == 'worker_online':
+            if message.task_id or message.fence or message.revision != self.store.settings.source_revision:
+                raise Denied('invalid_worker_heartbeat')
+            self.ledger.worker_beat(message.revision)
+            return {'phase': 'ONLINE', 'fence': 0}
+        if message.task_id is None:
+            raise Denied('task_scope_required')
         task_id = str(message.task_id)
         if message.action == 'submit':
             if message.fence:
@@ -84,6 +91,7 @@ class RuntimeBroker:
         row = self.ledger.get(task_id, message.fence)
         if message.action == 'heartbeat':
             self.ledger.beat(task_id, message.fence)
+            self.ledger.worker_beat(self.store.settings.source_revision)
         return {'phase': row['phase'], 'fence': row['fence']}
 
 

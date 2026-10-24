@@ -1,4 +1,9 @@
 name: acc-f1
+x-bounded-logging: &bounded_logging
+  driver: local
+  options:
+    max-size: ${F1_SERVICE_LOG_MIB:-10}m
+    max-file: '${F1_SERVICE_LOG_FILES:-3}'
 services:
   db:
     image: postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
@@ -17,6 +22,7 @@ services:
     mem_limit: 512m
     cpus: 1
     pids_limit: 128
+    logging: *bounded_logging
   redis:
     user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
     working_dir: /tmp
@@ -32,6 +38,7 @@ services:
     mem_limit: 128m
     cpus: 0.5
     pids_limit: 32
+    logging: *bounded_logging
   api:
     build:
       context: .
@@ -59,6 +66,7 @@ services:
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 64
+    logging: *bounded_logging
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
@@ -87,6 +95,7 @@ services:
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 64
+    logging: *bounded_logging
     depends_on:
       runtime-broker: {condition: service_started}
       redis: {condition: service_started}
@@ -125,7 +134,7 @@ services:
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 64
-    logging: {driver: local, options: {max-size: 10m, max-file: '3'}}
+    logging: *bounded_logging
     depends_on:
       db: {condition: service_healthy}
   watchdog:
@@ -148,7 +157,7 @@ services:
     mem_limit: 128m
     cpus: 0.25
     pids_limit: 32
-    logging: {driver: local, options: {max-size: 10m, max-file: '3'}}
+    logging: *bounded_logging
     depends_on:
       db: {condition: service_healthy}
 networks:

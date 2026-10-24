@@ -242,6 +242,45 @@ def test_watchdog_loss_blocks_new_admission(store, tmp_path):
         service.pool.shutdown()
 
 
+def test_watchdog_loss_stops_active_run(store, sleeping_broker):
+    service, task, run = sleeping_broker
+    service.ledger.watchdog(False)
+    service.last_future.result(timeout=15)
+    assert docker('inspect', Runner.name({**task, 'fence': run['fence']})).returncode != 0
+    assert store.get(task['id'])['state'] != 'SUCCEEDED'
+    with pytest.raises(Denied, match='watchdog_unavailable'):
+        service.submit(create(store)['id'], store.settings.source_revision)
+
+
+def test_watchdog_detects_idle_worker_heartbeat_loss(store, tmp_path):
+    ledger = RuntimeLedger(tmp_path / 'runtime.sqlite')
+    guard = Watchdog(store, ledger, RuntimeBackend(mode='cloud-rootful-test'))
+    guard.started_at -= 10
+    ledger.worker_beat(store.settings.source_revision)
+    guard.tick()
+    with ledger.tx() as db:
+        db.execute('UPDATE worker_monitor SET heartbeat=0')
+    guard.tick()
+    assert any(event['event']['kind'] == 'worker_heartbeat_missing' for event in store.snapshot()['events'])
+
+
+def test_actual_executor_log_rotation_is_bounded():
+    name = 'acc-f1-log-limit-' + uuid4().hex
+    args = Runner.command(name, 'acc-f1-executor:local')
+    args[-1:-1] = ['--detach', '--entrypoint', 'python']
+    args += ['-I', '-c', "for _ in range(2048): print('x'*2048)"]
+    import subprocess
+    from command_center.local_docker import environment
+    try:
+        result = subprocess.run(args, capture_output=True, timeout=15, env=environment())
+        assert result.returncode == 0
+        assert docker('wait', name, timeout=20).returncode == 0
+        logs = docker('logs', name)
+        assert logs.returncode == 0 and 0 < len(logs.stdout) < 3 * 1024 * 1024
+    finally:
+        docker('rm', '--force', name)
+
+
 def test_owner_session_expiration_and_https_required(store, oidc):
     configured, assertion = oidc
     with TestClient(create_app(configured), base_url='https://testserver') as client:

@@ -254,6 +254,7 @@ def main():
             time.sleep(1)
             continue
         try:
+            client.request({'action': 'worker_online', 'revision': os.environ['F1_SOURCE_REVISION']})
             event = queue.rpop("f1:work")
             if event:
                 message = json.loads(event)

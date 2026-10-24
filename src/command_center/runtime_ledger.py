@@ -25,6 +25,7 @@ class RuntimeLedger:
                 deadline REAL, heartbeat REAL, revision TEXT, stops INTEGER DEFAULT 0,
                 observed INTEGER NOT NULL DEFAULT 0)''')
             db.execute('CREATE TABLE IF NOT EXISTS monitor(id INTEGER PRIMARY KEY, heartbeat REAL, healthy INTEGER)')
+            db.execute('CREATE TABLE IF NOT EXISTS worker_monitor(id INTEGER PRIMARY KEY, heartbeat REAL, revision TEXT)')
             db.execute('CREATE TABLE IF NOT EXISTS evidence(seq INTEGER PRIMARY KEY, event TEXT, previous TEXT, digest TEXT)')
             if 'observed' not in {r[1] for r in db.execute('PRAGMA table_info(runs)')}:
                 db.execute('ALTER TABLE runs ADD COLUMN observed INTEGER NOT NULL DEFAULT 0')
@@ -104,6 +105,15 @@ class RuntimeLedger:
         with self.tx() as db:
             db.execute("UPDATE runs SET heartbeat=? WHERE id=? AND fence=? AND phase IN ('INTENT','ACTIVE')",
                        (time.time(), task_id, fence))
+
+    def worker_beat(self, revision):
+        with self.tx() as db:
+            db.execute('INSERT OR REPLACE INTO worker_monitor VALUES(1,?,?)', (time.time(), revision))
+
+    def worker_fresh(self, revision, ttl):
+        with self.tx() as db:
+            row = db.execute('SELECT * FROM worker_monitor WHERE id=1').fetchone()
+            return bool(row and row['revision'] == revision and 0 <= time.time() - row['heartbeat'] <= ttl)
 
     def stop_attempt(self, task_id, fence):
         with self.tx() as db:

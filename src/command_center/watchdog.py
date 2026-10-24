@@ -18,6 +18,8 @@ class Watchdog:
         self.store, self.ledger = store, ledger
         self.limits = limits or RuntimeLimits()
         self.runner = Runner(store, backend, self.limits)
+        self.last_worker_state = None
+        self.started_at = time.monotonic()
 
     def emergency(self, row, reason):
         self.ledger.record('watchdog_emergency', task_id=row['id'], fence=row['fence'], reason=reason)
@@ -50,6 +52,17 @@ class Watchdog:
 
     def tick(self):
         self.ledger.verify()
+        worker_alive = self.ledger.worker_fresh(self.store.settings.source_revision, self.limits.heartbeat_seconds)
+        if worker_alive != self.last_worker_state and (worker_alive or time.monotonic() - self.started_at > 5):
+            self.ledger.record('worker_online' if worker_alive else 'worker_heartbeat_missing')
+            if not worker_alive:
+                try:
+                    with self.store.transaction() as session:
+                        self.store.check_audit(session)
+                        self.store.audit(session, 'worker_heartbeat_missing', 'watchdog')
+                except Exception:
+                    pass
+            self.last_worker_state = worker_alive
         healthy = True
         for row in self.ledger.runs():
             reason = None

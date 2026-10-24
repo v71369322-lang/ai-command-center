@@ -14,6 +14,8 @@ def main():
             raise RuntimeError('missing_runtime_container')
         info = json.loads(result.stdout)[0]
         host, config = info['HostConfig'], info['Config']
+        if host['LogConfig']['Type'] != 'local' or not host['LogConfig']['Config'].get('max-size'):
+            raise RuntimeError('runtime_logs_unbounded')
         mounts = {item['Destination'] for item in info['Mounts']}
         if (config['User'].split(':')[0] == '0' or host['Privileged'] or not host['ReadonlyRootfs']
                 or host['CapDrop'] != ['ALL'] or 'no-new-privileges:true' not in host['SecurityOpt']
