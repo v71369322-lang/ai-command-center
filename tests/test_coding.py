@@ -198,6 +198,27 @@ def test_f2_real_broker_two_sandboxes_and_atomic_pr(store, tmp_path):
         service.pool.shutdown(wait=True)
 
 
+def test_f2_failed_acceptance_preserves_test_history_and_usage(store, tmp_path):
+    ledger = RuntimeLedger(tmp_path / 'runtime.sqlite')
+    ledger.watchdog()
+    service = RuntimeBroker(store, ledger, RuntimeBackend(mode='cloud-rootful-test'), RuntimeLimits())
+    try:
+        task = store.create('owner', str(uuid4()), payload(CodingRequest(max_iterations=1)))
+        service.submit(task['id'], store.settings.source_revision)
+        service.last_future.result(timeout=20)
+        result = store.get(task['id'])
+        assert result['state'] == 'FAILED'
+        assert len(result['coding']['test_runs']) == 1
+        assert result['coding']['test_runs'][0]['checks']['failures'] == 2
+        assert result['coding']['failure'] == 'attempt_limit'
+        assert 'Лимит исправлений' in result['coding']['summary']
+        assert not result['coding'].get('pr')
+        assert store.snapshot()['budget']['actual'] == 1
+        assert store.snapshot()['budget']['reserved'] == 0
+    finally:
+        service.pool.shutdown(wait=True)
+
+
 @pytest.mark.parametrize('stop', ['cancel', 'deadline', 'watchdog_lost'])
 def test_f2_runtime_stop_never_accepts_pr_or_restarts(store, tmp_path, stop):
     ledger = RuntimeLedger(tmp_path / 'runtime.sqlite')

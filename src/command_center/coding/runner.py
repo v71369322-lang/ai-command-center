@@ -101,9 +101,16 @@ class CodingRunner(Runner):
                     and 0 <= candidate_usage['units'] <= config['max_units']):
                 usage = candidate_usage['units']
             if result.get('status') != 'ready_for_verification':
+                explanations = {
+                    'attempt_limit': 'Лимит исправлений исчерпан. Тесты ещё не проходят; PR не подготовлен.',
+                    'budget_limit': 'Достигнут лимит тестовых затрат или токенов; PR не подготовлен.',
+                    'provider_unavailable': 'Тестовый провайдер недоступен. Автоматический повтор не выполнен.',
+                    'scope_or_execution_blocked': 'Изменение вышло за разрешённую область или проверка не выполнена. Выполнение остановлено.',
+                    'time_limit': 'Время выполнения исчерпано; результат не принят.'}
                 self.store.coding_stage(task['id'], task['fence'], 'failed',
-                                        summary='Задача остановлена: ' + str(result.get('status', 'invalid_result'))[:64],
-                                        failure=result.get('status'), provider_usage=candidate_usage)
+                                        summary=explanations.get(result.get('status'), 'Результат некорректен; задача остановлена.'),
+                                        failure=result.get('status'), provider_usage=candidate_usage,
+                                        test_runs=result.get('history', []))
                 raise Denied('coding_attempts_or_scope_blocked')
             report, _, snapshots = inspect_result(result, task['id'], task['fence'], config)
             self.store.coding_stage(task['id'], task['fence'], 'verification', agent_result=result,
