@@ -82,7 +82,7 @@ def test_profile_closed_and_normalizes_with_real_compose(release):
 
 
 @pytest.mark.parametrize('attack', ['public', 'privileged', 'socket', 'host_mount', 'host_network',
-                                   'synthetic_auth', 'rootful', 'integration'])
+                                   'synthetic_auth', 'rootful', 'integration', 'wrong_image', 'secret_scope', 'egress'])
 def test_profile_rejects_boundary_changes(release, attack):
     bundle, _ = release
     p = copy.deepcopy(bundle['compose'])
@@ -101,8 +101,14 @@ def test_profile_rejects_boundary_changes(release, attack):
         api['environment']['F1_AUTH_MODE'] = 'synthetic'
     elif attack == 'rootful':
         p['services']['watchdog']['environment']['F1_RUNTIME_MODE'] = 'cloud-rootful-test'
-    else:
+    elif attack == 'integration':
         api['environment']['F2_INTEGRATION_CONFIG_FILE'] = '/host/live.json'
+    elif attack == 'wrong_image':
+        api['image'] = 'alpine:latest'
+    elif attack == 'secret_scope':
+        api['secrets'].append({'source': 'db_admin_password'})
+    else:
+        api['networks'] = {'access': None}
     with pytest.raises(ValueError):
         validate_profile(p, bundle['manifest'])
 

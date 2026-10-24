@@ -108,7 +108,20 @@ def render(base, m):
 def validate_profile(p, m):
     if p['name'] != PROJECT or set(p['services']) != SERVICES or not p['networks']['control']['internal']:
         raise ValueError('deployment_boundary_invalid')
+    if p['secrets'] != {k: {'file': str(Path(m['data_root']) / 'secrets' / k)} for k in SECRETS}:
+        raise ValueError('secret_source_changed')
     for name, s in p['services'].items():
+        expected_image = (m['database_image'] if name == 'db' else m['redis_image'] if name == 'redis'
+                          else m['images']['broker' if name in {'runtime-broker', 'watchdog'} else name])
+        if s['image'] != expected_image or set(s['networks']) != {'control'}:
+            raise ValueError('service_image_or_network_changed')
+        allowed_secrets = {'db': {'db_admin_password'}, 'redis': {'redis_password'},
+                           'api': {'db_password', 'redis_password', 'identities'},
+                           'worker': {'redis_password', 'broker_token'},
+                           'runtime-broker': {'db_runtime_password', 'redis_password', 'broker_token'},
+                           'watchdog': {'db_runtime_password', 'redis_password'}}
+        if {v['source'] if isinstance(v, dict) else v for v in s['secrets']} != allowed_secrets[name]:
+            raise ValueError('service_secret_scope_changed')
         if s.get('privileged') or s.get('network_mode') or s.get('pid') or s.get('devices') or s.get('cap_add'):
             raise ValueError('host_privilege_forbidden')
         if name != 'api' and s.get('ports'):

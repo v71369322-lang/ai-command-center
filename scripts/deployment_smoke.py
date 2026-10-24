@@ -21,6 +21,9 @@ from command_center.local_docker import environment, run as docker
 
 class CloudEngine:
     def run(self, *args, data=None, timeout=120):
+        # Production namespace-root maps to the control user's host UID. The
+        # cloud rootful TEST daemon needs that host UID explicitly for 0600 files.
+        args = [f'--user={os.getuid()}:{os.getgid()}' if v == '--user=0:0' else v for v in args]
         result = docker(*args, input=data, timeout=timeout)
         if result.returncode:
             raise RuntimeError('cloud_deployment_drill_command_failed:' + args[0])
