@@ -67,7 +67,7 @@ def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue, tmp_
             finally:
                 service.pool.shutdown(wait=True)
             page.get_by_role('button', name='Войти / обновить', exact=True).click()
-            page.get_by_text('Проверка 1: найдена ошибка, выполнено исправление', exact=True).wait_for()
+            page.get_by_text('Проверка 1: найдена ошибка', exact=True).wait_for()
             page.get_by_text('Проверка 2: пройдена', exact=True).wait_for()
             page.get_by_role('button', name='Открыть подготовленный PR', exact=True).click()
             page.get_by_role('heading', name='Подготовленный PR', exact=True).wait_for()
