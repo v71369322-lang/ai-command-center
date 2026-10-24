@@ -67,10 +67,31 @@ print(json.dumps(result))
     assert all(not entry.startswith('F1_') for entry in info['Config']['Env'])
 
 
-def test_T10_actual_memory_limit():
-    result, info = sandbox("data = bytearray(256 * 1024 * 1024)", wait_for_oom=True)
-    assert result.returncode == 137
-    assert info['State']['OOMKilled']
+@pytest.mark.parametrize('exceed', [True, False])
+def test_T10_actual_memory_limit(exceed):
+    # Read kernel evidence in this container's cgroup while PID 1 stays alive.
+    # Some containerd/Engine combinations lose the asynchronous OOMKilled flag
+    # after PID 1 exits. Exit 137 alone must NEVER substitute for OOM evidence.
+    code = '''
+import json,subprocess,sys
+from pathlib import Path
+root=Path('/sys/fs/cgroup')
+def kills():
+ return int(dict(line.split() for line in (root/'memory.events').read_text().splitlines())['oom_kill'])
+before=kills()
+child=subprocess.run([sys.executable,'-I','-c','data=bytearray(' + str(SIZE) + ')'],timeout=10)
+print(json.dumps({'limit':int((root/'memory.max').read_text()),'before':before,'after':kills(),'child':child.returncode}))
+'''.replace('SIZE', str((256 if exceed else 4) * 1024 * 1024))
+    result, info = sandbox(code)
+    assert result.returncode == 0
+    evidence = json.loads(result.stdout)
+    assert info['HostConfig']['Memory'] == evidence['limit'] == 128 * 1024 * 1024
+    if exceed:
+        assert evidence['child'] == -9
+        assert evidence['after'] > evidence['before']
+    else:
+        assert evidence['child'] == 0
+        assert evidence['after'] == evidence['before']
 
 
 @pytest.mark.parametrize('delayed', [True, False])

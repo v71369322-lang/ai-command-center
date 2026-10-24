@@ -39,6 +39,15 @@ Final results must distinguish these boundaries, and no skipped check is a pass.
   Docker OOM flag assertion. Exit 137 alone remains insufficient. The bounded
   asynchronous OOM evidence wait was increased from 3 to 10 seconds; neither
   expected OOMKilled nor exit-code assertions were removed or relaxed.
+  The same flag remained absent in run 40123193489. Consequently T10 now uses
+  direct **kernel cgroup evidence**, not exit 137 or the unreliable Docker flag:
+  PID 1 observes its own `memory.max == 128 MiB` and the `memory.events.oom_kill`
+  counter while a child overallocates. The child must die by SIGKILL and the
+  counter must increase; a 4-MiB negative control must exit normally with no
+  increase. Both cases passed locally. The observer needs no extra privileges,
+  host mounts or network. Unsupported/missing kernel evidence fails the test.
+  Legacy asynchronous Docker-state observation tests remain; no daemon OOM flag
+  is presented as proven when absent. This adds one case to the full suite.
 * At `0028366`, the new **real-container F2.3 smoke passed**: normalized API
   task contract -> execution/verifier -> quiescence -> encrypted backup ->
   separate networkless restored database with audit anchor -> application
