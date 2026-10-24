@@ -1,7 +1,7 @@
 # F2.1 verification evidence
 
-This record separates executed evidence from pending final gates. The definitive
-final-head CI status will be linked in the development PR. No earlier F2/F1 run
+This record separates executed evidence from live deployment gates. The definitive
+final-head CI status is linked in [PR #14 checks](https://github.com/v71369322-lang/ai-command-center/pull/14/checks). No earlier F2/F1 run
 is substituted for F2.1 validation. Overlapping pytest selections are not added.
 
 ## Environment corrections
@@ -32,20 +32,34 @@ owner-visible stop reasons. None of these enabled live services or weakened test
 The final review also closed the approval/scope-installation race: both now commit
 in the existing F1 approval transaction, with rollback regression coverage.
 
-## Final run status
+## Executed final cloud run
 
-Pending execution summary after current clean-source checks:
+2026-10-24, clean source commit
+`f637581a722a8262607e60bb9e74b187a363b2f4`:
+`F1_BUILD_CA_FILE=/etc/ssl/certs/ca-certificates.crt scripts/verify_cloud.sh`.
+All images were rebuilt for that exact source; coding image:
+`sha256:bd17791cb66d61ae908bc5b024cb59af8566d568d0e2c79e9078917f2c7d13bc`.
+The source/image pinning and resource gates remained enabled.
 
 | Gate | Status |
 |---|---|
-| 40 F2.1 readiness tests | 40 passed after environment correction; full suite will recheck the final atomic-approval fix |
-| Full Python suite, including mobile | Pending |
-| 32 infrastructure tests | Pending |
-| Ruff / OpenAPI | Passed on checkpoint |
-| TypeScript/Vite | Passed during development; final run pending |
-| Security/dependency audits | Pending F2.1 final run |
-| Container API/worker, restore/restart/watchdog | Pending F2.1 final run |
-| Final-head GitHub CI | Pending PR |
+| 40 F2.1 readiness tests | **40/40 passed**, included in the full suite; atomic approval rollback and exact verifier refusal checked |
+| Full Python suite, including mobile | **183 passed**, zero failures/errors/skips, 203.36 seconds |
+| Infrastructure suite | **32 passed**, separate from Python application suite |
+| Ruff (`src tests scripts` and `infra/vps`) / OpenAPI snapshot | PASS |
+| TypeScript / Vite | PASS |
+| All Python dependency audit | 64 dependencies; **0 known advisories** |
+| npm audit | **0 known advisories** |
+| Bandit | 0 MEDIUM/HIGH; 29 reviewed LOW findings retained |
+| Current runtime-value secret scan / whitespace | PASS; not a universal secret detector |
+| API / PG / Outbox / Redis / worker / broker container smoke | PASS |
+| Encrypted backup → separate networkless PG restore / audit interlock | PASS |
+| Restart / persisted result / cancel intent / new task | PASS |
+| Worker SIGKILL → watchdog → confirmed absence / no orphan | PASS |
+| F2 container smoke / runtime credential-mount boundaries | PASS |
+| Full F2.1 HTTP-mock cycle with real coding/verifier sandboxes | PASS, including matching draft PR, two AI fixture calls and usage settlement |
+| Mobile Chromium at 390×844 | PASS: create → exact budget approval → repair/test history → mock publication; no live PR link or horizontal overflow |
+| Final-head GitHub CI | Must be green on the documentation follow-up commit; PR check records exact head and run |
 
 HTTP tests use `httpx.MockTransport` at the documented OpenAI/GitHub URLs, fake
 credentials and explicitly fictional tariffs. No real API calls or new-publisher
@@ -54,6 +68,27 @@ mode is explicitly cloud-rootful-test. Browser testing uses Chromium at 390×844
 not a physical iPhone or proof of real MFA/VPN.
 The targeted run including the mobile F2.1 scenario passed 41 tests (the same
 40 readiness tests plus one mobile test; these are not additional disjoint totals).
+The full 183 also includes those tests; it must not be added to 40 or 41. The
+infrastructure suite's 32 tests are disjoint. Existing test coverage remains intact.
+
+F2.1 scenarios cover missing credentials, invalid scopes/model/fence/source,
+unconfirmed tariffs, task/day/month limits, simultaneous requests, old disputed
+costs, provider timeouts before/after response, credential echo, tool/scope/prompt
+injection, cancellation/revocation during HTTP, PG loss before/after I/O,
+audit/financial-row corruption, independent verifier mismatch, GitHub
+403/409/429/500, duplicate publication, lost commit/ref/PR response and read-only
+reconciliation after reconstructing the gateway. The full suite also retains F1
+lease, isolation, watchdog, cancellation, resource and recovery negatives.
+
+The two new Bandit B110 LOW findings are intentional fail-closed exception paths:
+gateway cannot record interruption when PG/audit is unavailable and preserves
+pre-I/O intent; runner cannot overwrite reports after cancellation/audit loss and
+still stops execution. No swallowed exception grants completion or new authority.
+
+Local evidence under ignored `.runtime/`: `f21-final-verification.log`,
+`test-results.xml`, `f21-mobile.png`, `security-summary.json`, `all-pip-audit.json`,
+`npm-audit.json`, `bandit.json`, and restore/restart/watchdog/boundary artifacts.
+These are local synthetic evidence, not independent offsite operational checkpoints.
 
 Known inherited warnings are retained: Starlette TestClient/httpx deprecation and
 GitHub's Node 20 pinned-action runtime migration. Any new warning/failure will
