@@ -106,7 +106,8 @@ def main():
             def closed_access():
                 require(client.get('/').status_code == 200)
                 require(client.get('/api/state').status_code == 401)
-                require(client.post('/api/auth/exchange', json={'assertion': 'synthetic-unconfigured-identity-assertion'}).status_code == 503)
+                denied = client.post('/api/auth/exchange', json={'assertion': 'synthetic-unconfigured-identity-assertion'})
+                require(denied.status_code == 403 and denied.json()['detail'] == 'https_required')
             wait(closed_access)
         code = ('import json;from command_center.config import Settings;from command_center.store import Store;'
                 "print(json.dumps(Store(Settings.load()).create('owner','f23-cloud-smoke',{'kind':'render','values':{'test':'synthetic'}})))")
