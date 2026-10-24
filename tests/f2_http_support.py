@@ -30,11 +30,14 @@ class Credentials:
 
 
 class FakeHTTP:
-    def __init__(self, scenario='normal'):
+    def __init__(self, scenario='normal', model='fixture-model'):
         self.calls, self.ai_calls, self.prs, self.branches, self.objects = [], 0, [], {}, {}
         self.scenario, self.before, self.after = scenario, None, None
         self.fail_status, self.fail_path = None, ''
         self.base_sha = BASE_SHA
+        self.model = model
+        self.repository_id = 725000001  # Public fixture ID only, not an actual repository.
+        self.protected = True
 
     def handle(self, request):
         self.calls.append((request.method, request.url.path))
@@ -54,8 +57,9 @@ class FakeHTTP:
         body = json.loads(request.content) if request.content else None
         if request.url.host == 'api.openai.com':
             assert request.url.path == '/v1/responses' and request.method == 'POST'
-            assert set(body) == {'model', 'store', 'max_output_tokens', 'input', 'text'}
-            assert body['store'] is False and body['model'] == 'fixture-model'
+            assert set(body) == {'model', 'store', 'service_tier', 'max_output_tokens', 'input', 'text'}
+            assert body['service_tier'] == 'default'
+            assert body['store'] is False and body['model'] == self.model
             assert body['text']['format'] == FORMAT and body['input'][0] == {'role': 'developer', 'content': INSTRUCTION}
             context = json.loads(body['input'][1]['content'])
             assert not any(v in json.dumps(context) for v in Credentials.values.values())
@@ -71,7 +75,8 @@ class FakeHTTP:
                 output[0]['content'][0]['text'] = json.dumps({'source': CORRECT, 'repository': 'CRM'})
             if self.scenario == 'credential_echo':
                 output[0]['content'][0]['text'] = json.dumps({'source': '# ' + Credentials.values['openai'] + '\n' + CORRECT})
-            return {'id': 'resp_fixture_' + str(self.ai_calls), 'object': 'response', 'model': 'fixture-model',
+            return {'id': 'resp_fixture_' + str(self.ai_calls), 'object': 'response', 'model': self.model,
+                    'service_tier': 'default',
                     'created_at': 1, 'status': 'completed', 'output': output,
                     'usage': {'input_tokens': 100, 'output_tokens': 32, 'total_tokens': 132}}
         assert request.url.host == 'api.github.com'
@@ -79,6 +84,11 @@ class FakeHTTP:
         assert request.url.path.startswith(prefix)
         path = request.url.path[len(prefix):]
         if request.method == 'GET':
+            if path == '':
+                return {'id': self.repository_id, 'full_name': 'fixture/acc-f2-synthetic-test',
+                        'archived': False, 'disabled': False, 'permissions': {'admin': False, 'push': True}}
+            if path == '/branches/main':
+                return {'name': 'main', 'protected': self.protected, 'commit': {'sha': self.base_sha}}
             if path == '/git/ref/heads/main':
                 return {'ref': 'refs/heads/main', 'object': {'sha': self.base_sha}}
             if path.startswith('/git/ref/heads/'):

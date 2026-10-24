@@ -139,6 +139,14 @@ def test_f21_mobile_owner_http_mock_cycle(settings, store, tmp_path):
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
             page.screenshot(path='.runtime/f21-mobile.png', full_page=True)
             assert fake.ai_calls == 2 and len(fake.prs) == 1
+            page.get_by_role('heading', name='Первый эксперимент F2.2', exact=True).wait_for()
+            page.get_by_text('Модель: gpt-5.4-mini-2026-03-17', exact=True).wait_for()
+            page.get_by_role('button', name='Подготовить одну задачу без запуска', exact=True).click()
+            page.get_by_role('button', name='Окончательно разрешить эксперимент до 100 ₽', exact=True).wait_for()
+            assert page.get_by_role('button', name='Окончательно разрешить эксперимент до 100 ₽', exact=True).is_disabled()
+            assert fake.ai_calls == 2  # Preparing F2.2 does not perform another inference.
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+            page.screenshot(path='.runtime/f22-mobile.png', full_page=True)
             context.close()
             browser.close()
     finally:

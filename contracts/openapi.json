@@ -84,6 +84,18 @@
             "title": "Base Sha",
             "type": "string"
           },
+          "experiment_id": {
+            "anyOf": [
+              {
+                "const": "f2.2-first-live",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experiment Id"
+          },
           "max_iterations": {
             "default": 2,
             "maximum": 3.0,
@@ -237,6 +249,47 @@
           "budget_nano_rub"
         ],
         "title": "ExternalApprovalRequest",
+        "type": "object"
+      },
+      "FinalExperimentApproval": {
+        "additionalProperties": false,
+        "properties": {
+          "budget_nano_rub": {
+            "default": 100000000000,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Budget Nano Rub",
+            "type": "integer"
+          },
+          "confirmation": {
+            "const": "AUTHORIZE_FIRST_PAID_EXPERIMENT",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "profile_hash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Profile Hash",
+            "type": "string"
+          },
+          "seconds": {
+            "default": 120,
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "confirmation",
+          "profile_hash"
+        ],
+        "title": "FinalExperimentApproval",
         "type": "object"
       },
       "ResumeRequest": {
@@ -782,6 +835,169 @@
           }
         },
         "summary": "Stop"
+      }
+    },
+    "/api/experiments/first": {
+      "get": {
+        "operationId": "first_experiment_status_api_experiments_first_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "First Experiment Status"
+      }
+    },
+    "/api/experiments/first/task": {
+      "post": {
+        "operationId": "create_first_experiment_api_experiments_first_task_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Create First Experiment"
+      }
+    },
+    "/api/experiments/first/{task_id}/authorize": {
+      "post": {
+        "operationId": "authorize_first_experiment_api_experiments_first__task_id__authorize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalExperimentApproval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Authorize First Experiment"
       }
     },
     "/api/health": {

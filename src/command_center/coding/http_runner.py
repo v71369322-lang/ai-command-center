@@ -34,6 +34,7 @@ class HttpCodingRunner(CodingRunner):
         try:
             with self.store.transaction() as s:
                 self.gateway.authority(s, task['id'], task['fence'])
+            RemotePublisher(self.gateway, task).verify_repository()  # Before the first paid model request.
             provider = GatewayProvider(self.gateway, task)
             source, checks = INITIAL, None
             base = {'operation_id': task['id'], 'fence': task['fence'], 'coding': config}

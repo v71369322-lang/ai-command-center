@@ -48,6 +48,17 @@ class RemotePublisher:
     def __init__(self, gateway, task):
         self.gateway, self.task = gateway, task
 
+    def verify_repository(self):
+        g, task = self.gateway, self.task
+        if not g.config.first_experiment:
+            return
+        from .first_experiment import validate_repository
+        prefix = '/repos/' + g.config.synthetic_repository
+        nonce = uuid4().hex[:8]
+        metadata = g.request(task['id'], task['fence'], 'repo/' + nonce, 'github', 'GET', prefix)
+        branch = g.request(task['id'], task['fence'], 'protection/' + nonce, 'github', 'GET', prefix + '/branches/main')
+        validate_repository(metadata, branch, g.config.synthetic_repository, g.config.first_experiment.repository_id)
+
     def publish(self, result):
         g, task = self.gateway, self.task
         report, objects, snapshots = inspect_result(result, task['id'], task['fence'], task['payload']['coding'])
@@ -61,6 +72,7 @@ class RemotePublisher:
         g.store.coding_stage(task['id'], task['fence'], 'publication_pending',
                              publication_plan=plan, summary='Результат проверен. Подготовка разрешённого draft PR.')
         prefix = '/repos/' + g.config.synthetic_repository
+        self.verify_repository()
         base = g.request(task['id'], task['fence'], 'base-check/' + uuid4().hex[:8], 'github', 'GET', prefix + '/git/ref/heads/main')
         if base.get('object', {}).get('sha') != BASE_SHA:
             raise Denied('remote_base_revision_changed')
