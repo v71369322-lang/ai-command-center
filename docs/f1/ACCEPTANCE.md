@@ -1,5 +1,10 @@
 # T01–T14: проверяемый статус F1
 
+Обновление hardening: [115+32 actual cases, negative matrix и остаточные gates](HARDENING_VALIDATION.md).
+T01/T04/T07/T08/T09/T10/T11/T12/T13/T14 получили дополнительные cloud evidence;
+rootless host, real MFA/HTTPS/offsite и independent review не считаются PASS.
+Таблица ниже сохраняет baseline предыдущего аудита (75 cases), не подменяет его.
+
 Основание: [VALIDATION.md](VALIDATION.md), 75 тестов после полного аудита и завершённый контейнерный
 профиль. PASS относится только к описанной cloud-проверке. Непроверенные условия
 не считаются пройденными. Owner acceptance отсутствует.

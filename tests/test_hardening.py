@@ -358,7 +358,10 @@ def test_runtime_database_role_cannot_create_approval_or_read_owner_session(stor
         restricted.engine.dispose()
 
 
-def test_backup_job_actual_dump_readback_freshness_corruption_restore(store, admin, tmp_path):
+def test_backup_job_actual_dump_readback_freshness_corruption_restore(store, admin, tmp_path, oidc):
+    configured, assertion = oidc
+    with TestClient(create_app(configured), base_url='https://testserver') as client:
+        assert client.post('/api/auth/exchange', json={'assertion': assertion()}).status_code == 200
     create(store)
     repo = LocalRepository(tmp_path / 'repo')
     jobs = BackupJobs(store, repo, b'K' * 32, tmp_path / 'state')
@@ -371,6 +374,13 @@ def test_backup_job_actual_dump_readback_freshness_corruption_restore(store, adm
     target = 'f1_restore_' + uuid4().hex
     try:
         assert jobs.restore(receipt['name'], target, admin.settings)['state'] == 'VERIFIED_QUARANTINED'
+        restored = Store(replace(admin.settings, database_url=admin.settings.database_url.set(database=target)))
+        try:
+            with restored.engine.connect() as connection:
+                assert connection.execute(text('SELECT count(*) FROM owner_sessions')).scalar_one() == 1
+                assert connection.execute(text('SELECT count(*) FROM owner_sessions WHERE NOT revoked')).scalar_one() == 0
+        finally:
+            restored.engine.dispose()
     finally:
         with admin.engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
             connection.execute(text(f'DROP DATABASE IF EXISTS "{target}" WITH (FORCE)'))

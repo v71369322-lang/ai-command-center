@@ -15,8 +15,9 @@ credentials. Broker имеет отдельный f1_runtime PG role: не со�
 roles и очищает старые grants перед выдачей узких прав. Worker вообще не имеет PG
 credential, поэтому не может подделать owner approval через SQL.
 
-RPC model: submit(task UUID, exact source SHA) и status/heartbeat(task UUID,
-strict integer fence). Extra fields/неизвестные действия/oversized body/неверный
+RPC model: submit(task UUID, exact source SHA), status/heartbeat(task UUID,
+strict integer fence) и worker_online(exact source SHA) без task authority.
+Extra fields/неизвестные действия/oversized body/неверный
 token отклоняются. Нет raw Docker JSON, image/mount/shell/network выбора от worker.
 Image выбирает только trusted broker configuration; immutable ID и source label
 проверяются перед запуском. Trusted CI/provenance на целевом хосте остаётся gate.
@@ -52,7 +53,8 @@ socket безопасным из-за доверенного имени серв
 runtime_ledger — fsynced SQLite с append hash-linked evidence и durable run
 mapping; worker не получает volume. Heartbeat watchdog нужен для admission;
 исчезновение watchdog также останавливает текущий broker run. Watchdog — другой
-процесс/контейнер, не поток worker. Он проверяет wall/worker heartbeat/PG lease/
+процесс/контейнер, не поток worker. Idle-worker heartbeat проверяется отдельно;
+его потеря журналируется. Он проверяет wall/worker heartbeat/PG lease/
 fence/cancel/halt/audit и bounded stop + actual absence/daemon health.
 
 При stop refusal/неизвестном create: UNCERTAIN, reservation сохраняется, новые
