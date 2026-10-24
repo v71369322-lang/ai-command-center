@@ -68,3 +68,13 @@ class Audit(Base):
     event: Mapped[dict] = mapped_column(JSONB)
     previous: Mapped[str] = mapped_column(String(64))
     digest: Mapped[str] = mapped_column(String(64))
+
+
+class OwnerSession(Base):
+    __tablename__ = 'owner_sessions'
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    csrf_hash: Mapped[str] = mapped_column(String(64))
+    assertion_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    subject: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)

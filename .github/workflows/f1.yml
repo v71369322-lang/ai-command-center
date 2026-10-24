@@ -10,7 +10,7 @@ concurrency:
 jobs:
   synthetic:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -26,6 +26,8 @@ jobs:
           python -m pip install uv==0.12.23
           uv sync --frozen
           .venv/bin/ruff check src tests scripts
+          .venv/bin/ruff check infra/vps
+          .venv/bin/pytest infra/vps/tests -q
           .venv/bin/python scripts/export_contract.py --check
           npm ci --prefix web
           npm run --prefix web build

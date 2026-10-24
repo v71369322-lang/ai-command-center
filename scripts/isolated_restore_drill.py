@@ -65,6 +65,7 @@ def main():
                  'time': datetime.now(timezone.utc).isoformat(), 'revision': os.environ['F1_SOURCE_REVISION']}
         interlock = sql.SQL("BEGIN; UPDATE control SET halted=true,recovery=true,epoch=epoch+1; "
                             "UPDATE approvals SET revoked=true; "
+                            "UPDATE owner_sessions SET revoked=true; "
                             "UPDATE tasks SET state='RECONCILING' WHERE state NOT IN "
                             "('SUCCEEDED','FAILED','CANCELLED','SECURITY_BLOCKED','CANCEL_REQUESTED'); "
                             "INSERT INTO audit(event,previous,digest) VALUES ({}::jsonb,{},{}); COMMIT;")

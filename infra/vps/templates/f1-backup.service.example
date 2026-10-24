@@ -1,0 +1,18 @@
+# FUTURE HOST INSTALLATION ONLY. No service installed/enabled by this package.
+[Unit]
+Description=F1 encrypted synthetic backup and verified receipt
+After=network.target
+
+[Service]
+Type=oneshot
+User=__TRUSTED_BACKUP_ACCOUNT__
+EnvironmentFile=/etc/ai-command-center/f1/backup.env
+ExecStart=/opt/ai-command-center/.venv/bin/python -m command_center.backup_jobs backup --repository /var/lib/f1-backups/repository --state-dir /var/lib/f1-backups/state --key-file /etc/ai-command-center/f1/secrets/backup_key
+TimeoutStartSec=180
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/f1-backups
+# Backup account's Docker access is trusted operator authority, not executor scope.
+# Replace with scoped backup transport before production; this is not offsite.

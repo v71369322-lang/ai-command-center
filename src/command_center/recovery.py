@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .config import Settings
 from .local_docker import run as docker
-from .models import Approval, Control, Task
+from .models import Approval, Control, Task, OwnerSession
 from .store import Store, TERMINAL
 
 MAGIC = b"ACC-F1-BACKUP-v1\x00"
@@ -38,6 +38,8 @@ def enter_recovery(store):
         control.epoch += 1
         for approval in s.query(Approval).all():
             approval.revoked = True
+        for owner_session in s.query(OwnerSession).all():
+            owner_session.revoked = True
         for task in s.query(Task).all():
             if task.state not in TERMINAL and task.state != "CANCEL_REQUESTED":
                 task.state = "RECONCILING"

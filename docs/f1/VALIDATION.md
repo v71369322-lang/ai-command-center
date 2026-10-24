@@ -1,5 +1,10 @@
 # Cloud F1 evidence
 
+Последующий infrastructure-hardening: [HARDENING_VALIDATION.md](HARDENING_VALIDATION.md)
+и [реализация/границы](INFRASTRUCTURE_HARDENING.md). Пройден новый cloud-профиль:
+115 Python cases + 32 infrastructure cases, broker/watchdog/session/backup и
+actual worker SIGKILL drill. Результаты прежних стадий ниже сохранены как baseline.
+
 ## Полный аудит PR #8 + #9
 
 Clean-tree source `5133bd3e599c62e900bb83d1a8a101deeaceccf7`: **75 passed**, 73.79 s.

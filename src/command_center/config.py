@@ -27,6 +27,12 @@ class Settings:
     lease_seconds: int = 15
     timeout_seconds: int = 30
     max_attempts: int = 2
+    auth_mode: str = 'synthetic'
+    oidc_issuer: str = ''
+    oidc_audience: str = ''
+    oidc_owner: str = ''
+    oidc_jwks_file: str = ''
+    web_origin: str = ''
 
     @classmethod
     def load(cls, *, identities_required=True):
@@ -42,6 +48,14 @@ class Settings:
                          password=secret("F1_DB_PASSWORD_FILE"),
                          host=os.environ.get("F1_DB_HOST", "db"),
                          port=int(os.environ.get("F1_DB_PORT", "5432")), database="f1")
+        mode = os.environ.get('F1_AUTH_MODE', 'synthetic')
+        if mode not in {'synthetic', 'oidc'}:
+            raise RuntimeError('unknown_auth_mode')
         return cls(url, os.environ.get("F1_REDIS_URL", "redis://redis:6379/0"),
                    secret("F1_REDIS_PASSWORD_FILE"), identities, revision,
-                   os.environ.get("F1_EXECUTOR_IMAGE", "acc-f1-executor:local"))
+                   os.environ.get("F1_EXECUTOR_IMAGE", "acc-f1-executor:local"),
+                   auth_mode=mode, oidc_issuer=os.environ.get('F1_OIDC_ISSUER', ''),
+                   oidc_audience=os.environ.get('F1_OIDC_AUDIENCE', ''),
+                   oidc_owner=os.environ.get('F1_OIDC_OWNER', ''),
+                   oidc_jwks_file=os.environ.get('F1_OIDC_JWKS_FILE', ''),
+                   web_origin=os.environ.get('F1_WEB_ORIGIN', ''))

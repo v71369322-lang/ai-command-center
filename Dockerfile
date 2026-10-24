@@ -23,5 +23,8 @@ USER 10001:10001
 CMD ["uvicorn", "command_center.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 
 FROM app AS worker
-COPY --chmod=0555 --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 CMD ["python", "-m", "command_center.worker"]
+
+FROM worker AS broker
+COPY --chmod=0555 --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+CMD ["uvicorn", "command_center.runtime_broker:create_broker_app", "--factory", "--uds", "/run/f1-broker/runtime.sock", "--no-access-log"]

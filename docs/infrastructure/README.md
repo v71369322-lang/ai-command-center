@@ -1,5 +1,11 @@
 # F1: пакет подготовки выделенного VPS
 
+Этот пакет фиксирует baseline PR #11. Последующая облачная реализация broker,
+watchdog, owner session adapter и backup jobs описана в
+[INFRASTRUCTURE_HARDENING](../f1/INFRASTRUCTURE_HARDENING.md). Слова «не реализовано»
+ниже относятся к моменту подготовки; host/offsite/actual identity gates по-прежнему
+не закрыты одним фактом появления кода.
+
 **Только подготовка. Серверы не посещались и не сканировались.**
 База — PR #10 `d551cfb8dd29deb5540d9842faf704f1612d598e`, последовательно
 зависимый от открытых PR #8/#9 и исторических PR. Ветка infra/f1-vps-preparation

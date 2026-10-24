@@ -1,0 +1,23 @@
+# FUTURE VPS PROFILE ONLY: host UID/cgroup/socket paths must first be audited.
+# Does not implement VPN/HTTPS/IdP enrollment or offsite custody.
+services:
+  api:
+    environment:
+      F1_AUTH_MODE: oidc
+      F1_OIDC_ISSUER: ${F1_OIDC_ISSUER:-}
+      F1_OIDC_AUDIENCE: ${F1_OIDC_AUDIENCE:-}
+      F1_OIDC_OWNER: ${F1_OIDC_OWNER:-}
+      F1_WEB_ORIGIN: ${F1_WEB_ORIGIN:-}
+      F1_OIDC_JWKS_FILE: /run/identity/public-jwks.json
+    volumes:
+      - ./infra/vps/identity-unconfigured.json:/run/identity/public-jwks.json:ro
+  runtime-broker:
+    environment:
+      F1_RUNTIME_MODE: rootless-required
+    volumes:
+      - /run/user/${F1_EXECUTION_UID:?Dedicated rootless UID required}/docker.sock:/var/run/docker.sock
+  watchdog:
+    environment:
+      F1_RUNTIME_MODE: rootless-required
+    volumes:
+      - /run/user/${F1_EXECUTION_UID:?Dedicated rootless UID required}/docker.sock:/var/run/docker.sock
