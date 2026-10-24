@@ -30,6 +30,11 @@ class CloudEngine:
         return json.loads(self.run(*args))
 
 
+def require(condition):
+    if not condition:
+        raise ValueError('cloud_deployment_expectation_failed')
+
+
 def wait(check, seconds=40):
     deadline = time.monotonic() + seconds
     while True:
@@ -90,9 +95,9 @@ def main():
         wait(deployment.postcheck)
         with httpx.Client(base_url='http://127.0.0.1:18000', timeout=5) as client:
             def closed_access():
-                assert client.get('/').status_code == 200
-                assert client.get('/api/state').status_code == 401
-                assert client.post('/api/auth/exchange', json={'assertion': 'not-a-real-assertion'}).status_code == 503
+                require(client.get('/').status_code == 200)
+                require(client.get('/api/state').status_code == 401)
+                require(client.post('/api/auth/exchange', json={'assertion': 'not-a-real-assertion'}).status_code == 503)
             wait(closed_access)
         code = ('import json;from command_center.config import Settings;from command_center.store import Store;'
                 "print(json.dumps(Store(Settings.load()).create('owner','f23-cloud-smoke',{'kind':'render','values':{'test':'synthetic'}})))")
@@ -101,8 +106,8 @@ def main():
         def succeeded():
             value = json.loads(deployment.tool('import json;from command_center.config import Settings;'
                 'from command_center.store import Store;print(json.dumps(Store(Settings.load()).get(' + repr(task['id']) + ')))'))
-            assert value['state'] == 'SUCCEEDED'
-            assert value['artifact_hash']
+            require(value['state'] == 'SUCCEEDED')
+            require(bool(value['artifact_hash']))
             return value
         evidence = wait(succeeded)
         deployment.quiesce()
@@ -111,10 +116,10 @@ def main():
         deployment.compose('stop', 'api', 'worker', 'runtime-broker', 'watchdog')
         deployment.compose('up', '-d', '--no-build', '--pull', 'never')
         wait(deployment.postcheck)
-        assert wait(succeeded)['artifact_hash'] == evidence['artifact_hash']
+        require(wait(succeeded)['artifact_hash'] == evidence['artifact_hash'])
         deployment.compose('restart')
         wait(deployment.postcheck)
-        assert wait(succeeded)['artifact_hash'] == evidence['artifact_hash']
+        require(wait(succeeded)['artifact_hash'] == evidence['artifact_hash'])
         report = {'revision': revision, 'mode': 'CLOUD_ROOTFUL_TEST_ONLY', 'task_verified': True,
                   'closed_auth': True, 'persistent_recreate_and_restart': True, 'restore': restored,
                   'rootless_host_verified': False, 'systemd_boot_verified': False, 'vps_contacted': False}

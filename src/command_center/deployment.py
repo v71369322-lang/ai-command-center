@@ -170,10 +170,10 @@ class Deployment:
         args = ['run', '--rm', '--network', PROJECT + '_control', '--read-only', '--cap-drop=ALL',
                 '--security-opt=no-new-privileges', '--user=0:0', '--memory=256m', '--cpus=.5', '--pids-limit=64',
                 '--tmpfs=/tmp:rw,nosuid,nodev,size=16m']
-        env = dict(F1_DB_USER='f1_admin', F1_DB_HOST='db', F1_DB_PASSWORD_FILE='/run/secrets/db_admin_password',
-                   F1_APP_PASSWORD_FILE='/run/secrets/db_password', F1_RUNTIME_PASSWORD_FILE='/run/secrets/db_runtime_password',
-                   F1_IDENTITIES_FILE='/run/secrets/identities', F1_REDIS_PASSWORD_FILE='/run/secrets/redis_password',
-                   F1_REDIS_URL='redis://redis:6379/0', F1_SOURCE_REVISION=self.m['revision'])
+        env = {'F1_DB_USER': 'f1_admin', 'F1_DB_HOST': 'db', 'F1_DB_PASSWORD_FILE': '/run/secrets/db_admin_password',
+               'F1_APP_PASSWORD_FILE': '/run/secrets/db_password', 'F1_RUNTIME_PASSWORD_FILE': '/run/secrets/db_runtime_password',
+               'F1_IDENTITIES_FILE': '/run/secrets/identities', 'F1_REDIS_PASSWORD_FILE': '/run/secrets/redis_password',
+               'F1_REDIS_URL': 'redis://redis:6379/0', 'F1_SOURCE_REVISION': self.m['revision']}
         for key, value in env.items():
             args += ['--env', key + '=' + value]
         for name in SECRETS - {'broker_token'}:
