@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Command Center encrypted LOCAL backup (not offsite)
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/home/acc-control/source
+ExecStart=/home/acc-control/tools/bin/python -m command_center.deployment backup --active-state /home/acc-control/state
+ExecStartPost=/home/acc-control/tools/bin/python -m command_center.deployment backup-status --active-state /home/acc-control/state
+UMask=0077
+TimeoutStartSec=180

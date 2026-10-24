@@ -1,0 +1,17 @@
+# USER service, installed only after host audit and exact release authorization.
+# Replace paths with protected absolute paths of the approved bundle/tools.
+[Unit]
+Description=AI Command Center closed synthetic control plane
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/acc-control/source
+ExecStart=/home/acc-control/tools/bin/python -m command_center.deployment boot --active-state /home/acc-control/state
+TimeoutStartSec=180
+UMask=0077
+
+[Install]
+WantedBy=default.target
