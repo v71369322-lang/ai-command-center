@@ -29,12 +29,13 @@ class Request(BaseModel):
 
 
 class RuntimeBroker:
-    def __init__(self, store, ledger, backend, limits=None):
+    def __init__(self, store, ledger, backend, limits=None, gateway_factory=None):
         self.store, self.ledger, self.backend = store, ledger, backend
         self.limits = limits or RuntimeLimits()
         self.lock = Lock()
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.last_future = None
+        self.gateway_factory = gateway_factory
 
     def submit(self, task_id, revision):
         with self.lock:
@@ -60,8 +61,13 @@ class RuntimeBroker:
 
     def execute(self, task):
         if task['payload']['kind'] == 'coding_synthetic':
-            from .coding.runner import CodingRunner
-            runner = CodingRunner(self.store, self.backend, self.limits, self.ledger)
+            if task['payload']['coding']['provider'] == 'openai':
+                from .coding.http_runner import HttpCodingRunner
+                gateway = self.gateway_factory() if self.gateway_factory else None
+                runner = HttpCodingRunner(self.store, self.backend, self.limits, self.ledger, gateway)
+            else:
+                from .coding.runner import CodingRunner
+                runner = CodingRunner(self.store, self.backend, self.limits, self.ledger)
         else:
             runner = Runner(self.store, self.backend, self.limits, self.ledger)
         try:

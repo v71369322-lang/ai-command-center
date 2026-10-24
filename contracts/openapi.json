@@ -39,6 +39,42 @@
         "title": "AssertionRequest",
         "type": "object"
       },
+      "BillingReconciliation": {
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "pattern": "^[a-f0-9-]{36}$",
+            "title": "Action Id",
+            "type": "string"
+          },
+          "evidence_reference": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Evidence Reference",
+            "type": "string"
+          },
+          "input_tokens": {
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "output_tokens": {
+            "maximum": 4096.0,
+            "minimum": 0.0,
+            "title": "Output Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action_id",
+          "input_tokens",
+          "output_tokens",
+          "evidence_reference"
+        ],
+        "title": "BillingReconciliation",
+        "type": "object"
+      },
       "CodingRequest": {
         "additionalProperties": false,
         "properties": {
@@ -57,7 +93,7 @@
           },
           "max_seconds": {
             "default": 15,
-            "maximum": 20.0,
+            "maximum": 120.0,
             "minimum": 1.0,
             "title": "Max Seconds",
             "type": "integer"
@@ -83,8 +119,11 @@
             "type": "string"
           },
           "provider": {
-            "const": "mock",
             "default": "mock",
+            "enum": [
+              "mock",
+              "openai"
+            ],
             "title": "Provider",
             "type": "string"
           },
@@ -169,6 +208,35 @@
           "detail"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "ExternalApprovalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "budget_nano_rub": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 10000000000000.0,
+            "title": "Budget Nano Rub",
+            "type": "integer"
+          },
+          "seconds": {
+            "default": 120,
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "budget_nano_rub"
+        ],
+        "title": "ExternalApprovalRequest",
         "type": "object"
       },
       "ResumeRequest": {
@@ -495,6 +563,73 @@
         "summary": "Create Coding"
       }
     },
+    "/api/coding/tasks/{task_id}/authorize": {
+      "post": {
+        "operationId": "authorize_external_api_coding_tasks__task_id__authorize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Authorize External"
+      }
+    },
     "/api/coding/template": {
       "get": {
         "operationId": "coding_scope_api_coding_template_get",
@@ -695,6 +830,112 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/integration/reconcile-billing": {
+      "post": {
+        "operationId": "reconcile_billing_api_integration_reconcile_billing_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingReconciliation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Reconcile Billing"
+      }
+    },
+    "/api/integration/status": {
+      "get": {
+        "operationId": "integration_status_api_integration_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Integration Status"
       }
     },
     "/api/simulator/commands": {

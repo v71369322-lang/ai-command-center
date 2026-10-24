@@ -14,11 +14,14 @@ def main():
         raise ValueError('coding_input_limit')
     job = json.loads(raw)
     task = CodingRequest.model_validate(job['coding']).model_dump()
-    if task['provider'] != 'mock':
-        raise ValueError('provider_not_authorized')
     if job['mode'] == 'agent':
+        if task['provider'] != 'mock':
+            raise ValueError('provider_not_authorized')
         from command_center.coding.agent import execute
         result = execute({**job, 'coding': task}, Path('/work/repository'))
+    elif job['mode'] == 'external_iteration':
+        from command_center.coding.external_execution import apply_proposals
+        result = apply_proposals({**job, 'coding': task}, Path('/work/repository'))
     elif job['mode'] == 'verify':
         result = replay(job['result'], job['operation_id'], job['fence'], task, Path('/work/verification'))
     else:

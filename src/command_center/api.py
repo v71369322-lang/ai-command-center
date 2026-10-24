@@ -59,7 +59,19 @@ class AssertionRequest(BaseModel):
     assertion: str = Field(min_length=32, max_length=7000)
 
 
-def create_app(settings=None):
+class ExternalApprovalRequest(ApprovalRequest):
+    budget_nano_rub: int = Field(gt=0, le=10_000_000_000_000, strict=True)
+
+
+class BillingReconciliation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    action_id: str = Field(pattern=r'^[a-f0-9-]{36}$')
+    input_tokens: int = Field(ge=0, le=10_000_000, strict=True)
+    output_tokens: int = Field(ge=0, le=4096, strict=True)
+    evidence_reference: str = Field(min_length=1, max_length=300)
+
+
+def create_app(settings=None, gateway_factory=None):
     settings = settings or Settings.load()
     store = Store(settings)
     owner_auth = OwnerAuth(store)
@@ -77,6 +89,10 @@ def create_app(settings=None):
                              429: {"model": ErrorResponse, "description": "Bounded request rate exceeded"}})
     app.state.store = store
     limiter = RateLimit()
+
+    def external_gateway():
+        from .coding.gateway import Gateway
+        return gateway_factory() if gateway_factory else Gateway(store)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request, error):
@@ -192,7 +208,38 @@ def create_app(settings=None):
 
     @app.get("/api/state")
     def state(role=Depends(human)):
-        return store.snapshot()
+        result = store.snapshot()
+        for task in result['tasks']:
+            if task['payload'].get('coding', {}).get('provider') == 'openai':
+                gateway = external_gateway()
+                try:
+                    task['integration'] = gateway.status(task['id'])
+                finally:
+                    gateway.close()
+        return result
+
+    @app.get('/api/integration/status')
+    def integration_status(role=Depends(human)):
+        from .coding.integration_config import IntegrationConfig
+        return IntegrationConfig.load().public()
+
+    @app.post('/api/coding/tasks/{task_id}/authorize')
+    def authorize_external(task_id: str, command: ExternalApprovalRequest, role=Depends(identity)):
+        gateway = external_gateway()
+        try:
+            return gateway.authorize(role, task_id, command.version,
+                                     budget_nano_rub=command.budget_nano_rub, seconds=command.seconds)
+        finally:
+            gateway.close()
+
+    @app.post('/api/integration/reconcile-billing')
+    def reconcile_billing(command: BillingReconciliation, role=Depends(identity)):
+        gateway = external_gateway()
+        try:
+            return gateway.reconcile_usage(role, command.action_id, command.input_tokens,
+                                           command.output_tokens, command.evidence_reference)
+        finally:
+            gateway.close()
 
     @app.get('/api/coding/template')
     def coding_scope(role=Depends(human)):
