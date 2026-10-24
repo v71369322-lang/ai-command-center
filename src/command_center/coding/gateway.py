@@ -31,6 +31,19 @@ class Gateway:
     def close(self):
         self.client.close()
 
+    @staticmethod
+    def action_digest(row):
+        return digest({'id': row.id, 'task': row.task_id, 'key': row.key, 'kind': row.kind,
+                       'request': row.request_hash, 'state': row.state, 'reserved': row.reserved,
+                       'actual': row.actual, 'evidence': row.evidence})
+
+    def check_ledger(self, s, rows):
+        anchors = {a.event['action_id']: a.event['ledger_digest'] for a in s.execute(
+            select(Audit).order_by(Audit.sequence)).scalars()
+                   if 'action_id' in a.event and 'ledger_digest' in a.event}
+        if any(anchors.get(row.id) != self.action_digest(row) for row in rows):
+            raise Denied('external_ledger_integrity_failure')
+
     def authorize(self, actor, task_id, version, *, budget_nano_rub, seconds=120):
         if actor != 'owner':
             raise Denied('owner_required')
@@ -57,7 +70,7 @@ class Gateway:
                         'revision': self.store.settings.source_revision, 'base_sha': BASE_SHA,
                         'config_hash': digest(c.model_dump()), 'budget': budget_nano_rub,
                         'repository': c.synthetic_repository, 'model': c.tariff.model,
-                        'max_calls': task.payload['coding']['max_iterations'],
+                        'max_calls': min(task.payload['coding']['max_iterations'], task.payload['coding']['max_units']),
                         'secret_refs': [c.openai_secret_ref, c.github_secret_ref]}
             seal = digest(document)
             s.add(ExternalGrant(task_id=task_id, document=document, digest=seal))
@@ -110,6 +123,7 @@ class Gateway:
     def _reserve(self, s, task_id, doc, amount):
         c = self.config
         rows = s.execute(select(ExternalAction)).scalars().all()
+        self.check_ledger(s, rows)
         now = self.store.now(s)
         day, month = now.strftime('%Y-%m-%d'), now.strftime('%Y-%m')
         task_total = sum(r.actual + r.reserved for r in rows if r.task_id == task_id)
@@ -132,6 +146,7 @@ class Gateway:
         encoded = json.dumps(body, sort_keys=True, separators=(',', ':'))
         if len(encoded.encode()) > 16384 or token in encoded:
             raise Denied('external_input_boundary')
+        body = json.loads(encoded)  # Freeze the body whose hash is admitted, independent of caller mutation.
         fingerprint = digest({'kind': kind, 'method': method, 'path': path, 'body': body, 'query': query})
         opkey = task_id + ':' + key
         if len(opkey) > 200:
@@ -164,6 +179,7 @@ class Gateway:
                     raise Denied('external_pr_query_scope')
             old = s.execute(select(ExternalAction).where(ExternalAction.key == opkey)).scalar_one_or_none()
             if old:
+                self.check_ledger(s, [old])
                 if old.request_hash != fingerprint:
                     raise Denied('external_idempotency_conflict')
                 if old.state == 'COMPLETE':
@@ -172,8 +188,12 @@ class Gateway:
             if reconcile and method != 'GET':
                 raise Denied('reconciliation_cannot_write_remote')
             count = s.execute(select(ExternalAction).where(ExternalAction.task_id == task_id)).scalars().all()
+            self.check_ledger(s, count)
             if len(count) >= 64:
                 raise Denied('external_call_limit')
+            if method == 'POST' and any(r.state in {'INTENT', 'UNCERTAIN', 'SETTLED'}
+                                       and r.evidence.get('method') != 'GET' for r in count):
+                raise Denied('external_budget_or_pending_limit')
             amount = 0
             if kind == 'openai':
                 tariff = self.config.tariff
@@ -189,20 +209,30 @@ class Gateway:
                     raise Denied('provider_request_contract') from None
                 if sum(r.kind == 'openai' for r in count) >= doc['max_calls']:
                     raise Denied('external_iteration_limit')
+                known_tokens = sum(r.evidence.get('usage', {}).get('total_tokens', 0) for r in count if r.kind == 'openai')
+                if known_tokens >= task.payload['coding']['max_tokens']:
+                    raise Denied('external_token_limit')
                 amount = tariff.maximum()
                 self._reserve(s, task_id, doc, amount)
             action = ExternalAction(id=str(uuid4()), task_id=task_id, key=opkey, kind=kind,
                                     request_hash=fingerprint, state='INTENT', reserved=amount,
-                                    actual=0, created_at=self.store.now(s), evidence={})
+                                    actual=0, created_at=self.store.now(s), evidence={'method': method})
             s.add(action)
             self.store.audit(s, 'external_intent', 'gateway', task_id, action_id=action.id,
-                             request_hash=fingerprint, kind=kind, reserved_nano_rub=amount)
+                             request_hash=fingerprint, external_kind=kind, reserved_nano_rub=amount)
+            self.store.audit(s, 'external_ledger_anchor', 'gateway', task_id, action_id=action.id,
+                             ledger_digest=self.action_digest(action))
             action_id = action.id
         # No DB transaction is held during I/O. Intent/reservation is already durable.
+        request_id = ''
         try:
             headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/json'}
             with self.client.stream(method, url, json=body, params=query, headers=headers,
                                     follow_redirects=False, timeout=8) as response:
+                request_id = response.headers.get('x-request-id', response.headers.get('x-github-request-id', ''))
+                if not re.fullmatch(r'[A-Za-z0-9_-]{0,128}', request_id) or token in request_id:
+                    request_id = ''
+                    raise Uncertain('invalid_request_identifier')
                 raw = bytearray()
                 for chunk in response.iter_bytes():
                     raw.extend(chunk)
@@ -213,13 +243,10 @@ class Gateway:
                 if response.status_code not in {200, 201}:
                     raise Uncertain('external_http_' + str(response.status_code))
                 data = json.loads(raw)
-                request_id = response.headers.get('x-request-id', response.headers.get('x-github-request-id', ''))
-                if not re.fullmatch(r'[A-Za-z0-9_-]{0,128}', request_id) or token in request_id:
-                    raise Uncertain('invalid_request_identifier')
             with self.store.transaction() as s:
                 self.store.check_audit(s)
                 operation = s.get(ExternalAction, action_id)
-                evidence = {'response': data, 'request_id': request_id}
+                evidence = {'method': method, 'response': data, 'request_id': request_id}
                 if kind == 'openai':
                     # Financial settlement requires documented, bounded usage. Bad/missing usage stays reserved.
                     from .http_contract import ResponseEnvelope
@@ -236,7 +263,7 @@ class Gateway:
                 operation.state, operation.evidence = 'COMPLETE', evidence
                 self.store.audit(s, 'external_response', 'gateway', task_id, action_id=action_id,
                                  response_hash=digest(data), actual_nano_rub=operation.actual,
-                                 request_id=request_id)
+                                 request_id=request_id, ledger_digest=self.action_digest(operation))
             with self.store.transaction() as s:
                 self.authority(s, task_id, fence)  # Cancellation/revocation during I/O never grants continuation.
             if self.runtime_guard and not self.runtime_guard():
@@ -250,7 +277,9 @@ class Gateway:
                     operation = s.get(ExternalAction, action_id)
                     if operation.state != 'COMPLETE':
                         operation.state = 'UNCERTAIN'
-                    self.store.audit(s, 'external_interrupted', 'gateway', task_id, action_id=action_id)
+                        operation.evidence = {**operation.evidence, 'request_id': request_id}
+                    self.store.audit(s, 'external_interrupted', 'gateway', task_id, action_id=action_id,
+                                     ledger_digest=self.action_digest(operation))
             except Exception:
                 pass
             if isinstance(error, Denied):
@@ -262,17 +291,19 @@ class Gateway:
         with self.store.transaction() as s:
             self.authority(s, task_id, fence)
             row = s.execute(select(ExternalAction).where(ExternalAction.key == task_id + ':' + key)).scalar_one()
+            self.check_ledger(s, [row])
             if row.request_hash != expected_hash or row.kind != 'github' or row.state == 'COMPLETE':
                 raise Denied('reconciliation_mismatch')
-            row.state, row.evidence = 'COMPLETE', {'response': data, 'reconciled': True}
+            row.state, row.evidence = 'COMPLETE', {**row.evidence, 'response': data, 'reconciled': True}
             self.store.audit(s, 'external_reconciled', 'gateway', task_id, action_id=row.id,
-                             response_hash=digest(data))
+                             response_hash=digest(data), ledger_digest=self.action_digest(row))
 
     def status(self, task_id):
         with self.store.transaction() as s:
             self.store.check_audit(s)
             task = self.store.task(s, task_id)
             rows = s.execute(select(ExternalAction).where(ExternalAction.task_id == task_id)).scalars().all()
+            self.check_ledger(s, rows)
             grant = s.get(ExternalGrant, task_id)
             return {**self.config.public(), 'description': 'Исправить сумму положительных чисел',
                     'task_state': task.state, 'budget_nano_rub': grant.document['budget'] if grant else None,
@@ -295,6 +326,7 @@ class Gateway:
             row = s.get(ExternalAction, action_id)
             if not row or row.kind != 'openai' or row.state not in {'INTENT', 'UNCERTAIN'}:
                 raise Denied('billing_reconciliation_mismatch')
+            self.check_ledger(s, [row])
             grant = s.get(ExternalGrant, row.task_id)
             if not grant or grant.document['config_hash'] != digest(self.config.model_dump()):
                 raise Denied('billing_tariff_changed')
@@ -306,5 +338,6 @@ class Gateway:
                             'settled_day': now.strftime('%Y-%m-%d'), 'settled_month': now.strftime('%Y-%m'),
                             'usage': {'input_tokens': input_tokens, 'output_tokens': output_tokens}}
             self.store.audit(s, 'billing_reconciled', actor, row.task_id, action_id=row.id,
-                             actual_nano_rub=price, evidence_hash=digest(evidence_reference))
+                             actual_nano_rub=price, evidence_hash=digest(evidence_reference),
+                             ledger_digest=self.action_digest(row))
             return {'settled': True, 'actual_nano_rub': price, 'task_resumed': False}

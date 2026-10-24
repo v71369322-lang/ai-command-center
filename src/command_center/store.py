@@ -129,7 +129,8 @@ class Store:
             if payload['kind'] == 'coding_synthetic':
                 from .coding.spec import PLAN
                 task.coding_evidence = {'plan': PLAN, 'stage': 'queued',
-                                        'summary': 'Задача разрешена. Ожидает тестового разработчика.'}
+                                        'summary': 'Ожидает ограниченного разрешения владельца.' if requires_approval(payload)
+                                        else 'Задача разрешена. Ожидает тестового разработчика.'}
             s.flush()
             self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint)
             if task.state == "READY":

@@ -209,6 +209,15 @@ def create_app(settings=None, gateway_factory=None):
     @app.get("/api/state")
     def state(role=Depends(human)):
         result = store.snapshot()
+        from .coding.integration_config import IntegrationConfig
+        if gateway_factory:
+            gateway = external_gateway()
+            try:
+                result['integration'] = gateway.config.public()
+            finally:
+                gateway.close()
+        else:
+            result['integration'] = IntegrationConfig.load().public()
         for task in result['tasks']:
             if task['payload'].get('coding', {}).get('provider') == 'openai':
                 gateway = external_gateway()
@@ -284,6 +293,8 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.post("/api/tasks/{task_id}/approve")
     def approve(task_id: str, approval: ApprovalRequest, role=Depends(identity)):
+        if store.get(task_id)['payload'].get('coding', {}).get('provider') == 'openai':
+            raise Denied('external_scope_approval_required')
         return store.approve(role, task_id, approval.version, approval.seconds)
 
     @app.post("/api/tasks/{task_id}/cancel")

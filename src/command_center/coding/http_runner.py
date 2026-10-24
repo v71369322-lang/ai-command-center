@@ -74,6 +74,18 @@ class HttpCodingRunner(CodingRunner):
             self.store.finish(task['id'], task['fence'], summary, hashlib.sha256(summary.encode()).hexdigest(),
                               actual_cost=len(proposals))
         except Exception as error:
+            if isinstance(error, Uncertain):
+                code, message = 'external_outcome_uncertain', 'Внешний результат неопределён. Повтор заблокирован до сверки.'
+            elif isinstance(error, PermissionError):
+                code, message = 'credential_not_connected', 'Credentials не подключены или их защищённое предоставление отклонено.'
+            elif isinstance(error, Denied):
+                code, message = str(error)[:80], 'Выполнение остановлено проверкой полномочий, лимитов или результата.'
+            else:
+                code, message = 'provider_or_verifier_contract_rejected', 'Ответ или результат проверки не соответствует контракту. PR не принят.'
+            try:
+                self.store.coding_stage(task['id'], task['fence'], 'external_stopped', failure=code, summary=message)
+            except Exception:
+                pass  # Cancellation/audit/PG failure must not be bypassed to update a report.
             stopped = self.quiesce(self.name(task))
             # HTTP uncertainty is distinct from confirmed sandbox termination.
             self.store.abort(task['id'], task['fence'], 'external_outcome_uncertain' if isinstance(error, Uncertain)

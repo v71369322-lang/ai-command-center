@@ -83,3 +83,68 @@ def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue, tmp_
         server.should_exit = True
         thread.join(timeout=5)
         sock.close()
+
+
+def test_f21_mobile_owner_http_mock_cycle(settings, store, tmp_path):
+    import httpx
+    from command_center.coding.gateway import Gateway
+    from f2_http_support import Credentials, FakeHTTP, config
+    fake = FakeHTTP()
+    def make_gateway():
+        return Gateway(store, config(), transport=httpx.MockTransport(fake.handle), credentials=Credentials())
+    identities = {role: f'public-f21-browser-{role}-fixture-not-a-real-secret' for role in ('owner', 'operator', 'agent')}
+    sock = socket.socket()
+    sock.bind(('127.0.0.1', 0))
+    app = create_app(replace(settings, identities=identities), gateway_factory=make_gateway)
+    server = uvicorn.Server(uvicorn.Config(app, log_level='critical', access_log=False))
+    thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 5
+    while not server.started and time.monotonic() < deadline:
+        time.sleep(.05)
+    ledger = RuntimeLedger(tmp_path / 'f21-mobile.sqlite')
+    ledger.watchdog()
+    stop = threading.Event()
+    def heartbeat():
+        while not stop.wait(.5):
+            ledger.watchdog()
+    monitor = threading.Thread(target=heartbeat, daemon=True)
+    monitor.start()
+    service = RuntimeBroker(store, ledger, RuntimeBackend(mode='cloud-rootful-test'), RuntimeLimits(), make_gateway)
+    try:
+        assert server.started
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context(viewport={'width': 390, 'height': 844})
+            context.route('**/*', lambda route: route.continue_() if route.request.url.startswith('http://127.0.0.1:') else route.abort())
+            page = context.new_page()
+            page.goto(f'http://127.0.0.1:{sock.getsockname()[1]}')
+            page.get_by_label('Тестовый credential').fill(identities['owner'])
+            page.get_by_role('button', name='Войти / обновить', exact=True).click()
+            page.get_by_role('button', name='Создать задачу AI без запуска', exact=True).click()
+            page.get_by_role('heading', name='Требуется разрешение', exact=True).wait_for()
+            assert fake.ai_calls == 0
+            page.get_by_label('Лимит задачи в рублях').fill('0,01')
+            page.get_by_role('button', name='Разрешить ограниченную AI-задачу', exact=True).click()
+            page.get_by_role('heading', name='READY', exact=True).wait_for()
+            task = store.snapshot()['tasks'][0]
+            service.submit(task['id'], settings.source_revision)
+            service.last_future.result(timeout=35)
+            page.get_by_role('button', name='Войти / обновить', exact=True).click()
+            page.get_by_role('heading', name='SUCCEEDED', exact=True).wait_for()
+            page.get_by_role('heading', name='HTTP-mock цикл завершён; настоящий PR не создан', exact=True).wait_for()
+            page.get_by_text('AI-вызовов: 2', exact=True).wait_for()
+            assert page.get_by_text('Проверка 2: пройдена', exact=True).count() == 1
+            assert page.locator('a[href^="https://github.com/"]').count() == 0
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+            page.screenshot(path='.runtime/f21-mobile.png', full_page=True)
+            assert fake.ai_calls == 2 and len(fake.prs) == 1
+            context.close()
+            browser.close()
+    finally:
+        service.pool.shutdown(wait=True)
+        stop.set()
+        monitor.join(timeout=2)
+        server.should_exit = True
+        thread.join(timeout=5)
+        sock.close()

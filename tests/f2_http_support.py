@@ -45,6 +45,8 @@ class FakeHTTP:
         data = self.dispatch(request)
         if self.after:
             self.after(request)
+        if isinstance(data, httpx.Response):
+            return data
         return httpx.Response(200 if request.method == 'GET' or request.url.host == 'api.openai.com' else 201,
                               json=data, headers={'x-request-id': 'fixture-request-id'})
 
@@ -84,7 +86,8 @@ class FakeHTTP:
                 return {'ref': 'refs/heads/' + branch, 'object': {'sha': self.branches.get(branch)}}
             if path == '/pulls':
                 return self.prs
-            return {'sha': path.rsplit('/', 1)[-1]}
+            sha = path.rsplit('/', 1)[-1]
+            return {'sha': sha} if sha in self.objects else httpx.Response(404, json={'message': 'not found'})
         if path == '/git/blobs':
             assert body['encoding'] == 'utf-8'
             obj = Blob.from_string(body['content'].encode())
@@ -101,8 +104,9 @@ class FakeHTTP:
             for field in ('author', 'committer'):
                 identity = body[field]
                 setattr(obj, field, (identity['name'] + ' <' + identity['email'] + '>').encode())
-                setattr(obj, field + '_time', int(datetime.fromisoformat(identity['date']).timestamp()))
-                setattr(obj, field + '_timezone', 0)
+                clock = 'author' if field == 'author' else 'commit'
+                setattr(obj, clock + '_time', int(datetime.fromisoformat(identity['date']).timestamp()))
+                setattr(obj, clock + '_timezone', 0)
         elif path == '/git/refs':
             assert body['ref'].startswith('refs/heads/f2/task-')
             branch = body['ref'].removeprefix('refs/heads/')

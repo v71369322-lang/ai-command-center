@@ -46,6 +46,7 @@ class IntegrationConfig(Strict):
     openai_secret_ref: str = 'openai'
     github_secret_ref: str = 'github-installation-token'
     credential_files: dict[str, str] = Field(default_factory=dict, repr=False, exclude=True)
+    budget_evidence: str = Field(default='', max_length=300)
 
     @model_validator(mode='after')
     def scope(self):
@@ -64,7 +65,9 @@ class IntegrationConfig(Strict):
         return cls.model_validate_json(p.read_text())
 
     def connected(self):
-        return self.mode == 'http_mock' or (self.mode == 'live' and self.live_authorized)
+        return self.mode == 'http_mock' or (self.mode == 'live' and self.live_authorized
+            and bool(self.budget_evidence) and self.openai_secret_ref in self.credential_files
+            and self.github_secret_ref in self.credential_files)
 
     def public(self):
         return {'connected': self.connected(), 'mode': self.mode,
@@ -73,8 +76,7 @@ class IntegrationConfig(Strict):
                 'repository': self.synthetic_repository, 'scope': ['calculator.py'],
                 'model': self.tariff.model if self.tariff else None,
                 'tariff_confirmed': bool(self.tariff and self.tariff.confirmed),
-                'daily_nano_rub': self.daily_nano_rub, 'monthly_nano_rub': self.monthly_nano_rub,
-                'real_call_performed': False}
+                'daily_nano_rub': self.daily_nano_rub, 'monthly_nano_rub': self.monthly_nano_rub}
 
 
 class FileCredentials:
@@ -86,13 +88,12 @@ class FileCredentials:
         path = self.config.credential_files.get(reference)
         if not path:
             raise PermissionError('credential_not_connected')
-        p = Path(path)
-        if p.is_symlink() or not p.is_file():
-            raise PermissionError('unsafe_credential_binding')
-        metadata = p.stat()
-        if metadata.st_mode & 0o077 or not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 1024:
-            raise PermissionError('unsafe_credential_binding')
-        value = p.read_text().strip()
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor) as file:
+            metadata = os.fstat(file.fileno())
+            if metadata.st_mode & 0o077 or not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 1024:
+                raise PermissionError('unsafe_credential_binding')
+            value = file.read(1025).strip()
         if not 16 <= len(value) <= 1024 or '\n' in value:
             raise PermissionError('invalid_credential_binding')
         return value
