@@ -82,8 +82,16 @@ class Store:
     def create(self, actor, key, payload):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
-        if payload.get("kind") not in {"render", "approved_render"}:
+        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic'}:
             raise Denied("unknown_action")
+        if payload['kind'] == 'coding_synthetic':
+            if actor != 'owner':
+                raise Denied('owner_required_for_coding')
+            from .coding.contract import validate_payload
+            try:
+                validate_payload(payload)
+            except ValueError:
+                raise Denied('invalid_coding_scope') from None
         known_secrets = [*self.settings.identities.values(), self.settings.redis_password,
                          self.settings.database_url.password]
         encoded = canonical(payload) + key
@@ -110,8 +118,13 @@ class Store:
             task = Task(id=str(uuid4()), request_key=scoped_key, payload_hash=fingerprint,
                         payload=payload, state="WAITING_APPROVAL" if payload["kind"] == "approved_render"
                         else "READY", version=1, epoch=control.epoch, owner_role=actor,
-                        created_at=self.now(s), dependency=dependency, attempts=0, fence=0, reserved=0)
+                        created_at=self.now(s), dependency=dependency, attempts=0, fence=0, reserved=0,
+                        coding_evidence={})
             s.add(task)
+            if payload['kind'] == 'coding_synthetic':
+                from .coding.spec import PLAN
+                task.coding_evidence = {'plan': PLAN, 'stage': 'queued',
+                                        'summary': 'Задача разрешена. Ожидает тестового разработчика.'}
             s.flush()
             self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint)
             if task.state == "READY":
@@ -229,7 +242,7 @@ class Store:
             task.lease_until = self.now(s) + timedelta(seconds=self.settings.lease_seconds)
             return True
 
-    def finish(self, task_id, fence, artifact, artifact_hash):
+    def finish(self, task_id, fence, artifact, artifact_hash, actual_cost=None):
         with self.transaction() as s:
             self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
@@ -241,13 +254,16 @@ class Store:
             if a and (a.revoked or a.expires_at <= self.now(s) or a.task_version != task.version):
                 raise Denied("stale_approval")
             task.artifact, task.artifact_hash = artifact, artifact_hash
+            charge = task.reserved if actual_cost is None else actual_cost
+            if type(charge) is not int or not 0 <= charge <= task.reserved:
+                raise Denied('invalid_actual_cost')
             task.state = "SUCCEEDED"
             control.reserved -= task.reserved
-            control.actual += task.reserved
+            control.actual += charge
             task.reserved = 0
             self.audit(s, "verified", "verifier", task.id, fence=fence, artifact_hash=artifact_hash)
 
-    def abort(self, task_id, fence, reason, stopped):
+    def abort(self, task_id, fence, reason, stopped, actual_cost=0, usage_unknown=False):
         with self.transaction() as s:
             task, control = self.task(s, task_id), s.get(Control, 1)
             if task.fence != fence or task.state in TERMINAL:
@@ -261,10 +277,29 @@ class Store:
             else:
                 task.state = "FAILED"
             task.reason = reason
-            if stopped:
+            if stopped and not usage_unknown:
+                if type(actual_cost) is not int or not 0 <= actual_cost <= task.reserved:
+                    raise Denied('invalid_actual_cost')
+                control.actual += actual_cost
                 control.reserved -= task.reserved
                 task.reserved = 0
             self.audit(s, "execution_stopped" if stopped else "outcome_uncertain", "worker", task.id, reason=reason)
+
+    def coding_stage(self, task_id, fence, stage, **evidence):
+        with self.transaction() as session:
+            self.check_audit(session)
+            task, control = self.task(session, task_id), session.get(Control, 1)
+            self.check_task_revision(session, task)
+            if (control.halted or control.recovery or task.state != 'RUNNING' or task.fence != fence
+                    or task.epoch != control.epoch or task.lease_until <= self.now(session)
+                    or task.payload['kind'] != 'coding_synthetic' or digest(task.payload) != task.payload_hash):
+                raise Denied('coding_authority_lost')
+            data = {**task.coding_evidence, **evidence, 'stage': stage}
+            if len(canonical(data).encode()) > 65536:
+                raise Denied('coding_evidence_limit')
+            task.coding_evidence = data
+            self.audit(session, 'coding_' + stage, 'coding_pipeline', task_id, fence=fence,
+                       evidence_hash=digest(data))
 
     def recover(self):
         """Mark expired runs uncertain. Never replay them automatically."""
@@ -389,7 +424,7 @@ class Store:
             return {"halted": c.halted, "recovery": c.recovery, "epoch": c.epoch,
                     "checkpoint_digest": s.execute(select(Audit.digest).order_by(Audit.sequence.desc()).limit(1)).scalar_one(),
                     "budget": {"synthetic": True, "actual": c.actual, "reserved": c.reserved,
-                               "forecast": c.forecast, "uncertain": sum(t.reserved for t in s.execute(select(Task).where(Task.state.in_(["RECONCILING", "SECURITY_BLOCKED", "CANCEL_REQUESTED"]))).scalars()), "limit": c.budget_limit,
+                               "forecast": c.forecast, "uncertain": sum(t.reserved for t in s.execute(select(Task).where(Task.state.in_(["RECONCILING", "SECURITY_BLOCKED", "CANCEL_REQUESTED", "FAILED", "CANCELLED"]))).scalars()), "limit": c.budget_limit,
                                "threshold": 100 if used >= c.budget_limit else 90 if used >= c.budget_limit * .9
                                else 70 if used >= c.budget_limit * .7 else 0},
                     "tasks": [self.view(t) for t in s.execute(select(Task).order_by(Task.created_at.desc()).limit(100)).scalars()],
@@ -405,4 +440,5 @@ class Store:
         return {"id": t.id, "operation_id": t.id, "state": t.state, "version": t.version,
                 "epoch": t.epoch, "payload": t.payload, "payload_hash": t.payload_hash,
                 "fence": t.fence, "attempts": t.attempts, "artifact": t.artifact,
-                "artifact_hash": t.artifact_hash, "reason": t.reason}
+                "artifact_hash": t.artifact_hash, "reason": t.reason,
+                'coding': {k: v for k, v in (t.coding_evidence or {}).items() if k != 'agent_result'}}

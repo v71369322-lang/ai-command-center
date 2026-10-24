@@ -17,6 +17,7 @@ from .limits import RateLimit
 from .store import Denied, Store
 from .worker import broker
 from .owner_auth import OwnerAuth
+from .coding.contract import CodingRequest, payload as coding_payload, template as coding_template
 
 
 class Command(BaseModel):
@@ -192,6 +193,26 @@ def create_app(settings=None):
     @app.get("/api/state")
     def state(role=Depends(human)):
         return store.snapshot()
+
+    @app.get('/api/coding/template')
+    def coding_scope(role=Depends(human)):
+        return coding_template()
+
+    @app.post('/api/coding/tasks', status_code=201)
+    def create_coding(command: CodingRequest, role=Depends(identity),
+                      idempotency_key: str = Header(..., min_length=1, max_length=100)):
+        try:
+            value = coding_payload(command)
+        except ValueError:
+            raise Denied('synthetic_source_pin_mismatch') from None
+        return store.create(role, idempotency_key, value)
+
+    @app.get('/api/tasks/{task_id}/pull-request')
+    def coding_pull_request(task_id: str, role=Depends(human)):
+        task = store.get(task_id)
+        if task['state'] != 'SUCCEEDED' or 'pr' not in task['coding']:
+            raise Denied('verified_pull_request_not_available')
+        return task['coding']['pr']
 
     @app.get("/api/health")
     def health(role=Depends(human)):

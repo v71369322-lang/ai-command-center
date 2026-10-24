@@ -33,6 +33,7 @@ class Settings:
     oidc_owner: str = ''
     oidc_jwks_file: str = ''
     web_origin: str = ''
+    coding_image: str = 'acc-f2-executor:local'
 
     @classmethod
     def load(cls, *, identities_required=True):
@@ -58,4 +59,5 @@ class Settings:
                    oidc_audience=os.environ.get('F1_OIDC_AUDIENCE', ''),
                    oidc_owner=os.environ.get('F1_OIDC_OWNER', ''),
                    oidc_jwks_file=os.environ.get('F1_OIDC_JWKS_FILE', ''),
-                   web_origin=os.environ.get('F1_WEB_ORIGIN', ''))
+                   web_origin=os.environ.get('F1_WEB_ORIGIN', ''),
+                   coding_image=os.environ.get('F2_EXECUTOR_IMAGE', 'acc-f2-executor:local'))

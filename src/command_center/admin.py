@@ -17,6 +17,7 @@ def main():
     store.initialize()
     password = secret("F1_APP_PASSWORD_FILE")
     with store.engine.begin() as connection:
+        connection.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS coding_evidence JSONB NOT NULL DEFAULT '{}'::jsonb"))
         exists = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname='f1_app'")).first()
         if not exists:
             with connection.connection.driver_connection.cursor() as cursor:
@@ -42,7 +43,7 @@ def main():
             connection.execute(text('GRANT USAGE ON SCHEMA public TO f1_runtime'))
             connection.execute(text('GRANT SELECT ON control,tasks,approvals,outbox,audit TO f1_runtime'))
             connection.execute(text('GRANT UPDATE(halted,recovery,epoch,actual,reserved) ON control TO f1_runtime'))
-            connection.execute(text('GRANT UPDATE(state,fence,lease_until,attempts,reserved,artifact,artifact_hash,reason) ON tasks TO f1_runtime'))
+            connection.execute(text('GRANT UPDATE(state,fence,lease_until,attempts,reserved,artifact,artifact_hash,reason,coding_evidence) ON tasks TO f1_runtime'))
             connection.execute(text('GRANT UPDATE(used) ON approvals TO f1_runtime'))
             connection.execute(text('GRANT INSERT,UPDATE ON outbox TO f1_runtime'))
             connection.execute(text('GRANT INSERT ON audit TO f1_runtime'))

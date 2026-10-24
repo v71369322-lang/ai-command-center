@@ -29,6 +29,7 @@ class Watchdog:
             self.ledger.phase(row['id'], row['fence'], 'UNCERTAIN')
         try:
             with self.ledger.launch_lock(blocking=False):
+                row = self.ledger.get(row['id'], row['fence'])
                 self.ledger.phase(row['id'], row['fence'], 'STOPPING')
                 confirmed = self.runner.stop(row['name'])
         except BlockingIOError:
@@ -39,7 +40,9 @@ class Watchdog:
         self.ledger.record('watchdog_stop_result', task_id=row['id'], fence=row['fence'], confirmed=confirmed)
         self.ledger.phase(row['id'], row['fence'], 'STOPPED' if confirmed else 'UNCERTAIN')
         try:
-            self.store.abort(row['id'], row['fence'], 'watchdog_' + reason, confirmed)
+            task = self.store.get(row['id'])
+            self.store.abort(row['id'], row['fence'], 'watchdog_' + reason, confirmed,
+                             usage_unknown=task['payload']['kind'] == 'coding_synthetic')
             if confirmed:
                 self.ledger.phase(row['id'], row['fence'], 'DONE')
             with self.store.transaction() as session:
@@ -103,7 +106,9 @@ class Watchdog:
         with self.ledger.launch_lock(blocking=False):
             if not self.runner.stop(row['name']):
                 raise Denied('runtime_stop_unconfirmed')
-            self.store.abort(task_id, fence, 'verified_no_effect', True)
+            task = self.store.get(task_id)
+            self.store.abort(task_id, fence, 'verified_no_effect', True,
+                             usage_unknown=task['payload']['kind'] == 'coding_synthetic')
             with self.store.transaction() as session:
                 session.get(Control, 1).halted = True
                 self.store.check_audit(session)

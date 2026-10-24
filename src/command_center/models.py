@@ -42,6 +42,7 @@ class Task(Base):
     artifact_hash: Mapped[str | None] = mapped_column(String(64))
     reason: Mapped[str | None] = mapped_column(String(80))
     dependency: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"))
+    coding_evidence: Mapped[dict] = mapped_column(JSONB, default=dict, server_default='{}')
 
 
 class Approval(Base):

@@ -59,7 +59,11 @@ class RuntimeBroker:
             return {'phase': 'INTENT', 'fence': task['fence']}
 
     def execute(self, task):
-        runner = Runner(self.store, self.backend, self.limits, self.ledger)
+        if task['payload']['kind'] == 'coding_synthetic':
+            from .coding.runner import CodingRunner
+            runner = CodingRunner(self.store, self.backend, self.limits, self.ledger)
+        else:
+            runner = Runner(self.store, self.backend, self.limits, self.ledger)
         try:
             runner.execute(task)
         except Exception:

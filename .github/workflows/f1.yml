@@ -1,4 +1,4 @@
-name: F1 synthetic verification
+name: F1 and F2 synthetic verification
 on:
   pull_request:
   workflow_dispatch:

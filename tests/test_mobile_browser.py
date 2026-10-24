@@ -12,9 +12,12 @@ import uvicorn
 
 from command_center.api import create_app
 from command_center.worker import Runner
+from command_center.runtime_broker import RuntimeBroker
+from command_center.runtime_ledger import RuntimeLedger
+from command_center.runtime_policy import RuntimeBackend, RuntimeLimits
 
 
-def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue):
+def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue, tmp_path):
     identities = {role: f'public-browser-{role}-fixture-not-a-runtime-secret' for role in ('owner','operator','agent')}
     app = create_app(replace(settings, identities=identities))
     sock = socket.socket()
@@ -52,6 +55,24 @@ def test_T01_T13_mobile_browser_real_synthetic_flow(settings, store, queue):
             assert page.evaluate('window.f1Injected === undefined')
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
             assert page.locator('img').count() == 0
+            page.get_by_role('button', name='Запустить тестового разработчика', exact=True).click()
+            page.get_by_role('heading', name='READY', exact=True).wait_for()
+            coding_task = next(t for t in store.snapshot()['tasks'] if t['payload']['kind'] == 'coding_synthetic')
+            ledger = RuntimeLedger(tmp_path / 'browser-runtime.sqlite')
+            ledger.watchdog()
+            service = RuntimeBroker(store, ledger, RuntimeBackend(mode='cloud-rootful-test'), RuntimeLimits())
+            try:
+                service.submit(coding_task['id'], settings.source_revision)
+                service.last_future.result(timeout=30)
+            finally:
+                service.pool.shutdown(wait=True)
+            page.get_by_role('button', name='Войти / обновить', exact=True).click()
+            page.get_by_text('Проверка 1: найдена ошибка, выполнено исправление', exact=True).wait_for()
+            page.get_by_text('Проверка 2: пройдена', exact=True).wait_for()
+            page.get_by_role('button', name='Открыть подготовленный PR', exact=True).click()
+            page.get_by_role('heading', name='Подготовленный PR', exact=True).wait_for()
+            assert page.get_by_text('Mock-режим: PR не опубликован в GitHub. Реальный AI не подключён.', exact=True).count() == 1
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
             Path('.runtime').mkdir(exist_ok=True)
             page.screenshot(path='.runtime/mobile.png', full_page=True)
             page.get_by_role('button', name='Выйти', exact=True).click()
