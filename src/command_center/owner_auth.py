@@ -30,12 +30,30 @@ class OwnerAuth:
                     and s.oidc_owner and s.oidc_jwks_file and Path(s.oidc_jwks_file).is_file()
                     and s.web_origin.startswith('https://'))
 
+    def trust_document(self):
+        try:
+            path = Path(self.settings.oidc_jwks_file)
+            if path.stat().st_size > 65536:
+                raise ValueError('oversized_trust_bundle')
+            return json.loads(path.read_text())
+        except Exception:
+            raise HTTPException(503, 'identity_trust_unavailable') from None
+
+    def binding(self, keys=None):
+        return checksum(json.dumps({'issuer': self.settings.oidc_issuer,
+                                        'audience': self.settings.oidc_audience,
+                                        'owner': self.settings.oidc_owner,
+                                        'origin': self.settings.web_origin,
+                                        'keys': self.trust_document() if keys is None else keys}, sort_keys=True))
+
     def exchange(self, assertion):
         if not self.trusted():
             raise HTTPException(503, 'identity_provider_not_configured')
+        trust_document = self.trust_document()
+        trust_binding = self.binding(trust_document)
         try:
             header = jwt.get_unverified_header(assertion)
-            keys = json.loads(Path(self.settings.oidc_jwks_file).read_text())['keys']
+            keys = trust_document['keys']
             selected = next(k for k in keys if k.get('kid') == header.get('kid') and k.get('kty') == 'RSA')
             key = jwt.PyJWK.from_dict(selected).key
             claims = jwt.decode(assertion, key, algorithms=['RS256'],
@@ -59,7 +77,7 @@ class OwnerAuth:
             if remaining < 1:
                 raise HTTPException(401, 'expired_owner_assertion')
             session.add(OwnerSession(token_hash=checksum(token), csrf_hash=checksum(csrf),
-                                     assertion_hash=assertion_hash, subject=claims['sub'],
+                                     assertion_hash=assertion_hash, subject=trust_binding,
                                      expires_at=self.store.now(session) + timedelta(seconds=remaining), revoked=False))
             self.store.audit(session, 'owner_session_created', 'owner')
         return token, csrf, remaining
@@ -70,7 +88,7 @@ class OwnerAuth:
             raise HTTPException(401, 'owner_session_required')
         with self.store.transaction() as session:
             row = session.get(OwnerSession, checksum(token))
-            if not row or row.revoked or row.expires_at <= self.store.now(session):
+            if not row or row.revoked or row.expires_at <= self.store.now(session) or row.subject != self.binding():
                 raise HTTPException(401, 'owner_session_invalid')
             if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
                 origin = request.headers.get('origin')

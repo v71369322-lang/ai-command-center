@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 import jwt
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from command_center.api import create_app
 from command_center.backup_jobs import BackupJobs, LocalRepository
@@ -79,6 +80,35 @@ def test_owner_idp_missing_is_fail_closed(store, settings):
     with TestClient(create_app(replace(settings, auth_mode='oidc')), base_url='https://testserver') as client:
         assert client.post('/api/auth/exchange', json={'assertion': 'x' * 64}).status_code == 503
         assert client.get('/api/state').status_code == 401
+
+
+@pytest.mark.parametrize('field,value', [('oidc_owner', 'retired-owner'),
+                                        ('oidc_issuer', 'https://rotated-idp.invalid'),
+                                        ('oidc_audience', 'rotated-audience'), ('jwks', 'rotated')])
+def test_owner_session_cannot_survive_identity_trust_change(store, oidc, field, value):
+    configured, assertion = oidc
+    with TestClient(create_app(configured), base_url='https://testserver') as client:
+        assert client.post('/api/auth/exchange', json={'assertion': assertion()}).status_code == 200
+        if field == 'jwks':
+            data = json.loads(Path(configured.oidc_jwks_file).read_text())
+            data['keys'][0]['kid'] = value
+            Path(configured.oidc_jwks_file).write_text(json.dumps(data))
+            changed = configured
+        else:
+            changed = replace(configured, **{field: value})
+        with TestClient(create_app(changed), base_url='https://testserver') as rotated:
+            rotated.cookies.update(client.cookies)
+            assert rotated.get('/api/state').status_code == 401
+
+
+def test_owner_assertion_signature_cannot_be_forged(store, oidc):
+    configured, assertion = oidc
+    parts = assertion().split('.')
+    signature = list(parts[2])
+    signature[5] = 'A' if signature[5] != 'A' else 'B'
+    parts[2] = ''.join(signature)
+    with TestClient(create_app(configured), base_url='https://testserver') as client:
+        assert client.post('/api/auth/exchange', json={'assertion': '.'.join(parts)}).status_code == 401
 
 
 def test_broker_rejects_auth_arbitrary_docker_and_forged_fence(store, tmp_path):
@@ -278,10 +308,13 @@ def test_runtime_database_role_cannot_create_approval_or_read_owner_session(stor
     password = Path('.runtime/secrets/db_runtime_password').read_text().strip()
     restricted = Store(replace(settings, database_url=settings.database_url.set(username='f1_runtime', password=password)))
     try:
+        with restricted.engine.connect() as connection:
+            assert connection.execute(text('SELECT 1')).scalar_one() == 1
         for sql in ('UPDATE approvals SET revoked=false', 'SELECT * FROM owner_sessions', "UPDATE tasks SET payload='{}'::jsonb"):
-            with pytest.raises(Exception):
+            with pytest.raises(DBAPIError) as denied:
                 with restricted.engine.begin() as connection:
                     connection.execute(text(sql))
+            assert denied.value.orig.sqlstate == '42501'
     finally:
         restricted.engine.dispose()
 
