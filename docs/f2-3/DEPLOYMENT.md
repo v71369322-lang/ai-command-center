@@ -73,9 +73,15 @@ the owner is not required to type them or use a PC. Never run them during F2.3.
    <https://docs.docker.com/engine/security/rootless/>. Ubuntu 24.04 AppArmor and
    restricted unprivileged user namespaces must be checked; do not disable these
    protections globally to force a passing rootless check.
-4. As control user, create a protected tools virtual environment and install
-   `requirements.lock` with `--require-hashes`, plus this exact source package
-   without unpinned dependency resolution. Keep each release checkout immutable
+4. As control user, create a protected Python 3.12 tools virtual environment:
+   `python3.12 -m venv /home/acc-control/tools`, then install using
+   `/home/acc-control/tools/bin/python -m pip install --require-hashes --only-binary=:all: --no-deps -r CHECKOUT/requirements.lock`.
+   Use `PYTHONPATH=CHECKOUT/src` for operator commands. Do **not** use `pip install .`:
+   the project's unpinned build backend is not included in this runtime lock.
+   User-service templates set PYTHONPATH to the immutable operator checkout;
+   adjust that protected absolute path during authorized setup. A missing wheel
+   blocks setup rather than permitting an unreviewed source build.
+   Keep each release checkout immutable
    and clean. A later release/rollback needs its original source/artifacts.
    Build via `sh infra/vps/build_release.sh` with the two audited UIDs; it refuses
    rootful endpoints, builds exact-source images and transfers only executor
@@ -96,12 +102,17 @@ the owner is not required to type them or use a PC. Never run them during F2.3.
    An existing data volume without a deployment journal blocks installation.
    It starts DB/Redis, explicitly bootstraps current additive schema/roles via a
    bounded trusted maintenance job, halts admission, starts all services and
-   checks DB/audit, Redis, container state and watchdog freshness.
+   checks DB/audit, Redis, container state and watchdog freshness. All subsequent
+   operations recheck the checkout because `redis.sh` remains a host bind.
 8. Install the reviewed user-service examples with actual protected tools paths;
    enable `acc-f23.service` and `acc-f23-backup.timer`. Boot selects the verified
    bundle from the atomic deployment journal, refuses partial installs and
-   halts admission before workers start. Test a real reboot after separate
-   permission. `unless-stopped` alone is not proof of boot/recovery correctness.
+   halts admission before workers start. Only DB/Redis use `unless-stopped`;
+   application containers use `restart: no`, so Docker cannot bypass the boot
+   interlock. Boot and updates take the same exclusive deployment lock. Test a
+   real reboot after separate permission. A crashed app is intentionally stopped:
+   watchdog expiry blocks unsafe work; availability requires supervised operator
+   recovery and host monitoring. This kit does not claim automatic app recovery.
 
 All CLI examples are `python -m command_center.deployment ACTION ...`. No SSH
 client, remote target or provider credential is embedded in the kit.

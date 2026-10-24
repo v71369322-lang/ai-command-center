@@ -150,10 +150,12 @@ class Deployment:
             raise ValueError('dedicated_control_user_required')
         self.engine.preflight()
         self.execution.preflight()
+        # redis.sh remains a host bind, so immutable images alone are insufficient.
+        # Boot, updates, backups and rollback must reject changed source too.
+        source_check(self.m)
         image_check(self.engine, {k: v for k, v in self.m['images'].items() if k not in {'executor', 'coding'}}, self.m['revision'])
         image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
         if fresh:
-            source_check(self.m)
             with socket.socket() as listener:
                 listener.bind(('127.0.0.1', 8000))
         for name in (*SECRETS, 'backup_key'):
@@ -305,6 +307,14 @@ class Deployment:
 
     def boot(self):
         self.preflight()
+        lock = os.open(self.root / 'deployment.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return self._boot_locked()
+        finally:
+            os.close(lock)
+
+    def _boot_locked(self):
         state = json.loads((self.root / 'deployment.json').read_text())
         if state.get('phase') != 'VERIFIED' or state['bundle'] != checksum(self.bundle):
             raise ValueError('boot_only_verified_release')

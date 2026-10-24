@@ -1,5 +1,6 @@
 """F2.3 release-policy/failure tests. Fake daemons are NOT rootless host evidence."""
 import copy
+import fcntl
 import importlib.util
 import json
 import os
@@ -159,6 +160,38 @@ def test_wrong_consent_cannot_start_any_command(operator):
     with pytest.raises(ValueError, match='authorization'):
         operator.apply('install', 'old-digest')
     assert not operator.engine.calls
+
+
+def test_boot_cannot_race_update_lock(operator):
+    state = mark_current(operator)
+    state['bundle'] = checksum(operator.bundle)
+    atomic_json(operator.root / 'deployment.json', state)
+    with (operator.root / 'deployment.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(BlockingIOError):
+            operator.boot()
+    assert not operator.engine.calls
+
+
+def test_restart_policy_cannot_bypass_boot_interlock(release):
+    p = release[0]['compose']
+    for name in ('api', 'worker', 'runtime-broker', 'watchdog'):
+        assert p['services'][name]['restart'] == 'no'
+
+
+def test_update_preflight_rejects_modified_bind_source(release, monkeypatch):
+    import command_center.deployment as module
+    bundle, directory = release
+    engine = FakeEngine()
+    engine.preflight = lambda: None
+    deployment = Deployment(bundle, directory, engine, engine)
+    monkeypatch.setattr(os, 'getuid', lambda: 1000)
+    monkeypatch.setattr(module, 'image_check', lambda *args: None)
+    def changed(_):
+        raise ValueError('source_checkout_changed')
+    monkeypatch.setattr(module, 'source_check', changed)
+    with pytest.raises(ValueError, match='source_checkout_changed'):
+        deployment.preflight(fresh=False)
 
 
 def test_update_quiesce_backup_before_any_stop(operator):
