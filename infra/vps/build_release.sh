@@ -16,6 +16,10 @@ for endpoint in "$control" "$execution"; do
     local_docker --host="$endpoint" info --format '{{json .SecurityOptions}}' | python3 -c \
         'import json,sys;assert any("rootless" in v for v in json.load(sys.stdin))'
 done
+# install intentionally uses --pull never. A clean host must already have these
+# exact digest-pinned infrastructure images, not only the application images.
+export F1_DOCKER_GID="$(stat -c %g /run/user/$ACC_CONTROL_UID/docker.sock)"
+local_docker --host="$control" compose --profile worker -f compose.yaml pull db redis
 local_docker --host="$control" build --build-arg F1_SOURCE_REVISION -f Dockerfile.executor -t acc-f1-executor:local .
 for target in app worker broker coding; do
     tag="acc-f1-$target:local"
