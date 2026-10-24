@@ -102,7 +102,7 @@ def main():
         deployment.tool('from command_center.admin import main;main()')
         deployment.compose('up', '-d', '--no-build', '--pull', 'never')
         wait(deployment.postcheck)
-        with httpx.Client(base_url='http://127.0.0.1:18000', timeout=5) as client:
+        with httpx.Client(base_url='http://127.0.0.1:18000', trust_env=False, timeout=5) as client:
             def closed_access():
                 require(client.get('/').status_code == 200)
                 require(client.get('/api/state').status_code == 401)
