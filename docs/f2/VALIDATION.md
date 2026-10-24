@@ -29,11 +29,21 @@ Clean source commit `b7b5c33cddab9ed161a7c0cc9ed35517c2812d68`,
 
 The full suite emitted one upstream `StarletteDeprecationWarning` concerning
 `httpx` in TestClient. It is retained, not filtered or described as a failed test.
-The final follow-up changes the failed-check UI label so it does not claim a
-repair occurred when attempts were exhausted; final-head CI reruns the browser
-test and the complete pipeline. PR #13 checks are the authoritative final-head
+The follow-up changes the failed-check UI label so it does not claim a repair
+occurred when attempts were exhausted. CI for `70419fc` then failed the existing
+memory probe: exit 137 was observed but immediate Docker inspect returned
+`OOMKilled=false` (139 other tests passed). This was not waived. The probe now
+retains the container for a bounded three-second wait for asynchronous OOM
+evidence; it **still requires both exit 137 and OOMKilled=true**. Deterministic
+regressions check delayed evidence and timeout without inventing OOM success.
+The actual memory test and both new regressions passed locally. Final-head CI
+reruns the browser test and complete pipeline, including all 142 Python cases.
+PR #13 checks are the authoritative final-head
 CI status: <https://github.com/v71369322-lang/ai-command-center/pull/13/checks>.
 Do not equate an earlier green run with validation of a later head.
+GitHub also emits a Node 20 action-runtime deprecation warning for inherited
+pinned actions, which it runs with Node 24; this is separate from the Node 22
+application build. The warning is retained rather than hidden.
 
 ## Concrete synthetic outcome
 
