@@ -61,7 +61,9 @@ def render(base, m):
         service.pop('profiles', None)
         service.pop('group_add', None)
         service.pop('container_name', None)
-        service['restart'] = 'unless-stopped'
+        # Applications must wait for the serialized boot interlock. Otherwise
+        # Docker restarts a worker before the user service can halt admission.
+        service['restart'] = 'unless-stopped' if name in {'db', 'redis'} else 'no'
         service['networks'] = {'control': None}
         service['logging'] = {'driver': 'local', 'options': {'max-size': '5m', 'max-file': '2'}}
         if name == 'db':
@@ -118,6 +120,8 @@ def validate_profile(p, m):
     if p['secrets'] != {k: {'file': str(Path(m['data_root']) / 'secrets' / k)} for k in SECRETS}:
         raise ValueError('secret_source_changed')
     for name, s in p['services'].items():
+        if s.get('restart') != ('unless-stopped' if name in {'db', 'redis'} else 'no'):
+            raise ValueError('restart_bypasses_boot_interlock')
         expected_image = (m['database_image'] if name == 'db' else m['redis_image'] if name == 'redis'
                           else m['images']['broker' if name in {'runtime-broker', 'watchdog'} else name])
         if s['image'] != expected_image or set(s['networks']) != ({'control', 'access'} if name == 'api' else {'control'}):
