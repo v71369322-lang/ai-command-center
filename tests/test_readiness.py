@@ -221,6 +221,8 @@ def test_real_http_mock_coding_cycle_broker_containers_and_pr(store, tmp_path, m
         result = store.get(task['id'])
         if bad_verifier:
             assert result['state'] == 'FAILED'
+            assert result['coding'].get('failure') == 'independent_verifier_mismatch'
+            assert fake.ai_calls == 2
             assert not fake.prs and not result['coding'].get('pr')
             assert not any(host == '/pulls' for method, host in fake.calls)
             return
