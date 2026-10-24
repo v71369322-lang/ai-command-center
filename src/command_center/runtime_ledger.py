@@ -101,6 +101,15 @@ class RuntimeLedger:
                        (phase, int(phase == 'ACTIVE'), task_id, fence))
             self.event(db, 'runtime_' + phase.lower(), task_id=task_id, fence=fence)
 
+    def next_stage(self, task_id, fence):
+        # Caller holds launch_lock and has proved previous container absent.
+        with self.tx() as db:
+            row = db.execute('SELECT * FROM runs WHERE id=? AND fence=?', (task_id, fence)).fetchone()
+            if not row or row['phase'] != 'ACTIVE' or not row['observed'] or row['deadline'] <= time.time():
+                raise ValueError('runtime_stage_revoked')
+            db.execute("UPDATE runs SET phase='INTENT',observed=0 WHERE id=? AND fence=?", (task_id, fence))
+            self.event(db, 'verification_launch_intent', task_id=task_id, fence=fence)
+
     def beat(self, task_id, fence):
         with self.tx() as db:
             db.execute("UPDATE runs SET heartbeat=? WHERE id=? AND fence=? AND phase IN ('INTENT','ACTIVE')",

@@ -35,6 +35,11 @@ else
     dkr build --build-arg F1_SOURCE_REVISION --target worker -q -t acc-f1-worker:local .
     dkr build --build-arg F1_SOURCE_REVISION --target broker -q -t acc-f1-broker:local .
 fi
+if [ -n "${F1_BUILD_CA_FILE:-}" ]; then
+    dkr build --build-arg F1_SOURCE_REVISION --secret "id=proxy_ca,src=$F1_BUILD_CA_FILE" --target coding -q -t acc-f2-executor:local .
+else
+    dkr build --build-arg F1_SOURCE_REVISION --target coding -q -t acc-f2-executor:local .
+fi
 scripts/cloud_test.sh
 .venv/bin/python scripts/isolated_restore_drill.py
 dkr compose --profile worker up -d --no-build api runtime-broker watchdog worker
@@ -42,6 +47,7 @@ dkr compose --profile worker up -d --no-build api runtime-broker watchdog worker
 dkr compose --profile worker restart api worker runtime-broker
 .venv/bin/python scripts/container_smoke.py --check-persisted
 .venv/bin/python scripts/hardening_smoke.py
+.venv/bin/python scripts/coding_smoke.py
 .venv/bin/python scripts/runtime_boundaries.py
 dkr image inspect acc-f1-app:local acc-f1-worker:local acc-f1-executor:local \
     --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' > .runtime/images.txt

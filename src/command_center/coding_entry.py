@@ -1,0 +1,30 @@
+"""Fixed F2 entry point, read-only image; sandbox writes only /work."""
+import json
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from command_center.coding.contract import CodingRequest  # noqa: E402
+from command_center.coding.verification import replay  # noqa: E402
+
+
+def main():
+    raw = sys.stdin.buffer.read(65537)
+    if len(raw) > 65536:
+        raise ValueError('coding_input_limit')
+    job = json.loads(raw)
+    task = CodingRequest.model_validate(job['coding']).model_dump()
+    if task['provider'] != 'mock':
+        raise ValueError('provider_not_authorized')
+    if job['mode'] == 'agent':
+        from command_center.coding.agent import execute
+        result = execute({**job, 'coding': task}, Path('/work/repository'))
+    elif job['mode'] == 'verify':
+        result = replay(job['result'], job['operation_id'], job['fence'], task, Path('/work/verification'))
+    else:
+        raise ValueError('unknown_coding_stage')
+    print(json.dumps({'operation_id': job['operation_id'], 'fence': job['fence'], 'result': result}, sort_keys=True))
+
+
+if __name__ == '__main__':
+    main()

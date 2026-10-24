@@ -39,6 +39,78 @@
         "title": "AssertionRequest",
         "type": "object"
       },
+      "CodingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base_sha": {
+            "default": "a41d5fdf083fa0a162299b74ac9c155b58b140cb",
+            "pattern": "^[a-f0-9]{40}$",
+            "title": "Base Sha",
+            "type": "string"
+          },
+          "max_iterations": {
+            "default": 2,
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "max_seconds": {
+            "default": 15,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Seconds",
+            "type": "integer"
+          },
+          "max_tokens": {
+            "default": 2048,
+            "maximum": 4096.0,
+            "minimum": 64.0,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "max_units": {
+            "default": 2,
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Units",
+            "type": "integer"
+          },
+          "objective": {
+            "const": "sum_positive_v1",
+            "default": "sum_positive_v1",
+            "title": "Objective",
+            "type": "string"
+          },
+          "provider": {
+            "const": "mock",
+            "default": "mock",
+            "title": "Provider",
+            "type": "string"
+          },
+          "repository": {
+            "const": "f2-synthetic-sum",
+            "default": "f2-synthetic-sum",
+            "title": "Repository",
+            "type": "string"
+          },
+          "scenario": {
+            "default": "normal",
+            "enum": [
+              "normal",
+              "unavailable",
+              "always_fail",
+              "escape_attempt",
+              "pin_change",
+              "slow"
+            ],
+            "title": "Scenario",
+            "type": "string"
+          }
+        },
+        "title": "CodingRequest",
+        "type": "object"
+      },
       "Command": {
         "additionalProperties": false,
         "properties": {
@@ -352,6 +424,123 @@
           }
         },
         "summary": "Revoke Sessions"
+      }
+    },
+    "/api/coding/tasks": {
+      "post": {
+        "operationId": "create_coding_api_coding_tasks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Create Coding"
+      }
+    },
+    "/api/coding/template": {
+      "get": {
+        "operationId": "coding_scope_api_coding_template_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Scope"
       }
     },
     "/api/control/resume": {
@@ -747,6 +936,63 @@
           }
         },
         "summary": "Cancel"
+      }
+    },
+    "/api/tasks/{task_id}/pull-request": {
+      "get": {
+        "operationId": "coding_pull_request_api_tasks__task_id__pull_request_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Pull Request"
       }
     },
     "/api/tasks/{task_id}/retry": {

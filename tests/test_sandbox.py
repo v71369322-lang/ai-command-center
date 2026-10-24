@@ -1,21 +1,34 @@
 import json
 import subprocess
+import time
 import pytest
 from uuid import uuid4
 
 from command_center.worker import Runner, docker
 
 
-def sandbox(code):
+def inspected_state(name, *, wait_for_oom=False, seconds=3):
+    # Docker can report process exit before its asynchronous OOM event updates
+    # inspect state. Keep the container until that evidence arrives, boundedly.
+    # A missing OOM flag is still a failure; exit 137 alone is not accepted.
+    deadline = time.monotonic() + seconds
+    while True:
+        inspect = docker('inspect', name, '--format', '{{json .}}')
+        assert inspect.returncode == 0
+        info = json.loads(inspect.stdout)
+        if not wait_for_oom or info['State']['OOMKilled'] or time.monotonic() >= deadline:
+            return info
+        time.sleep(.05)
+
+
+def sandbox(code, *, wait_for_oom=False):
     name = "acc-f1-probe-" + uuid4().hex
     args = Runner.command(name, "acc-f1-executor:local")
     args[-1:-1] = ["--entrypoint", "python"]
     args.extend(["-I", "-c", code])
     try:
         result = subprocess.run(args, input=b"", capture_output=True, timeout=15)
-        inspect = docker("inspect", name, "--format", "{{json .}}")
-        assert inspect.returncode == 0
-        return result, json.loads(inspect.stdout)
+        return result, inspected_state(name, wait_for_oom=wait_for_oom)
     finally:
         docker("rm", "--force", name)
 
@@ -55,9 +68,26 @@ print(json.dumps(result))
 
 
 def test_T10_actual_memory_limit():
-    result, info = sandbox("data = bytearray(256 * 1024 * 1024)")
+    result, info = sandbox("data = bytearray(256 * 1024 * 1024)", wait_for_oom=True)
     assert result.returncode == 137
     assert info['State']['OOMKilled']
+
+
+@pytest.mark.parametrize('delayed', [True, False])
+def test_memory_probe_waits_for_evidence_but_never_invents_oom(monkeypatch, delayed):
+    import sys
+    clock = iter(range(20))
+    calls = []
+    def inspect(*args):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, json.dumps({
+            'State': {'OOMKilled': delayed and len(calls) >= 2}}).encode())
+    monkeypatch.setattr(sys.modules[__name__], 'docker', inspect)
+    monkeypatch.setattr(time, 'monotonic', lambda: next(clock))
+    monkeypatch.setattr(time, 'sleep', lambda _: None)
+    info = inspected_state('synthetic-container', wait_for_oom=True, seconds=3)
+    assert info['State']['OOMKilled'] is delayed
+    assert len(calls) >= 2
 
 
 def test_T10_actual_file_limit():

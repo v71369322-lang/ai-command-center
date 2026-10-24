@@ -28,3 +28,8 @@ CMD ["python", "-m", "command_center.worker"]
 FROM worker AS broker
 COPY --chmod=0555 --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 CMD ["uvicorn", "command_center.runtime_broker:create_broker_app", "--factory", "--uds", "/run/f1-broker/runtime.sock", "--no-access-log"]
+
+FROM app AS coding
+USER 65532:65532
+WORKDIR /work
+ENTRYPOINT ["python", "-I", "-B", "/app/src/command_center/coding_entry.py"]
