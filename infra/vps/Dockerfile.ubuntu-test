@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+# Package availability/OS probe only. This is not a systemd/rootless VPS emulator.
+RUN --mount=type=secret,id=proxy_ca \
+    apt-get -o Acquire::https::CaInfo=/run/secrets/proxy_ca update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::https::CaInfo=/run/secrets/proxy_ca install -y --no-install-recommends \
+    ca-certificates curl gnupg uidmap dbus-user-session slirp4netns fuse-overlayfs acl \
+    python3 python3-venv git nftables wireguard-tools && \
+    rm -rf /var/lib/apt/lists/*
+COPY infra/vps/bootstrap_f23.py infra/vps/read_only_probe.py /probe/
+WORKDIR /probe
+CMD ["python3", "read_only_probe.py"]

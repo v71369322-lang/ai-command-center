@@ -36,6 +36,8 @@ jobs:
         run: |
           python scripts/bootstrap_secrets.py
           scripts/verify_cloud.sh
+      - name: Ubuntu 24.04 deployment prerequisites (not a VPS test)
+        run: sh scripts/ubuntu_deployment_probe.sh
       - name: Stop only owned synthetic services
         if: always()
         run: |
