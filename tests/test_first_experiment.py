@@ -87,8 +87,10 @@ def test_stale_evidence_bad_payment_and_insufficient_funding_block():
 @pytest.mark.parametrize('bad', ['id', 'protected', 'base', 'admin'])
 def test_repository_id_and_main_protection_are_required(bad):
     repo = {'id': 725000001, 'full_name': 'fixture/acc-f2-synthetic-test',
+            'archived': False, 'disabled': False,
             'permissions': {'admin': False, 'push': True}}
     branch = {'name': 'main', 'protected': True, 'commit': {'sha': BASE_SHA}}
+    validate_repository(repo, branch, 'fixture/acc-f2-synthetic-test', 725000001)
     if bad == 'id':
         repo['id'] = 1
     elif bad == 'protected':

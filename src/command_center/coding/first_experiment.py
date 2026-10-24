@@ -116,9 +116,9 @@ class FirstExperiment(Strict):
 
 
 def validate_repository(metadata, branch, expected_name, expected_id):
-    if (type(expected_id) is not int or metadata.get('id') != expected_id
-            or metadata.get('full_name') != expected_name or metadata.get('archived')
-            or metadata.get('disabled') or metadata.get('permissions', {}).get('admin')
+    if (type(expected_id) is not int or type(metadata.get('id')) is not int or metadata.get('id') != expected_id
+            or metadata.get('full_name') != expected_name or metadata.get('archived') is not False
+            or metadata.get('disabled') is not False or metadata.get('permissions', {}).get('admin') is not False
             or metadata.get('permissions', {}).get('push') is not True
             or branch.get('name') != 'main' or branch.get('protected') is not True
             or branch.get('commit', {}).get('sha') != BASE_SHA):
