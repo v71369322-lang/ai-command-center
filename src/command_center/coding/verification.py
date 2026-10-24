@@ -13,9 +13,10 @@ from dulwich.repo import Repo
 from .spec import BASE_SHA, CORRECT, FILES, FIRST, branch_name, commit_objects, safe_source
 
 
-def inspect_result(result, task_id, fence, task):
+def inspect_result(result, task_id, fence, task, *, allow_incomplete=False):
     git = result['git']
-    if (result.get('status') != 'ready_for_verification' or git['base_sha'] != BASE_SHA
+    allowed_status = {'ready_for_verification', 'attempt_failed'} if allow_incomplete else {'ready_for_verification'}
+    if (result.get('status') not in allowed_status or git['base_sha'] != BASE_SHA
             or task['base_sha'] != BASE_SHA or git['branch'] != branch_name(task_id, fence)):
         raise ValueError('git_source_or_branch_mismatch')
     if not 1 <= len(git['commits']) <= task['max_iterations'] or len(git['objects']) > 32:
@@ -67,13 +68,14 @@ def inspect_result(result, task_id, fence, task):
         replays.append(record)
         snapshots.append(files)
         parent = commit_id
-    if (set(objects) != reachable or git['head_sha'] != parent or not replays[-1]['checks']['passed'] or result['history'] != replays
+    if (set(objects) != reachable or git['head_sha'] != parent
+            or (not allow_incomplete and not replays[-1]['checks']['passed']) or result['history'] != replays
             or result['usage']['synthetic'] is not True or result['usage']['units'] != len(replays)
             or type(result['usage']['units']) is not int or type(result['usage']['tokens']) is not int
             or result['usage']['units'] > task['max_units'] or not 0 <= result['usage']['tokens'] <= task['max_tokens']):
         raise ValueError('forged_result_or_budget_evidence')
     return {'base_sha': BASE_SHA, 'head_sha': parent, 'branch': git['branch'],
-            'checks': replays, 'passed': True, 'allowed_files': ['calculator.py']}, objects, snapshots
+            'checks': replays, 'passed': replays[-1]['checks']['passed'], 'allowed_files': ['calculator.py']}, objects, snapshots
 
 
 def replay(result, task_id, fence, task, root):

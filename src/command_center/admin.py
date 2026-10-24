@@ -25,6 +25,7 @@ def main():
         connection.execute(text("GRANT USAGE ON SCHEMA public TO f1_app"))
         connection.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON control, tasks, approvals, outbox, owner_sessions TO f1_app"))
         connection.execute(text("GRANT SELECT, INSERT ON audit TO f1_app"))
+        connection.execute(text('GRANT SELECT,INSERT,UPDATE ON external_grants,external_actions TO f1_app'))
         connection.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO f1_app"))
         # Runtime policy service: no grant creation, payload edits, or owner sessions.
         runtime_binding = os.environ.get('F1_RUNTIME_PASSWORD_FILE')
@@ -47,6 +48,8 @@ def main():
             connection.execute(text('GRANT UPDATE(used) ON approvals TO f1_runtime'))
             connection.execute(text('GRANT INSERT,UPDATE ON outbox TO f1_runtime'))
             connection.execute(text('GRANT INSERT ON audit TO f1_runtime'))
+            connection.execute(text('GRANT SELECT ON external_grants TO f1_runtime'))
+            connection.execute(text('GRANT SELECT,INSERT,UPDATE ON external_actions TO f1_runtime'))
             connection.execute(text('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO f1_runtime'))
     print("Schema 001 initialized; restricted application role granted. No credentials printed.")
 

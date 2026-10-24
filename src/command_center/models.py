@@ -79,3 +79,24 @@ class OwnerSession(Base):
     subject: Mapped[str] = mapped_column(String(128))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ExternalGrant(Base):
+    __tablename__ = 'external_grants'
+    task_id: Mapped[str] = mapped_column(ForeignKey('tasks.id', ondelete='CASCADE'), primary_key=True)
+    document: Mapped[dict] = mapped_column(JSONB)
+    digest: Mapped[str] = mapped_column(String(64))
+
+
+class ExternalAction(Base):
+    __tablename__ = 'external_actions'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey('tasks.id', ondelete='CASCADE'), index=True)
+    key: Mapped[str] = mapped_column(String(200), unique=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(24))
+    reserved: Mapped[int] = mapped_column(BigInteger, default=0)
+    actual: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    evidence: Mapped[dict] = mapped_column(JSONB, default=dict)

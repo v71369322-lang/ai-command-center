@@ -14,6 +14,11 @@ ZERO = "0" * 64
 TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED", "SECURITY_BLOCKED"}
 
 
+def requires_approval(payload):
+    return payload['kind'] == 'approved_render' or (
+        payload['kind'] == 'coding_synthetic' and payload['coding']['provider'] == 'openai')
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
@@ -116,7 +121,7 @@ class Store:
             if dependency:
                 self.task(s, dependency)
             task = Task(id=str(uuid4()), request_key=scoped_key, payload_hash=fingerprint,
-                        payload=payload, state="WAITING_APPROVAL" if payload["kind"] == "approved_render"
+                        payload=payload, state="WAITING_APPROVAL" if requires_approval(payload)
                         else "READY", version=1, epoch=control.epoch, owner_role=actor,
                         created_at=self.now(s), dependency=dependency, attempts=0, fence=0, reserved=0,
                         coding_evidence={})
@@ -124,14 +129,15 @@ class Store:
             if payload['kind'] == 'coding_synthetic':
                 from .coding.spec import PLAN
                 task.coding_evidence = {'plan': PLAN, 'stage': 'queued',
-                                        'summary': 'Задача разрешена. Ожидает тестового разработчика.'}
+                                        'summary': 'Ожидает ограниченного разрешения владельца.' if requires_approval(payload)
+                                        else 'Задача разрешена. Ожидает тестового разработчика.'}
             s.flush()
             self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint)
             if task.state == "READY":
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
             return self.view(task)
 
-    def approve(self, actor, task_id, version, seconds=120):
+    def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None):
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
@@ -154,6 +160,8 @@ class Store:
             s.add(Outbox(id=str(uuid4()), task_id=task.id))
             self.audit(s, "approved", actor, task.id, version=version,
                        payload_hash=task.payload_hash, epoch=control.epoch, expires_at=expires_at.isoformat())
+            if _scope_installer:
+                _scope_installer(s, task)
             return self.view(task)
 
     def cancel(self, actor, task_id, revoke=False):
@@ -201,7 +209,7 @@ class Store:
                 task.state, task.reason = "FAILED", "attempt_limit"
                 self.audit(s, "attempt_limit", "policy", task.id)
                 return None
-            if task.payload["kind"] == "approved_render":
+            if requires_approval(task.payload):
                 a = s.get(Approval, task.id)
                 if (not a or a.used or a.revoked or a.expires_at <= self.now(s)
                         or a.task_version != task.version or a.payload_hash != task.payload_hash
@@ -216,7 +224,7 @@ class Store:
                 task.state, task.reason = "FAILED", "budget_limit"
                 self.audit(s, "budget_blocked", "policy", task.id)
                 return None
-            if task.payload["kind"] == "approved_render":
+            if requires_approval(task.payload):
                 a.used = True
             control.reserved += charge
             task.reserved = charge
@@ -389,7 +397,7 @@ class Store:
                 raise Denied("retry_not_safe")
             task.version += 1
             task.epoch = control.epoch
-            task.state = "WAITING_APPROVAL" if task.payload["kind"] == "approved_render" else "READY"
+            task.state = "WAITING_APPROVAL" if requires_approval(task.payload) else "READY"
             if task.state == "READY":
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
             self.audit(s, "retry_authorized", actor, task.id)
