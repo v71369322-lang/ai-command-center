@@ -1,4 +1,5 @@
 from dataclasses import replace
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -97,6 +98,13 @@ def test_broker_rejects_auth_arbitrary_docker_and_forged_fence(store, tmp_path):
 def test_broker_unavailable_has_no_direct_runtime_fallback(tmp_path):
     with pytest.raises(Exception):
         BrokerClient(str(tmp_path / 'missing.sock'), 'synthetic-token').request({'action': 'submit'})
+
+
+def test_runtime_ledger_simultaneous_process_startup(tmp_path):
+    path = tmp_path / 'shared' / 'runtime.sqlite'
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ledgers = list(pool.map(lambda _: RuntimeLedger(path), range(8)))
+    assert all(ledger.verify() == '0' * 64 for ledger in ledgers)
 
 
 @pytest.mark.parametrize('field,value', [('cpu', 8), ('memory_mib', 4096), ('pids', 4096),

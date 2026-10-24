@@ -13,15 +13,19 @@ class RuntimeLedger:
     def __init__(self, path):
         self.path = Path(path)
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if not self.path.exists():
+        try:
             fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             os.close(fd)
+        except FileExistsError:
+            if self.path.is_symlink():
+                raise ValueError('runtime_ledger_symlink_forbidden') from None
         with self.tx() as db:
-            db.executescript('''CREATE TABLE IF NOT EXISTS runs(
+            db.execute('''CREATE TABLE IF NOT EXISTS runs(
                 id TEXT PRIMARY KEY, fence INTEGER, name TEXT, phase TEXT,
-                deadline REAL, heartbeat REAL, revision TEXT, stops INTEGER DEFAULT 0);
-                CREATE TABLE IF NOT EXISTS monitor(id INTEGER PRIMARY KEY, heartbeat REAL, healthy INTEGER);
-                CREATE TABLE IF NOT EXISTS evidence(seq INTEGER PRIMARY KEY, event TEXT, previous TEXT, digest TEXT);''')
+                deadline REAL, heartbeat REAL, revision TEXT, stops INTEGER DEFAULT 0,
+                observed INTEGER NOT NULL DEFAULT 0)''')
+            db.execute('CREATE TABLE IF NOT EXISTS monitor(id INTEGER PRIMARY KEY, heartbeat REAL, healthy INTEGER)')
+            db.execute('CREATE TABLE IF NOT EXISTS evidence(seq INTEGER PRIMARY KEY, event TEXT, previous TEXT, digest TEXT)')
             if 'observed' not in {r[1] for r in db.execute('PRAGMA table_info(runs)')}:
                 db.execute('ALTER TABLE runs ADD COLUMN observed INTEGER NOT NULL DEFAULT 0')
 
