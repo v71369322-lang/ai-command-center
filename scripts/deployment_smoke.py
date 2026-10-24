@@ -97,7 +97,7 @@ def main():
             def closed_access():
                 require(client.get('/').status_code == 200)
                 require(client.get('/api/state').status_code == 401)
-                require(client.post('/api/auth/exchange', json={'assertion': 'not-a-real-assertion'}).status_code == 503)
+                require(client.post('/api/auth/exchange', json={'assertion': 'synthetic-unconfigured-identity-assertion'}).status_code == 503)
             wait(closed_access)
         code = ('import json;from command_center.config import Settings;from command_center.store import Store;'
                 "print(json.dumps(Store(Settings.load()).create('owner','f23-cloud-smoke',{'kind':'render','values':{'test':'synthetic'}})))")
