@@ -7,7 +7,7 @@ from uuid import uuid4
 from command_center.worker import Runner, docker
 
 
-def inspected_state(name, *, wait_for_oom=False, seconds=3):
+def inspected_state(name, *, wait_for_oom=False, seconds=10):
     # Docker can report process exit before its asynchronous OOM event updates
     # inspect state. Keep the container until that evidence arrives, boundedly.
     # A missing OOM flag is still a failure; exit 137 alone is not accepted.

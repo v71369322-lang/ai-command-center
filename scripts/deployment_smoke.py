@@ -119,7 +119,9 @@ def main():
                 require(denied.status_code == 403 and denied.json()['detail'] == 'https_required')
             wait(closed_access)
         code = ('import json;from command_center.config import Settings;from command_center.store import Store;'
-                "print(json.dumps(Store(Settings.load()).create('owner','f23-cloud-smoke',{'kind':'render','values':{'test':'synthetic'}})))")
+                'from command_center.api import Command;'
+                "print(json.dumps(Store(Settings.load()).create('owner','f23-cloud-smoke',"
+                "Command(kind='render',values={'test':'synthetic'}).model_dump())))")
         task = json.loads(deployment.tool(code))
 
         def succeeded():
@@ -127,7 +129,8 @@ def main():
                 'from command_center.store import Store;print(json.dumps(Store(Settings.load()).get(' + repr(task['id']) + ')))'))
             if value['state'] in {'FAILED', 'CANCELLED', 'SECURITY_BLOCKED', 'RECONCILING'}:
                 raise ValueError('synthetic_task_' + value['state'] + ':' + str(value['reason']))
-            require(value['state'] == 'SUCCEEDED')
+            if value['state'] != 'SUCCEEDED':
+                raise ValueError('synthetic_task_waiting:' + value['state'])
             require(bool(value['artifact_hash']))
             return value
         evidence = wait(succeeded)
