@@ -44,10 +44,13 @@ class Gateway:
         if any(anchors.get(row.id) != self.action_digest(row) for row in rows):
             raise Denied('external_ledger_integrity_failure')
 
-    def authorize(self, actor, task_id, version, *, budget_nano_rub, seconds=120):
+    def authorize(self, actor, task_id, version, *, budget_nano_rub, seconds=120, final_confirmation=False,
+                  expected_config_hash=None):
         if actor != 'owner':
             raise Denied('owner_required')
         c = self.config
+        if expected_config_hash is not None and expected_config_hash != digest(c.model_dump()):
+            raise Denied('first_experiment_profile_changed')
         if not c.connected() or not c.synthetic_repository:
             raise Denied('integration_not_connected')
         if not c.tariff or not c.tariff.confirmed or not c.daily_nano_rub or not c.monthly_nano_rub:
@@ -57,6 +60,9 @@ class Gateway:
         view = self.store.get(task_id)
         if view['payload'].get('coding', {}).get('provider') != 'openai':
             raise Denied('not_external_coding_task')
+        tagged = view['payload']['coding'].get('experiment_id')
+        if tagged and not c.first_experiment:
+            raise Denied('first_experiment_profile_required')
         # The F1 approval remains the sole grant of task execution authority.
         # ExternalGrant only narrows it with immutable financial/endpoint scope.
         def install_scope(s, task):
@@ -64,12 +70,24 @@ class Gateway:
             self.store.check_task_revision(s, task)
             if task.version != version or task.state != 'READY' or s.get(ExternalGrant, task_id):
                 raise Denied('external_grant_conflict')
+            if c.first_experiment:
+                c.first_experiment.validate_scope(c, task.payload['coding'], budget_nano_rub, self.store.now(s),
+                                                  final_confirmation=final_confirmation)
+                existing = s.execute(select(ExternalGrant).where(
+                    ExternalGrant.document['experiment_id'].astext == c.first_experiment.id,
+                    ExternalGrant.document['mode'].astext == c.mode)).first()
+                if existing:
+                    raise Denied('first_experiment_already_bound')
             document = {'task_version': version, 'payload_hash': task.payload_hash,
                         'revision': self.store.settings.source_revision, 'base_sha': BASE_SHA,
                         'config_hash': digest(c.model_dump()), 'budget': budget_nano_rub,
                         'repository': c.synthetic_repository, 'model': c.tariff.model,
                         'max_calls': min(task.payload['coding']['max_iterations'], task.payload['coding']['max_units']),
                         'secret_refs': [c.openai_secret_ref, c.github_secret_ref]}
+            if c.first_experiment:
+                document.update(experiment_id=c.first_experiment.id, mode=c.mode,
+                                final_confirmation=bool(final_confirmation),
+                                repository_id=c.first_experiment.repository_id)
             seal = digest(document)
             s.add(ExternalGrant(task_id=task_id, document=document, digest=seal))
             self.store.audit(s, 'external_scope_approved', actor, task_id, grant_digest=seal)
@@ -100,6 +118,11 @@ class Gateway:
             select(Audit).where(Audit.event['task_id'].astext == task_id)).scalars())
         if not anchored:
             raise Denied('external_grant_unanchored')
+        if c.first_experiment:
+            c.first_experiment.validate_scope(c, task.payload['coding'], doc['budget'], now,
+                                              final_confirmation=doc.get('final_confirmation') is True)
+            if doc.get('experiment_id') != c.first_experiment.id or doc.get('repository_id') != c.first_experiment.repository_id:
+                raise Denied('first_experiment_binding_changed')
         return task, doc
 
     def endpoint(self, kind, path, method):
@@ -107,6 +130,8 @@ class Gateway:
         if kind == 'openai' and path == '/v1/responses' and method == 'POST':
             return 'https://api.openai.com' + path, c.openai_secret_ref
         prefix = '/repos/' + c.synthetic_repository
+        if kind == 'github' and c.first_experiment and method == 'GET' and path in {prefix, prefix + '/branches/main'}:
+            return 'https://api.github.com' + path, c.github_secret_ref
         if not c.synthetic_repository or not path.startswith(prefix + '/'):
             raise Denied('external_repository_forbidden')
         relative = path[len(prefix):]
@@ -250,6 +275,8 @@ class Gateway:
                     # Financial settlement requires documented, bounded usage. Bad/missing usage stays reserved.
                     from .http_contract import ResponseEnvelope
                     parsed = ResponseEnvelope.model_validate(data)
+                    if self.config.first_experiment and self.config.mode == 'live' and data.get('service_tier') != 'default':
+                        raise Uncertain('first_experiment_pricing_tier_mismatch')
                     if (parsed.model != self.config.tariff.model or parsed.usage.total_tokens !=
                             parsed.usage.input_tokens + parsed.usage.output_tokens):
                         raise Uncertain('provider_model_or_usage_mismatch')

@@ -20,7 +20,7 @@ def request_document(context, model, max_output_tokens):
             or context['repository'] != REPOSITORY or context['objective'] != OBJECTIVE
             or len(json.dumps(context).encode()) > 8192):
         raise ValueError('provider_context_scope')
-    return {'model': model, 'store': False, 'max_output_tokens': max_output_tokens,
+    return {'model': model, 'store': False, 'service_tier': 'default', 'max_output_tokens': max_output_tokens,
             'input': [{'role': 'developer', 'content': INSTRUCTION},
                       {'role': 'user', 'content': json.dumps(context, sort_keys=True)}],
             'text': {'format': FORMAT}}

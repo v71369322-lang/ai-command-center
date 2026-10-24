@@ -71,6 +71,12 @@ class BillingReconciliation(BaseModel):
     evidence_reference: str = Field(min_length=1, max_length=300)
 
 
+class FinalExperimentApproval(ExternalApprovalRequest):
+    budget_nano_rub: int = Field(default=100_000_000_000, gt=0, le=100_000_000_000, strict=True)
+    confirmation: Literal['AUTHORIZE_FIRST_PAID_EXPERIMENT']
+    profile_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
 def create_app(settings=None, gateway_factory=None):
     settings = settings or Settings.load()
     store = Store(settings)
@@ -231,6 +237,48 @@ def create_app(settings=None, gateway_factory=None):
     def integration_status(role=Depends(human)):
         from .coding.integration_config import IntegrationConfig
         return IntegrationConfig.load().public()
+
+    @app.get('/api/experiments/first')
+    def first_experiment_status(role=Depends(human)):
+        from .coding.first_experiment import FirstExperiment, EXPERIMENT_ID
+        from .store import digest
+        gateway = external_gateway()
+        try:
+            config = gateway.config
+            result = (config.first_experiment or FirstExperiment()).report()
+            result.update(mode=config.mode, connected=config.connected(), repository=config.synthetic_repository or None,
+                          profile_hash=digest(config.model_dump()),
+                          credential_refs_configured=bool(config.credential_files))
+            task = next((t for t in store.snapshot()['tasks'] if t['payload'].get('coding', {}).get('experiment_id') == EXPERIMENT_ID), None)
+            result['task_state'] = task
+            if task:
+                result['integration'] = gateway.status(task['id'])
+            return result
+        finally:
+            gateway.close()
+
+    @app.post('/api/experiments/first/task', status_code=201)
+    def create_first_experiment(role=Depends(identity)):
+        from .coding.first_experiment import EXPERIMENT_ID
+        if role != 'owner':
+            raise Denied('owner_required')
+        # Stable request identity makes repeated phone taps return the same task.
+        request = CodingRequest(provider='openai', experiment_id=EXPERIMENT_ID, max_iterations=2,
+                                max_units=2, max_tokens=4096, max_seconds=30)
+        return store.create(role, 'first-experiment-f2-2', coding_payload(request))
+
+    @app.post('/api/experiments/first/{task_id}/authorize')
+    def authorize_first_experiment(task_id: str, command: FinalExperimentApproval, role=Depends(identity)):
+        from .coding.first_experiment import EXPERIMENT_ID
+        if store.get(task_id)['payload'].get('coding', {}).get('experiment_id') != EXPERIMENT_ID:
+            raise Denied('not_first_experiment_task')
+        gateway = external_gateway()
+        try:
+            return gateway.authorize(role, task_id, command.version, budget_nano_rub=command.budget_nano_rub,
+                                     seconds=command.seconds, final_confirmation=True,
+                                     expected_config_hash=command.profile_hash)
+        finally:
+            gateway.close()
 
     @app.post('/api/coding/tasks/{task_id}/authorize')
     def authorize_external(task_id: str, command: ExternalApprovalRequest, role=Depends(identity)):

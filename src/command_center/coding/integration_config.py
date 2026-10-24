@@ -5,13 +5,9 @@ import re
 import stat
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-NANO_RUB = 1_000_000_000
-
-
-class Strict(BaseModel):
-    model_config = ConfigDict(extra='forbid', strict=True)
+from pydantic import Field, model_validator
+from .financial_types import NANO_RUB as NANO_RUB, Strict
+from .first_experiment import FirstExperiment
 
 
 class Tariff(Strict):
@@ -47,6 +43,7 @@ class IntegrationConfig(Strict):
     github_secret_ref: str = 'github-installation-token'
     credential_files: dict[str, str] = Field(default_factory=dict, repr=False, exclude=True)
     budget_evidence: str = Field(default='', max_length=300)
+    first_experiment: FirstExperiment | None = None
 
     @model_validator(mode='after')
     def scope(self):
@@ -70,13 +67,16 @@ class IntegrationConfig(Strict):
             and self.github_secret_ref in self.credential_files)
 
     def public(self):
-        return {'connected': self.connected(), 'mode': self.mode,
+        result = {'connected': self.connected(), 'mode': self.mode,
                 'state': 'integration_not_connected' if not self.connected() else (
                     'budget_unconfirmed' if not self.tariff or not self.tariff.confirmed else 'permission_required'),
                 'repository': self.synthetic_repository, 'scope': ['calculator.py'],
                 'model': self.tariff.model if self.tariff else None,
                 'tariff_confirmed': bool(self.tariff and self.tariff.confirmed),
                 'daily_nano_rub': self.daily_nano_rub, 'monthly_nano_rub': self.monthly_nano_rub}
+        if self.first_experiment:
+            result['first_experiment'] = self.first_experiment.report()
+        return result
 
 
 class FileCredentials:

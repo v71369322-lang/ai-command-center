@@ -11,6 +11,7 @@ class CodingRequest(BaseModel):
     objective: Literal['sum_positive_v1'] = OBJECTIVE
     base_sha: str = Field(default=BASE_SHA, pattern='^[a-f0-9]{40}$')
     provider: Literal['mock', 'openai'] = 'mock'
+    experiment_id: Literal['f2.2-first-live'] | None = None
     max_iterations: int = Field(default=2, ge=1, le=3, strict=True)
     max_units: int = Field(default=2, ge=1, le=3, strict=True)
     max_tokens: int = Field(default=2048, ge=64, le=4096, strict=True)
