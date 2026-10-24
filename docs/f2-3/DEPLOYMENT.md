@@ -36,7 +36,10 @@ Broker compromise still grants broad control over the execution daemon; rootless
 Docker is not a complete hostile-code kernel escape boundary. Only synthetic
 tasks are eligible. An additional sandbox/VM remains a gate for broader threats.
 
-All service networking is internal. API publication is exactly
+Database/worker/runtime service networking is internal. API additionally has an
+access bridge because Docker internal-only bridges do not reliably publish host
+ports. This bridge is **not an egress firewall**; host-specific egress controls
+remain to be audited. API publication is exactly
 `127.0.0.1:8000`; PostgreSQL/Redis/broker/watchdog have no host ports. Real AI
 and GitHub integrations have no mounted credentials/config and remain disabled.
 The API is fixed to unconfigured OIDC and rejects owner access. This is a closed

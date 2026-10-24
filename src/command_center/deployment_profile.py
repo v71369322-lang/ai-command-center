@@ -54,7 +54,7 @@ def render(base, m):
     profile.pop('x-bounded-logging', None)
     profile['name'] = PROJECT
     profile['volumes'] = {'pgdata': {'name': PROJECT + '-pgdata'}}
-    profile['networks'] = {'control': {'internal': True}}
+    profile['networks'] = {'control': {'internal': True}, 'access': {'internal': False}}
     profile['secrets'] = {k: {'file': str(root / 'secrets' / k)} for k in SECRETS}
     for name, service in profile['services'].items():
         service.pop('build', None)
@@ -87,6 +87,10 @@ def render(base, m):
         env['F1_SOURCE_REVISION'] = m['revision']
         service['volumes'] = []
         if name == 'api':
+            # Docker internal-only bridges do not reliably publish host ports.
+            # This interface exposes only the pinned loopback binding; it is NOT
+            # an egress firewall. External credentials/config remain absent.
+            service['networks']['access'] = None
             env.update(F1_AUTH_MODE='oidc', F1_OIDC_ISSUER='', F1_OIDC_AUDIENCE='', F1_OIDC_OWNER='',
                        F1_WEB_ORIGIN='', F1_OIDC_JWKS_FILE='/run/identity/public-jwks.json')
             service['volumes'] = [{'type': 'bind', 'source': str(root / 'identity/public-jwks.json'),
@@ -113,7 +117,7 @@ def validate_profile(p, m):
     for name, s in p['services'].items():
         expected_image = (m['database_image'] if name == 'db' else m['redis_image'] if name == 'redis'
                           else m['images']['broker' if name in {'runtime-broker', 'watchdog'} else name])
-        if s['image'] != expected_image or set(s['networks']) != {'control'}:
+        if s['image'] != expected_image or set(s['networks']) != ({'control', 'access'} if name == 'api' else {'control'}):
             raise ValueError('service_image_or_network_changed')
         allowed_secrets = {'db': {'db_admin_password'}, 'redis': {'redis_password'},
                            'api': {'db_password', 'redis_password', 'identities'},

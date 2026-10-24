@@ -108,7 +108,7 @@ def test_profile_rejects_boundary_changes(release, attack):
     elif attack == 'secret_scope':
         api['secrets'].append({'source': 'db_admin_password'})
     else:
-        api['networks'] = {'access': None}
+        api['networks'] = {'unapproved': None}
     with pytest.raises(ValueError):
         validate_profile(p, bundle['manifest'])
 
