@@ -137,7 +137,7 @@ class Store:
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
             return self.view(task)
 
-    def approve(self, actor, task_id, version, seconds=120):
+    def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None):
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
@@ -160,6 +160,8 @@ class Store:
             s.add(Outbox(id=str(uuid4()), task_id=task.id))
             self.audit(s, "approved", actor, task.id, version=version,
                        payload_hash=task.payload_hash, epoch=control.epoch, expires_at=expires_at.isoformat())
+            if _scope_installer:
+                _scope_installer(s, task)
             return self.view(task)
 
     def cancel(self, actor, task_id, revoke=False):

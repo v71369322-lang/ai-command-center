@@ -59,10 +59,8 @@ class Gateway:
             raise Denied('not_external_coding_task')
         # The F1 approval remains the sole grant of task execution authority.
         # ExternalGrant only narrows it with immutable financial/endpoint scope.
-        self.store.approve(actor, task_id, version, seconds)
-        with self.store.transaction() as s:
+        def install_scope(s, task):
             self.store.check_audit(s)
-            task = self.store.task(s, task_id)
             self.store.check_task_revision(s, task)
             if task.version != version or task.state != 'READY' or s.get(ExternalGrant, task_id):
                 raise Denied('external_grant_conflict')
@@ -75,6 +73,7 @@ class Gateway:
             seal = digest(document)
             s.add(ExternalGrant(task_id=task_id, document=document, digest=seal))
             self.store.audit(s, 'external_scope_approved', actor, task_id, grant_digest=seal)
+        self.store.approve(actor, task_id, version, seconds, _scope_installer=install_scope)
         return {'authorized': True, 'task_id': task_id, 'budget_nano_rub': budget_nano_rub,
                 'mode': c.mode, 'repository': c.synthetic_repository}
 

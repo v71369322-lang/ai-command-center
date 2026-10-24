@@ -349,7 +349,7 @@ def test_external_ledger_tamper_is_detected(store, admin):
     g.close()
 
 
-def test_external_task_api_defaults_waiting_and_cannot_self_approve(client, headers):
+def test_external_task_api_defaults_waiting_and_cannot_self_approve(client, headers, store, monkeypatch):
     response = client.post('/api/coding/tasks', json={'provider': 'openai'},
                            headers={**headers['owner'], 'Idempotency-Key': str(uuid4())})
     assert response.status_code == 201 and response.json()['state'] == 'WAITING_APPROVAL'
@@ -359,6 +359,21 @@ def test_external_task_api_defaults_waiting_and_cannot_self_approve(client, head
                              json={'version': task['version'], 'budget_nano_rub': 1000}, headers=headers[role])
         assert result.status_code == 409  # Live connection absent; no configuration through task JSON.
     assert client.get('/api/integration/status', headers=headers['owner']).json()['connected'] is False
+    gateway = Gateway(store, config(), transport=httpx.MockTransport(FakeHTTP().handle), credentials=Credentials())
+    original_audit = store.audit
+    def fail_scope(*args, **kwargs):
+        if args[1] == 'external_scope_approved':
+            raise RuntimeError('fixture_interrupted_scope_installation')
+        return original_audit(*args, **kwargs)
+    monkeypatch.setattr(store, 'audit', fail_scope)
+    with pytest.raises(RuntimeError, match='scope_installation'):
+        gateway.authorize('owner', task['id'], task['version'], budget_nano_rub=1_000_000)
+    assert store.get(task['id'])['state'] == 'WAITING_APPROVAL'
+    assert gateway.status(task['id'])['permission'] is False
+    monkeypatch.setattr(store, 'audit', original_audit)
+    gateway.authorize('owner', task['id'], task['version'], budget_nano_rub=1_000_000)
+    assert store.claim(task['id'])['state'] == 'RUNNING'
+    gateway.close()
 
 
 @pytest.mark.parametrize('period', ['day', 'month'])
