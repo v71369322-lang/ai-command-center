@@ -81,6 +81,41 @@ class OwnerSession(Base):
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class TelegramInbox(Base):
+    __tablename__ = 'telegram_inbox'
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    profile: Mapped[str] = mapped_column(String(64), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    intent: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(32), default='RECEIVED')
+    task_id: Mapped[str | None] = mapped_column(ForeignKey('tasks.id'))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TelegramDelivery(Base):
+    __tablename__ = 'telegram_deliveries'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    profile: Mapped[str] = mapped_column(String(64), index=True)
+    body: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(24), default='NEW')
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    message_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class TelegramCard(Base):
+    __tablename__ = 'telegram_cards'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    profile: Mapped[str] = mapped_column(String(64))
+    delivery_id: Mapped[str] = mapped_column(ForeignKey('telegram_deliveries.id'))
+    task_id: Mapped[str] = mapped_column(ForeignKey('tasks.id'))
+    version: Mapped[int] = mapped_column(Integer)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    epoch: Mapped[int] = mapped_column(Integer)
+    revision: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_update: Mapped[str | None] = mapped_column(String(100))
+
+
 class ExternalGrant(Base):
     __tablename__ = 'external_grants'
     task_id: Mapped[str] = mapped_column(ForeignKey('tasks.id', ondelete='CASCADE'), primary_key=True)

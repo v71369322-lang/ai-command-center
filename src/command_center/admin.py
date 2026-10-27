@@ -26,6 +26,7 @@ def main():
         connection.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON control, tasks, approvals, outbox, owner_sessions TO f1_app"))
         connection.execute(text("GRANT SELECT, INSERT ON audit TO f1_app"))
         connection.execute(text('GRANT SELECT,INSERT,UPDATE ON external_grants,external_actions TO f1_app'))
+        connection.execute(text('GRANT SELECT,INSERT,UPDATE ON telegram_inbox,telegram_deliveries,telegram_cards TO f1_app'))
         connection.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO f1_app"))
         # Runtime policy service: no grant creation, payload edits, or owner sessions.
         runtime_binding = os.environ.get('F1_RUNTIME_PASSWORD_FILE')
