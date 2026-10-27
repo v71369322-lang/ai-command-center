@@ -1,8 +1,9 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {createRoot} from 'react-dom/client';
 import './style.css';
 import {FirstExperimentPanel, type Experiment} from './FirstExperiment';
 import {IntegrationOverview, ExternalTaskPanel, type Integration} from './Integration';
+import {TelegramPanel} from './Telegram';
 type Draft = {title:string; mode:string; published:boolean; base_sha:string; head_sha:string; diff:string; risks:string[]; url:string|null};
 type Coding = {stage?:string; plan?:string[]; summary?:string; failure?:string; test_runs?:{attempt:number;checks:{passed:boolean;tests_run:number;failures:number}}[];pr?:Draft};
 type Task = {id:string; state:string; version:number; fence:number; attempts:number; payload_hash:string; artifact:string|null; artifact_hash:string|null; reason:string|null; payload:unknown;coding?:Coding;integration?:Integration};
@@ -15,10 +16,10 @@ function App(){
  const [experiment,setExperiment]=useState<Experiment|null>(null);
  const generation=useRef(0);
  useEffect(()=>{fetch('/api/auth/mode').then(r=>r.json()).then(v=>setMode(v.mode)).catch(()=>setMode('unknown'))},[]);
- async function request(path:string,body?:unknown){
-  const res=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:{...(mode==='synthetic'?{Authorization:'Bearer '+token}:{}),'X-CSRF-Token':csrf,'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
+ const request=useCallback(async(path:string,body?:unknown,signal?:AbortSignal)=>{
+  const res=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',signal,headers:{...(mode==='synthetic'?{Authorization:'Bearer '+token}:{}),'X-CSRF-Token':csrf,'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await res.json(); if(!res.ok)throw new Error(data.detail||'Запрос отклонён'); return data;
- }
+ },[mode,token,csrf]);
  async function refresh(){
   const current=generation.current;
   try{
@@ -46,6 +47,7 @@ function App(){
  <button onClick={()=>action('simulator/commands',{kind:'approved_render',values:{message:'approval fixture'}})}>Создать задачу с подтверждением</button>
  <h3>Тестовый разработчик F2</h3><p>Исправит сумму положительных чисел в отдельном синтетическом репозитории. До двух попыток, затем независимая проверка. Provider: mock, настоящий AI не подключён.</p><button onClick={()=>action('coding/tasks',{})}>Запустить тестового разработчика</button>
  {state.halted&&!state.recovery&&<button onClick={()=>action("control/resume",{epoch:state.epoch,checkpoint_digest:state.checkpoint_digest})}>Снять обычную остановку для новых задач</button>}<button className="danger" onClick={()=>action('control/stop')}>Аварийная остановка</button><pre>{JSON.stringify(health,null,2)}</pre><h3>Синтетический бюджет</h3><pre>{JSON.stringify(state.budget,null,2)}</pre></section>
+ <TelegramPanel request={request}/>
  <FirstExperimentPanel value={experiment} create={()=>action('experiments/first/task')} confirm={(id,version,profile_hash)=>action(`experiments/first/${id}/authorize`,{version,profile_hash,confirmation:'AUTHORIZE_FIRST_PAID_EXPERIMENT',budget_nano_rub:100_000_000_000,seconds:120})}/><IntegrationOverview value={state.integration} create={()=>action('coding/tasks',{provider:'openai'})}/><h2>Задачи и результаты</h2>{state.tasks.map(t=><section key={t.id} id={'task-'+t.id}><h3>{t.state}</h3><ExternalTaskPanel task={t} authorize={(id,version,nanos)=>action(`coding/tasks/${id}/authorize`,{version,budget_nano_rub:nanos,seconds:120})}/>{t.coding?.stage&&<><p>{t.state==='CANCELLED'?'Задача остановлена. Результат не принят.':t.coding.summary}</p><details><summary>План выполнения</summary><ol>{t.coding.plan?.map(p=><li key={p}>{p}</li>)}</ol></details>{t.coding.test_runs?.map(r=><p key={r.attempt}>Проверка {r.attempt}: {r.checks.passed?'пройдена':'найдена ошибка'}</p>)}{t.state==='SUCCEEDED'&&t.coding.pr&&<button onClick={()=>openDraft(t.id)}>Открыть подготовленный PR</button>}</>}<details><summary>Технические доказательства</summary><p className="id">{t.id}</p><p>Версия {t.version} · попытка {t.attempts} · fence {t.fence}</p><p className="id">Параметры: {t.payload_hash}</p><pre>{JSON.stringify(t.payload,null,2)}</pre></details>{t.reason&&<p>{t.reason}</p>}
  {t.state==='WAITING_APPROVAL'&&!t.integration&&<><p>Риск: только синтетические файлы изолированного запуска, внешних действий нет. Согласование: точная версия {t.version}, действие — синтетический render, срок 120 секунд.</p><button onClick={()=>action(`tasks/${t.id}/approve`,{version:t.version,seconds:120})}>Подтвердить эту версию</button></>}
  <button onClick={()=>action(`tasks/${t.id}/cancel`)}>Отказать / отменить</button><button onClick={()=>action(`tasks/${t.id}/revoke`)}>Отозвать подтверждение</button>
