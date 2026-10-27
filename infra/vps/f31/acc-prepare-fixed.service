@@ -1,0 +1,29 @@
+[Unit]
+Description=Prepare only the approved ACC 4cc6ec4 password release
+StartLimitIntervalSec=3600
+StartLimitBurst=2
+
+[Service]
+Type=oneshot
+User=acc-control
+Group=acc-control
+Environment=HOME=/home/acc-control
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+ExecStart=/bin/bash /usr/local/libexec/acc-password-prepare-fixed.sh
+UMask=0027
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/acc-control/f31 /var/lib/acc-password-prepare-receipt
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+TimeoutStartSec=2h
+KillMode=control-group
+
+# Docker builds run in existing separate daemons; this unit does not enforce
+# memory/CPU quotas on those daemons. Exactly one build is allowed by the lock.
