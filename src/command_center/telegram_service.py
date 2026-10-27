@@ -2,15 +2,29 @@
 import argparse
 from contextlib import contextmanager
 import json
+import os
+import re
 import signal
 import threading
 
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, URL
 
-from .config import Settings
+from .config import Settings, secret
 from .store import Denied, Store, digest
 from .telegram_bridge import TelegramBridge
 from .telegram_transport import ConfiguredTelegramHTTP, TelegramHTTPError, connection
+
+
+def service_settings():
+    """Only the application DB binding; no Redis, API-owner or admin credentials."""
+    revision = os.environ.get('F1_SOURCE_REVISION', '')
+    if (os.environ.get('F1_DB_USER', 'f1_app') != 'f1_app'
+            or not re.fullmatch(r'[a-f0-9]{40}', revision)):
+        raise Denied('telegram_nonadmin_pinned_database_binding_required')
+    url = URL.create('postgresql+psycopg', username='f1_app', password=secret('F1_DB_PASSWORD_FILE'),
+                     host=os.environ.get('F1_DB_HOST', 'db'), port=int(os.environ.get('F1_DB_PORT', '5432')),
+                     database='f1')
+    return Settings(database_url=url, redis_url='', redis_password='', identities={}, source_revision=revision)
 
 
 class TelegramService:
@@ -120,7 +134,7 @@ def main():
                               'revision': config.source_revision, 'connection_digest': digest(config.model_dump()),
                               'credentials_tested': False, 'network_contacted': False}))
             return
-        store = Store(Settings.load())
+        store = Store(service_settings())
         client = ConfiguredTelegramHTTP(args.config, args.approved_connection, store.settings.source_revision)
         service = TelegramService(store, client)
         stop = threading.Event()

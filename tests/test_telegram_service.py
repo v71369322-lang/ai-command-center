@@ -515,3 +515,21 @@ def test_bot_token_in_message_is_not_saved_or_forwarded(configured, store):
         assert fake.sent == [] and store.snapshot()["tasks"] == []
     finally:
         client.close()
+
+
+
+def test_service_entrypoint_needs_no_api_owner_or_redis_keys(settings, tmp_path, monkeypatch):
+    from command_center.telegram_service import service_settings
+    path = tmp_path / "public-db-binding"
+    path.write_text("public-database-fixture-not-a-real-key")
+    monkeypatch.setenv("F1_DB_PASSWORD_FILE", str(path))
+    monkeypatch.setenv("F1_DB_USER", "f1_app")
+    monkeypatch.setenv("F1_SOURCE_REVISION", settings.source_revision)
+    monkeypatch.delenv("F1_IDENTITIES_FILE", raising=False)
+    monkeypatch.delenv("F1_REDIS_PASSWORD_FILE", raising=False)
+    result = service_settings()
+    assert result.identities == {} and result.redis_password == "" and result.redis_url == ""
+    assert result.database_url.username == "f1_app"
+    monkeypatch.setenv("F1_DB_USER", "f1_admin")
+    with pytest.raises(Denied, match="nonadmin"):
+        service_settings()

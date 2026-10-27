@@ -45,6 +45,7 @@ def main():
                'bandit_medium_high': 0, 'bandit_reviewed_low': len(static.get('results', []))}
     (target / 'security-summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print('Locked dependency audit and static security gates: PASS')
+    print(json.dumps(summary, sort_keys=True))
 
 
 if __name__ == '__main__':

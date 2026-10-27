@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import stat
+from typing import Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +18,7 @@ from .store import Denied, canonical, digest
 class TelegramConnection(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True, frozen=True)
     schema_version: int = Field(default=1, ge=1, le=1)
-    mode: str = Field(default='disabled', pattern=r'^(disabled|http_mock|live)$')
+    mode: Literal['disabled', 'http_mock', 'live'] = 'disabled'
     owner_id: int = Field(gt=0, lt=2**52)
     bot_id: int = Field(gt=0, lt=2**52)
     source_revision: str = Field(pattern=r'^[a-f0-9]{40}$')
