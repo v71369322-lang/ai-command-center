@@ -26,7 +26,7 @@ def admin(settings):
 @pytest.fixture
 def store(settings, admin):
     with admin.engine.begin() as c:
-        c.execute(text("TRUNCATE approvals, outbox, tasks, audit, control, owner_sessions RESTART IDENTITY CASCADE"))
+        c.execute(text("TRUNCATE telegram_cards,telegram_deliveries,telegram_inbox,approvals,outbox,tasks,audit,control,owner_sessions RESTART IDENTITY CASCADE"))
     admin.initialize()
     result = Store(settings)
     yield result

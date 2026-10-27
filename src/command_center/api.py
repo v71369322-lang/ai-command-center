@@ -382,6 +382,26 @@ def create_app(settings=None, gateway_factory=None):
         store.resume(role, request.epoch, request.checkpoint_digest)
         return {"halted": False}
 
+    @app.get('/api/telegram/status')
+    def telegram_status(role=Depends(identity)):
+        if role != 'owner':
+            raise Denied('owner_required')
+        return {'mode': 'disabled', 'live_connected': False, 'voice_enabled': False,
+                'description': 'Synthetic HTTP-mock bridge is tested separately; no real bot is configured.'}
+
+    @app.get('/api/telegram/requests')
+    def telegram_requests(role=Depends(identity)):
+        from sqlalchemy import select
+        from .models import TelegramInbox
+        if role != 'owner':
+            raise Denied('owner_required')
+        with store.transaction() as session:
+            store.check_audit(session)
+            rows = session.execute(select(TelegramInbox).where(TelegramInbox.state == 'NEEDS_PLANNING')
+                                   .order_by(TelegramInbox.created_at.desc()).limit(50)).scalars()
+            return {'requests': [{'id': r.id, 'state': r.state, 'text': r.intent['text']} for r in rows],
+                    'ai_planning_connected': False}
+
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     def unknown_api(path: str):
         raise HTTPException(404, "unknown_action")

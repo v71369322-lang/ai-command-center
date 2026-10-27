@@ -137,7 +137,7 @@ class Store:
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
             return self.view(task)
 
-    def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None):
+    def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None, _deadline=None):
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
@@ -153,6 +153,10 @@ class Store:
                 s.delete(old)
                 s.flush()
             expires_at = self.now(s) + timedelta(seconds=seconds)
+            if _deadline is not None:
+                expires_at = min(expires_at, _deadline)
+                if expires_at <= self.now(s):
+                    raise Denied('approval_deadline_expired')
             s.add(Approval(task_id=task.id, task_version=task.version, payload_hash=task.payload_hash,
                            epoch=control.epoch, expires_at=expires_at,
                            used=False, revoked=False))
@@ -164,13 +168,15 @@ class Store:
                 _scope_installer(s, task)
             return self.view(task)
 
-    def cancel(self, actor, task_id, revoke=False):
+    def cancel(self, actor, task_id, revoke=False, *, _scope_installer=None):
         if actor not in {"owner", "operator"} or (revoke and actor != "owner"):
             raise Denied("role_forbidden")
         with self.transaction() as s:
             task = self.task(s, task_id)
             if actor == "operator" and task.owner_role != actor:
                 raise Denied("not_task_owner")
+            if _scope_installer:
+                _scope_installer(s, task)
             approval = s.get(Approval, task_id)
             if approval:
                 approval.revoked = True
@@ -336,11 +342,13 @@ class Store:
         with self.transaction() as s:
             return [self.view(t) for t in s.execute(select(Task).where(Task.state.in_(["RECONCILING", "CANCEL_REQUESTED"]))).scalars()]
 
-    def halt(self, actor):
+    def halt(self, actor, *, _scope_installer=None):
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
             control = s.get(Control, 1)
+            if _scope_installer:
+                _scope_installer(s, control)
             control.halted = True
             control.epoch += 1
             for approval in s.execute(select(Approval)).scalars():
