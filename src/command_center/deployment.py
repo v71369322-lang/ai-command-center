@@ -94,7 +94,8 @@ def image_check(engine, images, revision):
             raise ValueError('release_image_revision_mismatch')
 
 
-def prepare(source, directory, control_uid, execution_uid, data_root):
+def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_password_origin=None,
+            password_loopback_http=False):
     source = Path(source).resolve()
     engine = Engine(control_uid)
     # config does not start containers. Keep all input paths in the exact checkout.
@@ -112,6 +113,10 @@ def prepare(source, directory, control_uid, execution_uid, data_root):
                     redis_image=base['services']['redis']['image'], migration_hash=migration_hash(source),
                     control_uid=control_uid, execution_uid=execution_uid, data_root=str(Path(data_root).resolve()),
                     source_root=str(source))
+    if owner_password_origin:
+        manifest['owner_login'] = {'origin': owner_password_origin, 'loopback_http': password_loopback_http}
+    elif password_loopback_http:
+        raise ValueError('password_origin_required')
     source_check(manifest)
     image_check(engine, images, revision)
     bundle = {'manifest': manifest, 'compose': render(base, manifest)}
@@ -165,6 +170,9 @@ class Deployment:
                 raise ValueError('protected_secret_binding_required')
         if (self.root.stat().st_mode & 0o077) or self.root.is_symlink():
             raise ValueError('private_data_directory_required')
+        if 'owner_login' in self.m:
+            from .password_auth import load
+            load(str(self.root / 'secrets/owner_password'))
         self.compose('config', '--quiet')
 
     def tool(self, code):
@@ -402,6 +410,8 @@ def main():
     parser.add_argument('--execution-uid', type=int)
     parser.add_argument('--approved-bundle')
     parser.add_argument('--backup-file')
+    parser.add_argument('--owner-password-origin')
+    parser.add_argument('--password-loopback-http', action='store_true')
     args = parser.parse_args()
     if args.action == 'init-state':
         initialize_state(args.data_root)
@@ -422,7 +432,8 @@ def main():
     if args.action == 'prepare':
         if None in (args.control_uid, args.execution_uid, args.data_root):
             parser.error('prepare requires both UIDs and data root')
-        print(json.dumps({'bundle_digest': prepare(args.source, args.bundle, args.control_uid, args.execution_uid, args.data_root)}))
+        print(json.dumps({'bundle_digest': prepare(args.source, args.bundle, args.control_uid, args.execution_uid, args.data_root,
+            owner_password_origin=args.owner_password_origin, password_loopback_http=args.password_loopback_http)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())
