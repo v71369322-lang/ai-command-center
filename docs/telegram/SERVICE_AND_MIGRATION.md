@@ -58,7 +58,8 @@ Plan digest связывает source SHA, кластер, DB, audit anchor и h
 Обратное чтение/расшифровка и hash проверяются. До DDL копия восстанавливается
 в другом networkless контейнере pinned PostgreSQL: UID 999, read-only rootfs,
 cap_drop ALL, no-new-privileges, CPU/RAM/PID limits, tmpfs, без host mounts,
-портов и socket. Сравниваются все исходные строки. Неподтверждённое удаление
+портов и socket. Перед pg_restore требуется не только основной процесс postgres,
+но и успешный SQL SELECT 1; ожидание ограничено. Сравниваются все исходные строки. Неподтверждённое удаление
 restore-контейнера блокирует применение.
 
 Одна транзакция создаёт ровно три Telegram tables, grants f1_app, запрещает
@@ -104,6 +105,16 @@ bindings контейнерная проверка прошла; обновлё�
 штатными GitHub Git-object tools; это не новый проект или новая архитектура.
 GitHub Actions нового коммита — обязательная повторная проверка восстановленных файлов.
 Результаты не суммируются с полным suite. Токены в чат/PR/Git не передавались.
+
+GitHub Actions на d39db240fcf9596485c805bf575037df5d9733d6 подтвердил
+344 успешных теста, но дал 9 setup errors: PID postgres ошибочно считался
+готовностью новой тестовой БД до открытия TCP. Исправлены проверка SQL-готовности
+в fixture и аналогичная гонка в restore; отдельный regression имитирует отказ
+первого SQL-запроса при уже работающем postgres. Защитные проверки не сняты.
+На этом же SHA security gates и 32 infrastructure tests прошли.
+Окончательные SHA, CI URL и результаты полного повторного прогона фиксируются
+в [PR #23](https://github.com/v71369322-lang/ai-command-center/pull/23);
+предшествующий неуспешный прогон не является доказательством готовности.
 
 Два точечных nosec B106 относятся к публичному пути /run/telegram/token в smoke
 configuration и пустому неиспользуемому Redis field в DB-only settings. Это не
