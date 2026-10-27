@@ -24,7 +24,7 @@ def service_settings():
     url = URL.create('postgresql+psycopg', username='f1_app', password=secret('F1_DB_PASSWORD_FILE'),
                      host=os.environ.get('F1_DB_HOST', 'db'), port=int(os.environ.get('F1_DB_PORT', '5432')),
                      database='f1')
-    return Settings(database_url=url, redis_url='', redis_password='', identities={}, source_revision=revision)
+    return Settings(database_url=url, redis_url='', redis_password='', identities={}, source_revision=revision)  # nosec B106: unused Redis field; no Redis URL or connection
 
 
 class TelegramService:

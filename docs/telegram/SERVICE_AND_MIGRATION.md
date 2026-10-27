@@ -105,8 +105,9 @@ bindings контейнерная проверка прошла; обновлё�
 GitHub Actions нового коммита — обязательная повторная проверка восстановленных файлов.
 Результаты не суммируются с полным suite. Токены в чат/PR/Git не передавались.
 
-Точечный nosec B106 касается только публичного пути /run/telegram/token в smoke
-configuration, а не значения credential. Общие secret/static gates не отключены.
+Два точечных nosec B106 относятся к публичному пути /run/telegram/token в smoke
+configuration и пустому неиспользуемому Redis field в DB-only settings. Это не
+значения credentials; тест доказывает отсутствие Redis URL/credential и запрет admin binding. Общие secret/static gates не отключены.
 Security summary в CI теперь печатает только SHA и числовые результаты, без значений
 ключей, чтобы доказательства не зависели от потерянного workspace.
 
