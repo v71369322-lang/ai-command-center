@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "mode": "disabled",
+  "owner_id": 1234567,
+  "bot_id": 123456789,
+  "source_revision": "0000000000000000000000000000000000000000",
+  "token_file": "/run/telegram/token"
+}

@@ -34,8 +34,12 @@ def main():
     # Keep every finding. These LOW rules were manually reviewed in
     # SECURITY_REVIEW.md; a new rule or MEDIUM/HIGH blocks final verification.
     reviewed_low_rules = {'B404', 'B603', 'B607', 'B110', 'B105'}
-    if static.get('errors') or any(f['issue_severity'] != 'LOW' or f['test_id'] not in reviewed_low_rules
-                                   for f in static.get('results', [])):
+    unexpected = [f for f in static.get('results', [])
+                  if f['issue_severity'] != 'LOW' or f['test_id'] not in reviewed_low_rules]
+    if static.get('errors') or unexpected:
+        # Only locations/rule names, never issue text or source that could contain a credential.
+        print(json.dumps([{'file': f['filename'], 'line': f['line_number'],
+                           'rule': f['test_id'], 'severity': f['issue_severity']} for f in unexpected]))
         raise RuntimeError('unreviewed_static_security_finding')
     audit = json.loads((target / 'all-pip-audit.json').read_text())
     revision = os.environ.get('F1_SOURCE_REVISION') or run(['git', 'rev-parse', 'HEAD']).stdout.decode().strip()
@@ -45,6 +49,7 @@ def main():
                'bandit_medium_high': 0, 'bandit_reviewed_low': len(static.get('results', []))}
     (target / 'security-summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print('Locked dependency audit and static security gates: PASS')
+    print(json.dumps(summary, sort_keys=True))
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-"""Synthetic Telegram text bridge. Live credentials/HTTP are deliberately absent."""
+"""Telegram intents reuse F1 authority; external transport is separately scoped."""
 from datetime import timedelta
 import hashlib
 import json
@@ -12,6 +12,7 @@ from sqlalchemy import select, func
 from .api import Command
 from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit
 from .store import Denied, digest
+from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
 
 
 class MockTelegramHTTP:
@@ -40,10 +41,23 @@ class MockTelegramHTTP:
 
 class TelegramBridge:
     def __init__(self, store, client, owner_id):
-        if type(owner_id) is not int or not 0 < owner_id < 2**52 or not isinstance(client, MockTelegramHTTP):
+        if (type(owner_id) is not int or not 0 < owner_id < 2**52
+                or not isinstance(client, (MockTelegramHTTP, ConfiguredTelegramHTTP))):
             raise ValueError('synthetic_private_owner_binding_required')
         self.store, self.client, self.owner = store, client, owner_id
         self.profile = digest({'owner': owner_id, 'revision': store.settings.source_revision, 'mode': 'http_mock'})
+        if isinstance(client, ConfiguredTelegramHTTP):
+            if client.owner != owner_id or client.revision != store.settings.source_revision:
+                raise Denied('telegram_connection_scope_mismatch')
+            # Stable across code/credential rotation: remote Update IDs must not
+            # be treated as new work when the application is upgraded.
+            self.profile = digest({'owner': owner_id, 'bot_id': client.bot_id, 'mode': client.mode})
+
+    def guard(self):
+        if isinstance(self.client, ConfiguredTelegramHTTP):
+            self.client.check_enabled()
+            if getattr(self.client, 'runtime_guard', None):
+                self.client.runtime_guard()
 
     def enqueue(self, session, key, text, markup=None):
         oid = digest({'profile': self.profile, 'event': key})
@@ -87,14 +101,23 @@ class TelegramBridge:
             if (not isinstance(token, str) or not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token)
                     or type(message.get('message_id')) is not int or message['message_id'] <= 0):
                 raise Denied('telegram_callback_invalid')
-            return str(uid), {'kind': 'approve', 'card': hashlib.sha256(token[3:].encode()).hexdigest(),
-                              'message_id': message.get('message_id')}
+            intent = {'kind': 'approve', 'card': hashlib.sha256(token[3:].encode()).hexdigest(),
+                      'message_id': message.get('message_id')}
+            if isinstance(self.client, ConfiguredTelegramHTTP):
+                query_id = callback.get('id')
+                if (not isinstance(query_id, str) or not 1 <= len(query_id) <= 128
+                        or self.client.sensitive(query_id)):
+                    raise Denied('telegram_callback_invalid')
+                intent['callback_query_id'] = query_id
+            return str(uid), intent
         value = message.get('text')
         if not isinstance(value, str) or not 1 <= len(value.encode()) <= 2000:
             raise Denied('telegram_text_only')
         known = [*self.store.settings.identities.values(), self.store.settings.redis_password,
                  self.store.settings.database_url.password]
-        if any(v and v in value for v in known) or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}', value):
+        if (any(v and v in value for v in known)
+                or (isinstance(self.client, ConfiguredTelegramHTTP) and self.client.sensitive(value))
+                or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b[0-9]{6,20}:[A-Za-z0-9_-]{30,128}', value)):
             raise Denied('telegram_secret_content_forbidden')
         if value.startswith('/demo '):
             try:
@@ -115,6 +138,8 @@ class TelegramBridge:
         return str(uid), {'kind': 'capture', 'text': value.removeprefix('/task ')}
 
     def finish(self, session, iid, text):
+        self.guard()
+        self.store.check_audit(session)
         row = session.get(TelegramInbox, iid)
         if row.state == 'DONE':
             raise Denied('telegram_update_already_committed')
@@ -122,6 +147,7 @@ class TelegramBridge:
         self.enqueue(session, iid + ':reply', text)
 
     def receive(self, update):
+        self.guard()
         update_id, intent = self.normalize(update)
         iid = self.profile + ':' + update_id
         with self.store.transaction() as session:
@@ -137,7 +163,12 @@ class TelegramBridge:
                     raise Denied('telegram_inbox_capacity')
                 session.add(TelegramInbox(id=iid, profile=self.profile, fingerprint=digest(intent), intent=intent,
                                          state='RECEIVED', created_at=self.store.now(session)))
-                self.store.audit(session, 'telegram_update_received', 'owner', update_id=update_id, profile=self.profile)
+                self.store.audit(session, 'telegram_update_received', 'owner', update_id=update_id, profile=self.profile,
+                                 intent_hash=digest(intent))
+        return self._apply_pending(iid, intent)
+
+    def _apply_pending(self, iid, intent):
+        self.guard()
         kind = intent['kind']
         if kind == 'demo':
             # Crash-safe stable F1 idempotency key. A duplicate never creates another task.
@@ -173,6 +204,7 @@ class TelegramBridge:
                     raise Denied('telegram_card_unknown')
                 task_id, version, expires = card.task_id, card.version, card.expires_at
             def consume(session, task):
+                self.guard()
                 card = session.get(TelegramCard, intent['card'])
                 delivery = session.get(TelegramDelivery, card.delivery_id)
                 anchored = session.execute(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_card_created',
@@ -235,6 +267,7 @@ class TelegramBridge:
                     self.enqueue(session, f'task:{task.id}:{task.version}:{task.state}', text)
 
     def deliver_one(self):
+        self.guard()
         with self.store.transaction() as session:
             self.store.check_audit(session)
             row = session.execute(select(TelegramDelivery).join(Audit,
@@ -284,15 +317,68 @@ class TelegramBridge:
                 row.state = 'UNCERTAIN'
                 self.store.audit(session, 'telegram_delivery_recovery_uncertain', 'system', delivery_id=row.id)
 
-    def poll_once(self):
+    def resume_pending(self):
+        with self.store.transaction() as session:
+            self.store.check_audit(session)
+            rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == self.profile,
+                TelegramInbox.state == 'RECEIVED').order_by(TelegramInbox.created_at).limit(20)).scalars()
+            pending = []
+            for row in rows:
+                anchor = session.execute(select(Audit).where(
+                    Audit.event['kind'].as_string() == 'telegram_update_received',
+                    Audit.event['profile'].as_string() == self.profile,
+                    Audit.event['update_id'].as_string() == row.id.split(':')[-1],
+                    Audit.event['intent_hash'].as_string() == digest(row.intent),
+                    Audit.event['revision'].as_string() == self.store.settings.source_revision)).first()
+                if row.fingerprint != digest(row.intent) or not anchor:
+                    raise Denied('telegram_pending_integrity_or_source_revision_changed')
+                pending.append((row.id, row.intent))
+        for iid, intent in pending:
+            try:
+                self._apply_pending(iid, intent)
+            except Denied as error:
+                self.guard()
+                if 'capacity' in str(error):
+                    raise
+                with self.store.transaction() as session:
+                    self.store.check_audit(session)
+                    row = session.get(TelegramInbox, iid)
+                    if row.state == 'RECEIVED':
+                        row.state = 'REJECTED'
+                        self.store.audit(session, 'telegram_pending_rejected', 'owner', inbox_id=iid)
+
+    def acknowledge(self, update_id, query_id):
+        key = token_fingerprint(self.profile + ':' + update_id)
+        with self.store.transaction() as session:
+            self.store.check_audit(session)
+            seen = session.execute(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_callback_ack_intent',
+                                                       Audit.event['ack_id'].as_string() == key)).first()
+            if seen:
+                return
+            self.guard()
+            self.store.audit(session, 'telegram_callback_ack_intent', 'system', ack_id=key)
+        result = 'UNCERTAIN'
+        try:
+            if self.client.call('answerCallbackQuery', {'callback_query_id': query_id}) is True:
+                result = 'ACKNOWLEDGED'
+        except Exception:
+            pass  # Never undo a committed approval or repeat an uncertain acknowledgement.
+        with self.store.transaction() as session:
+            self.store.check_audit(session)
+            self.store.audit(session, 'telegram_callback_ack_result', 'system', ack_id=key, state=result)
+
+    def poll_once(self, timeout=0):
+        self.guard()
         self.recover()
+        self.resume_pending()
         with self.store.transaction() as session:
             self.store.check_audit(session)
             rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == self.profile)).scalars().all()
             pending = sorted((r for r in rows if r.state == 'RECEIVED'), key=lambda r: int(r.id.split(':')[-1]))
+            recent = [r for r in rows if r.created_at >= self.store.now(session) - timedelta(days=7)]
             offset = min(int(r.id.split(':')[-1]) for r in pending) if pending else max(
-                (int(r.id.split(':')[-1]) + 1 for r in rows), default=0)
-        updates = self.client.call('getUpdates', {'offset': offset, 'limit': 20, 'timeout': 0,
+                (int(r.id.split(':')[-1]) + 1 for r in recent), default=0)
+        updates = self.client.call('getUpdates', {'offset': offset, 'limit': 20, 'timeout': timeout,
                                                  'allowed_updates': ['message', 'callback_query']})
         if not isinstance(updates, list) or len(updates) > 20:
             raise Denied('telegram_batch_invalid')
@@ -304,7 +390,10 @@ class TelegramBridge:
             previous = uid
             try:
                 self.receive(update)
+                if isinstance(self.client, ConfiguredTelegramHTTP) and isinstance(update.get('callback_query'), dict):
+                    self.acknowledge(str(uid), update['callback_query']['id'])
             except Denied:
+                self.guard()  # Revocation/leadership loss must not discard a pending command.
                 # Rejected records retain no external text, files or sender metadata.
                 with self.store.transaction() as session:
                     self.store.check_audit(session)
@@ -318,5 +407,6 @@ class TelegramBridge:
                     elif row.state == 'RECEIVED':
                         row.state = 'REJECTED'
                     self.store.audit(session, 'telegram_update_rejected', 'unauthenticated', update_id=uid)
+        self.guard()
         self.collect_results()
         return [result for _ in range(20) if (result := self.deliver_one()) is not None]
