@@ -59,7 +59,10 @@ def restored_fingerprints(dump, runtime):
         while time.monotonic() < deadline:
             ready = runtime.call('exec', name, 'cat', '/proc/1/comm', timeout=5)
             if ready.returncode == 0 and ready.stdout.strip() == b'postgres':
-                break
+                sql = runtime.call('exec', name, 'psql', '-XqAt', '-v', 'ON_ERROR_STOP=1',
+                                   '-U', 'f1_admin', '-d', 'f1', '-c', 'SELECT 1', timeout=5)
+                if sql.returncode == 0 and sql.stdout.strip() == b'1':
+                    break
             time.sleep(.2)
         else:
             raise Denied('telegram_migration_restore_not_ready')

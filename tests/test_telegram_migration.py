@@ -10,6 +10,7 @@ from uuid import uuid4
 from cryptography.exceptions import InvalidTag
 import pytest
 from sqlalchemy import inspect, select, text
+from sqlalchemy.exc import OperationalError
 
 from command_center.local_docker import run as docker
 from command_center.models import Base, Control, OwnerSession, Audit, TelegramDelivery
@@ -69,6 +70,12 @@ def isolated_pg(settings):
             while time.monotonic() < deadline:
                 state = docker("exec", container, "cat", "/proc/1/comm", timeout=5)
                 if state.returncode == 0 and state.stdout.strip() == b"postgres":
+                    try:
+                        with admin.engine.connect() as conn:
+                            conn.execute(text("SELECT 1"))
+                    except OperationalError:
+                        time.sleep(0.2)
+                        continue
                     with admin.engine.begin() as conn:
                         conn.execute(text("CREATE ROLE f1_app NOLOGIN"))
                         conn.execute(text("CREATE ROLE f1_runtime NOLOGIN"))
@@ -259,3 +266,46 @@ def test_unconfirmed_restore_cleanup_blocks_migration(legacy, tmp_path):
     finally:
         for name in created:
             real_call("rm", "--force", name, timeout=15)
+
+
+def test_restore_waits_for_sql_even_when_postgres_process_exists(monkeypatch):
+    import command_center.telegram_migration as module
+
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    events = []
+    probes = 0
+
+    class DelayedSQLRuntime:
+        def call(self, *args, **kwargs):
+            nonlocal probes
+            if args[0] == "inspect":
+                if events[-1] == "removed":
+                    return CompletedProcess(args, 1, b"", b"No such container")
+                info = {
+                    "HostConfig": {
+                        "NetworkMode": "none",
+                        "Privileged": False,
+                        "CapDrop": ["ALL"],
+                        "ReadonlyRootfs": True,
+                    },
+                    "Mounts": [],
+                    "NetworkSettings": {"Ports": {}},
+                }
+                return CompletedProcess(args, 0, json.dumps([info]).encode(), b"")
+            if args[0] == "rm":
+                events.append("removed")
+            if "cat" in args:
+                return CompletedProcess(args, 0, b"postgres\n", b"")
+            if "SELECT 1" in args:
+                probes += 1
+                events.append("ready" if probes == 2 else "not_ready")
+                return CompletedProcess(args, 0 if probes == 2 else 2,
+                                        b"1\n" if probes == 2 else b"", b"")
+            if "pg_restore" in args:
+                assert events == ["not_ready", "ready"]
+                events.append("restored")
+            return CompletedProcess(args, 0, b"", b"")
+
+    result = module.restored_fingerprints(b"public synthetic dump", DelayedSQLRuntime())
+    assert probes == 2 and events == ["not_ready", "ready", "restored", "removed"]
+    assert result == {model.__tablename__: module.digest([]) for model in CORE}
