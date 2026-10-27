@@ -348,7 +348,14 @@ def test_crash_between_task_creation_and_card_commit_is_recoverable(bridge, stor
     task = restarted.receive(message(1, "/demo safe"))
     assert len(store.snapshot()["tasks"]) == 1 and task["state"] == "DONE"
     restarted.receive(card_callback(restarted, fake))
-    assert store.get(task["task_id"])["state"] == "QUEUED"
+    # F1 makes an approved task READY; the durable Outbox transports it later.
+    assert store.get(task["task_id"])["state"] == "READY"
+    with store.transaction() as session:
+        assert session.get(Approval, task["task_id"]).used is False
+        assert (
+            session.scalar(text("SELECT count(*) FROM outbox WHERE task_id=:id"), {"id": task["task_id"]})
+            == 1
+        )
 
 
 def test_runtime_role_has_no_telegram_permissions(store, admin):
