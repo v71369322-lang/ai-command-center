@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, SecretStr
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 
@@ -57,6 +57,12 @@ class ErrorResponse(BaseModel):
 class AssertionRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     assertion: str = Field(min_length=32, max_length=7000)
+
+
+class PasswordLogin(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    username: str = Field(min_length=1, max_length=64)
+    password: SecretStr = Field(min_length=1, max_length=128)
 
 
 class ExternalApprovalRequest(ApprovalRequest):
@@ -159,7 +165,7 @@ def create_app(settings=None, gateway_factory=None):
         return response
 
     def identity(request: Request, authorization: str = Header(default="")):
-        if settings.auth_mode == 'oidc':
+        if settings.auth_mode in {'oidc', 'password'}:
             return owner_auth.authenticate(request)
         if not authorization.startswith("Bearer "):
             raise HTTPException(401, "authentication_required")
@@ -178,7 +184,9 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.get('/api/auth/mode')
     def auth_mode():
-        return {'mode': settings.auth_mode, 'identity_provider_configured': owner_auth.trusted(),
+        return {'mode': settings.auth_mode,
+                'identity_provider_configured': settings.auth_mode == 'oidc' and owner_auth.trusted(),
+                'owner_login_configured': owner_auth.trusted(), 'mfa_verified': False,
                 'production_access_verified': False}
 
     @app.post('/api/auth/exchange')
@@ -191,23 +199,30 @@ def create_app(settings=None, gateway_factory=None):
         response.set_cookie(owner_auth.cookie, token, max_age=seconds, secure=True, httponly=True, samesite='strict', path='/')
         return {'csrf_token': csrf, 'expires_in': seconds}
 
+    @app.post('/api/auth/login')
+    def password_login(body: PasswordLogin, request: Request, response: Response):
+        token, csrf, seconds = owner_auth.password_login(request, body.username, body.password.get_secret_value())
+        response.set_cookie(owner_auth.cookie, token, max_age=seconds, secure=owner_auth.secure_cookie,
+                            httponly=True, samesite='strict', path='/')
+        return {'csrf_token': csrf, 'expires_in': seconds, 'mfa_verified': False}
+
     @app.post('/api/auth/logout')
     def logout(request: Request, response: Response, role=Depends(identity)):
-        if settings.auth_mode != 'oidc' or role != 'owner':
+        if settings.auth_mode not in {'oidc', 'password'} or role != 'owner':
             raise HTTPException(403, 'owner_session_required')
         owner_auth.revoke(request.cookies.get(owner_auth.cookie))
-        response.delete_cookie(owner_auth.cookie, secure=True, httponly=True, samesite='strict', path='/')
+        response.delete_cookie(owner_auth.cookie, secure=owner_auth.secure_cookie, httponly=True, samesite='strict', path='/')
         return {'revoked': True}
 
     @app.get('/api/auth/csrf')
     def session_csrf(request: Request, role=Depends(identity)):
-        if settings.auth_mode != 'oidc' or role != 'owner':
+        if settings.auth_mode not in {'oidc', 'password'} or role != 'owner':
             raise HTTPException(403, 'owner_session_required')
         return {'csrf_token': owner_auth.csrf(request.cookies.get(owner_auth.cookie, ''))}
 
     @app.post('/api/auth/revoke-all')
     def revoke_sessions(role=Depends(identity)):
-        if settings.auth_mode != 'oidc' or role != 'owner':
+        if settings.auth_mode not in {'oidc', 'password'} or role != 'owner':
             raise HTTPException(403, 'owner_required')
         owner_auth.revoke(all_sessions=True)
         return {'revoked': True}

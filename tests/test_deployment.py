@@ -37,6 +37,30 @@ def release(tmp_path):
     return bundle, directory
 
 
+def test_password_profile_is_explicit_and_api_only(release):
+    original, _ = release
+    m = copy.deepcopy(original['manifest'])
+    m['owner_login'] = {'origin': 'http://127.0.0.1:18000', 'loopback_http': True}
+    # Use the same normalized source compose used by the existing fixture.
+    source = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, F1_SOURCE_REVISION='a' * 40, F1_DOCKER_GID='0')
+    base = json.loads(subprocess.check_output(['docker', 'compose', '--profile', 'worker', '-f',
+        str(source / 'compose.yaml'), 'config', '--format', 'json'], env=env))
+    p = render(base, m)
+    assert p['services']['api']['environment']['F1_AUTH_MODE'] == 'password'
+    assert p['services']['api']['ports'][0]['host_ip'] == '127.0.0.1'
+    for name, service in p['services'].items():
+        mounted = any(v['target'] == '/run/owner/password.json' for v in service.get('volumes', []))
+        assert mounted == (name == 'api')
+    bad = copy.deepcopy(p)
+    bad['services']['api']['environment']['F1_WEB_ORIGIN'] = 'http://evil.invalid'
+    with pytest.raises(ValueError, match='password_login_binding_changed'):
+        validate_profile(bad, m)
+    m['owner_login']['origin'] = 'http://public.example'
+    with pytest.raises(ValueError, match='password_origin_invalid'):
+        validate_manifest(m)
+
+
 class FakeEngine:
     def __init__(self):
         self.calls = []

@@ -34,6 +34,8 @@ class Settings:
     oidc_jwks_file: str = ''
     web_origin: str = ''
     coding_image: str = 'acc-f2-executor:local'
+    owner_password_file: str = ''
+    password_loopback_http: bool = False
 
     @classmethod
     def load(cls, *, identities_required=True):
@@ -50,7 +52,7 @@ class Settings:
                          host=os.environ.get("F1_DB_HOST", "db"),
                          port=int(os.environ.get("F1_DB_PORT", "5432")), database="f1")
         mode = os.environ.get('F1_AUTH_MODE', 'synthetic')
-        if mode not in {'synthetic', 'oidc'}:
+        if mode not in {'synthetic', 'oidc', 'password'}:
             raise RuntimeError('unknown_auth_mode')
         return cls(url, os.environ.get("F1_REDIS_URL", "redis://redis:6379/0"),
                    secret("F1_REDIS_PASSWORD_FILE"), identities, revision,
@@ -60,4 +62,6 @@ class Settings:
                    oidc_owner=os.environ.get('F1_OIDC_OWNER', ''),
                    oidc_jwks_file=os.environ.get('F1_OIDC_JWKS_FILE', ''),
                    web_origin=os.environ.get('F1_WEB_ORIGIN', ''),
-                   coding_image=os.environ.get('F2_EXECUTOR_IMAGE', 'acc-f2-executor:local'))
+                   coding_image=os.environ.get('F2_EXECUTOR_IMAGE', 'acc-f2-executor:local'),
+                   owner_password_file=os.environ.get('F1_OWNER_PASSWORD_FILE', ''),
+                   password_loopback_http=os.environ.get('F1_PASSWORD_LOOPBACK_HTTP', '') == '1')

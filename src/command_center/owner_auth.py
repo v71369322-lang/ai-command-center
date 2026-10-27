@@ -9,9 +9,10 @@ import time
 
 from fastapi import HTTPException
 import jwt
-from sqlalchemy import select
+from sqlalchemy import select, func, cast, DateTime
 
-from .models import OwnerSession
+from .models import OwnerSession, Audit
+from . import password_auth
 
 
 def checksum(value):
@@ -19,13 +20,26 @@ def checksum(value):
 
 
 class OwnerAuth:
-    cookie = '__Host-f1-session'
+    @property
+    def cookie(self):
+        return '__Host-f1-session' if self.secure_cookie else 'f1-loopback-session'
+
+    @property
+    def secure_cookie(self):
+        return not (self.settings.auth_mode == 'password' and self.settings.password_loopback_http
+                    and self.settings.web_origin.startswith('http://'))
 
     def __init__(self, store):
         self.store, self.settings = store, store.settings
 
     def trusted(self):
         s = self.settings
+        if s.auth_mode == 'password':
+            try:
+                password_auth.load(s.owner_password_file)
+                return password_auth.origin_valid(s.web_origin, s.password_loopback_http)
+            except Exception:
+                return False
         return bool(s.auth_mode == 'oidc' and s.oidc_issuer.startswith('https://') and s.oidc_audience
                     and s.oidc_owner and s.oidc_jwks_file and Path(s.oidc_jwks_file).is_file()
                     and s.web_origin.startswith('https://'))
@@ -40,6 +54,11 @@ class OwnerAuth:
             raise HTTPException(503, 'identity_trust_unavailable') from None
 
     def binding(self, keys=None):
+        if self.settings.auth_mode == 'password':
+            return checksum(json.dumps({'mode': 'password', 'origin': self.settings.web_origin,
+                'loopback_http': self.settings.password_loopback_http,
+                'revision': self.settings.source_revision,
+                'verifier': password_auth.load(self.settings.owner_password_file) if keys is None else keys}, sort_keys=True))
         return checksum(json.dumps({'issuer': self.settings.oidc_issuer,
                                         'audience': self.settings.oidc_audience,
                                         'owner': self.settings.oidc_owner,
@@ -47,7 +66,7 @@ class OwnerAuth:
                                         'keys': self.trust_document() if keys is None else keys}, sort_keys=True))
 
     def exchange(self, assertion):
-        if not self.trusted():
+        if self.settings.auth_mode != 'oidc' or not self.trusted():
             raise HTTPException(503, 'identity_provider_not_configured')
         trust_document = self.trust_document()
         trust_binding = self.binding(trust_document)
@@ -82,9 +101,48 @@ class OwnerAuth:
             self.store.audit(session, 'owner_session_created', 'owner')
         return token, csrf, remaining
 
+    def transport_allowed(self, request):
+        if self.settings.auth_mode == 'password':
+            return (self.trusted() and str(request.base_url).rstrip('/') == self.settings.web_origin
+                    and (request.url.scheme == 'https' or not self.secure_cookie))
+        return request.url.scheme == 'https'
+
+    def password_login(self, request, username, password):
+        if self.settings.auth_mode != 'password' or not self.trusted():
+            raise HTTPException(503, 'password_login_not_configured')
+        if not self.transport_allowed(request) or request.headers.get('origin') != self.settings.web_origin:
+            raise HTTPException(403, 'login_transport_or_origin_rejected')
+        token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        valid = False
+        limited = False
+        # Same global admission/audit lock serializes attempts across API instances.
+        with self.store.transaction() as session:
+            self.store.check_audit(session)
+            now = self.store.now(session)
+            attempts = session.scalar(select(func.count()).select_from(Audit).where(
+                Audit.event['kind'].as_string() == 'owner_password_attempt',
+                cast(Audit.event['time'].as_string(), DateTime(timezone=True)) >= now - timedelta(minutes=15)))
+            limited = attempts >= 5
+            if not limited:
+                value = password_auth.load(self.settings.owner_password_file)
+                valid = password_auth.verify(value, username, password)
+                self.store.audit(session, 'owner_password_attempt', 'owner' if valid else 'unauthenticated',
+                                 accepted=valid)
+                if valid:
+                    session.add(OwnerSession(token_hash=checksum(token), csrf_hash=checksum(csrf),
+                        assertion_hash=checksum('password-session:' + token), subject=self.binding(value),
+                        expires_at=now + timedelta(minutes=15), revoked=False))
+                    self.store.audit(session, 'owner_session_created', 'owner', method='password', mfa=False)
+        # Raise only after the transaction commits, retaining denied attempts.
+        if limited:
+            raise HTTPException(429, 'owner_login_rate_limited')
+        if not valid:
+            raise HTTPException(401, 'invalid_owner_credentials')
+        return token, csrf, 900
+
     def authenticate(self, request):
         token = request.cookies.get(self.cookie, '')
-        if not self.trusted() or not token or len(token) > 256 or request.url.scheme != 'https':
+        if not self.trusted() or not token or len(token) > 256 or not self.transport_allowed(request):
             raise HTTPException(401, 'owner_session_required')
         with self.store.transaction() as session:
             row = session.get(OwnerSession, checksum(token))

@@ -10,6 +10,7 @@ from .store import canonical
 PROJECT = 'acc-f23'
 SERVICES = {'db', 'redis', 'api', 'worker', 'runtime-broker', 'watchdog'}
 IMAGE_KEYS = {'api', 'worker', 'broker', 'executor', 'coding'}
+OWNER_VERIFIER_PATH = '/run/owner/password.json'
 SECRETS = {'db_admin_password', 'db_password', 'db_runtime_password',
            'redis_password', 'identities', 'broker_token'}
 
@@ -26,9 +27,16 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
+    if 'owner_login' in m:
+        from .password_auth import origin_valid
+        login = m['owner_login']
+        if (not isinstance(login, dict) or set(login) != {'origin', 'loopback_http'}
+                or type(login['loopback_http']) is not bool
+                or not origin_valid(login['origin'], login['loopback_http'])):
+            raise ValueError('password_origin_invalid')
     if not re.fullmatch('[a-f0-9]{40}', m['revision']) or not re.fullmatch('[a-f0-9]{64}', m['migration_hash']):
         raise ValueError('exact_revision_and_migration_required')
     if (set(m['images']) != IMAGE_KEYS or any(not re.fullmatch('sha256:[a-f0-9]{64}', v)
@@ -100,6 +108,12 @@ def render(base, m):
                        F1_WEB_ORIGIN='', F1_OIDC_JWKS_FILE='/run/identity/public-jwks.json')
             service['volumes'] = [{'type': 'bind', 'source': str(root / 'identity/public-jwks.json'),
                                    'target': '/run/identity/public-jwks.json', 'read_only': True}]
+            if 'owner_login' in m:
+                env.update(F1_AUTH_MODE='password', F1_WEB_ORIGIN=m['owner_login']['origin'],
+                           F1_OWNER_PASSWORD_FILE=OWNER_VERIFIER_PATH,
+                           F1_PASSWORD_LOOPBACK_HTTP='1' if m['owner_login']['loopback_http'] else '0')
+                service['volumes'] = [{'type': 'bind', 'source': str(root / 'secrets/owner_password'),
+                                      'target': OWNER_VERIFIER_PATH, 'read_only': True}]
             service['ports'] = [{'target': 8000, 'published': '8000', 'host_ip': '127.0.0.1', 'protocol': 'tcp'}]
         if name in {'worker', 'runtime-broker'}:
             service['volumes'].append({'type': 'bind', 'source': str(root / 'broker-socket'),
@@ -158,13 +172,23 @@ def validate_profile(p, m):
             'watchdog': {(str(root / 'runtime-ledger'), '/var/lib/f1-runtime', False),
                          (f'/run/user/{m["execution_uid"]}/docker.sock', '/var/run/docker.sock', False)}}
         actual = {(v['source'], v['target'], v.get('read_only', False)) for v in s.get('volumes', [])}
+        if 'owner_login' in m:
+            allowed['api'] = {(str(root / 'secrets/owner_password'), OWNER_VERIFIER_PATH, True)}
         if actual != allowed[name]:
             raise ValueError('unapproved_mount')
         env = s.get('environment', {})
         if any(k.startswith(('F21_', 'F2_INTEGRATION')) for k in env):
             raise ValueError('external_integration_not_authorized')
-        if name == 'api' and env.get('F1_AUTH_MODE') != 'oidc':
+        if name == 'api' and env.get('F1_AUTH_MODE') != ('password' if 'owner_login' in m else 'oidc'):
             raise ValueError('synthetic_owner_access_forbidden')
+        if 'owner_login' in m and name == 'api':
+            expected = {'F1_WEB_ORIGIN': m['owner_login']['origin'],
+                        'F1_OWNER_PASSWORD_FILE': OWNER_VERIFIER_PATH,
+                        'F1_PASSWORD_LOOPBACK_HTTP': '1' if m['owner_login']['loopback_http'] else '0'}
+            if any(env.get(k) != v for k, v in expected.items()):
+                raise ValueError('password_login_binding_changed')
+        if name != 'api' and any(k.startswith(('F1_OWNER_PASSWORD', 'F1_PASSWORD_LOOPBACK')) for k in env):
+            raise ValueError('password_outside_api')
         if name in {'runtime-broker', 'watchdog'} and env.get('F1_RUNTIME_MODE') != 'rootless-required':
             raise ValueError('rootful_runtime_forbidden')
 
