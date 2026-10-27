@@ -1,0 +1,29 @@
+[Unit]
+Description=Prepare only the approved ACC 53565cc release
+StartLimitIntervalSec=3600
+StartLimitBurst=2
+
+[Service]
+Type=oneshot
+User=acc-control
+Group=acc-control
+Environment=HOME=/home/acc-control
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+ExecStart=/bin/bash /usr/local/libexec/acc-prepare-fixed.sh
+UMask=0027
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/acc-control/f30 /var/lib/acc-prepare-receipt
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+TimeoutStartSec=2h
+KillMode=control-group
+
+# Docker builds run in existing separate daemons; this unit does not enforce
+# memory/CPU quotas on those daemons. Exactly one build is allowed by the lock.
