@@ -19,7 +19,17 @@ function App(){
   const res=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:{...(mode==='synthetic'?{Authorization:'Bearer '+token}:{}),'X-CSRF-Token':csrf,'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await res.json(); if(!res.ok)throw new Error(data.detail||'Запрос отклонён'); return data;
  }
- async function refresh(){const current=generation.current;try{const next=await request('state');const status=await request('health');const preparation=await request('experiments/first');const proof=(mode==='oidc'||mode==='password')&&!csrf?await request('auth/csrf'):null;if(current===generation.current){setState(next);setHealth(status);setExperiment(preparation);if(proof)setCsrf(proof.csrf_token);setError('')}}catch(e){if(current===generation.current){setError(String(e));setState(null)}}}
+ async function refresh(){
+  const current=generation.current;
+  try{
+   // CSRF rotation appends audit evidence: read the approval checkpoint afterwards.
+   const proof=(mode==='oidc'||mode==='password')&&!csrf?await request('auth/csrf'):null;
+   const status=await request('health');
+   const preparation=await request('experiments/first');
+   const next=await request('state');
+   if(current===generation.current){setState(next);setHealth(status);setExperiment(preparation);if(proof)setCsrf(proof.csrf_token);setError('')}
+  }catch(e){if(current===generation.current){setError(String(e));setState(null)}}
+ }
  async function exchange(){try{const result=await request('auth/exchange',{assertion:token});generation.current++;setToken('');setCsrf(result.csrf_token);setError('Сессия создана. Обновите состояние.')}catch(e){setError(String(e))}}
  async function login(event:React.FormEvent){event.preventDefault();if(loginBusy)return;const current=generation.current;setLoginBusy(true);try{const result=await request('auth/login',{username,password:token});if(current===generation.current){generation.current++;setToken('');setCsrf(result.csrf_token);await refresh()}}catch(e){if(current===generation.current){setToken('');const message=String(e);setError(message.includes('invalid_owner_credentials')?'Неверный логин или пароль.':message.includes('owner_login_rate_limited')?'Слишком много попыток. Повторите вход через 15 минут.':message.includes('password_login_not_configured')?'Вход владельца ещё не настроен.':message.includes('login_transport_or_origin_rejected')?'Адрес подключения не разрешён для входа.':message);setState(null)}}finally{setLoginBusy(false)}}
  async function logout(){generation.current++;setToken('');setState(null);setHealth(null);setDraft(null);setExperiment(null);if(mode==='oidc'||mode==='password'){try{await request('auth/logout',{})}catch{setError('Серверный отзыв не подтверждён; сессия может оставаться активной.')}}setCsrf('')}

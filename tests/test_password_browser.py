@@ -13,6 +13,7 @@ from command_center.password_auth import document
 
 
 def test_password_mobile_login_stop_logout(settings, store, tmp_path):
+    store.halt('owner')  # Match the admission-halted VPS after installation.
     password = 'public-browser-password-fixture-only'
     path = tmp_path / 'owner.json'
     path.write_text(json.dumps(document('owner', password)))
@@ -47,6 +48,10 @@ def test_password_mobile_login_stop_logout(settings, store, tmp_path):
                 page.get_by_role('heading', name='Управление', exact=True).wait_for()
                 assert page.get_by_label('Пароль', exact=True).input_value() == ''
                 assert page.get_by_text('Подписанное MFA-подтверждение тестового IdP', exact=True).count() == 0
+                with page.expect_response('**/api/control/resume') as resumed:
+                    page.get_by_role('button', name='Снять обычную остановку для новых задач', exact=True).click()
+                assert resumed.value.status == 200, resumed.value.text()
+                page.get_by_text('Контур допускает синтетические задачи', exact=True).wait_for(timeout=5000)
                 page.get_by_role('button', name='Аварийная остановка', exact=True).click()
                 page.get_by_text('Запуски остановлены', exact=True).wait_for()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')

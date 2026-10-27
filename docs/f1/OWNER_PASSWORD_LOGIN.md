@@ -69,7 +69,10 @@ DB schema/models/admin не меняются; исходный rollback bundle �
    Новый пароль длиной 15–128 символов вводится скрыто дважды. Значение никогда
    не передаётся в чат/аргументы/runner. CLI требует терминал и не перезаписывает
    существующий файл. Для смены — отдельный защищённый файл и контролируемая замена,
-   не удаление рабочего verifier без подготовки. Backup verifier — только в
+   не удаление рабочего verifier без подготовки. При атомарной замене host-файла
+   bind mount может остаться на старом inode: нужно контролируемое пересоздание
+   API и проверка отказа старой cookie. Одна замена pathname не доказывает отзыв.
+   Backup verifier — только в
    защищённой custody, отдельно от Git и обычных task artifacts.
 2. После сборки exact новой revision выполнить `prepare` с прежним data-root,
    новым каталогом bundle и явными password-origin/loopback параметрами выше.
@@ -90,6 +93,10 @@ expiry/revocation/rotation (включая rotation во время провер
 HTTP/HTTPS, loopback opt-in, отсутствие bearer bypass, durable/concurrent rate
 limits, DB/audit failure. Browser test использует реальную React-панель и API
 на 390×844: неверный пароль → успешный login → stop → logout; секреты синтетические.
+В том же browser test добавлены исходная остановка, как после установки VPS,
+и resume. Он воспроизвёл 409 stale_or_recovery_resume: CSRF rotation происходила
+после чтения checkpoint. UI теперь получает CSRF до snapshot состояния;
+серверная проверка exact checkpoint осталась строгой.
 Deployment test проверяет, что verifier монтируется только API и public HTTP
 origin/изменённые настройки отклоняются. Результаты итогового SHA — в PR/CI;
 никаких заявлений о проведённом VPS password-update по этим тестам не делается.
