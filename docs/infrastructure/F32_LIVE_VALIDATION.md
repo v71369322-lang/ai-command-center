@@ -1,0 +1,99 @@
+# F32: фактический переход и первый Telegram-тест
+
+Дата: 28 октября 2026, время сообщений владельца около 12:30–12:37 МСК.
+Это журнал выполненного этапа, а не разрешение на следующие подключения.
+
+## Источники доказательств
+
+Подготовку на `brain1` подтверждает официальный self-hosted runner в
+[Actions run 40660017254](https://github.com/v71369322-lang/ai-command-center/actions/runs/40660017254):
+verify и prepare завершены SUCCESS. Ops trigger:
+`36cc76c8bb483512dfc4f9bb1dcb33181ef8c2b7`; код подготовки соответствует
+ранее проверенному `b02aa5b710dc2e7dd514426cd0812b80ad8afb99`.
+
+Последующие SSH-команды выполнял владелец, предоставлявший JSON-результаты
+и скриншоты Telegram Web. Прямого SSH-доступа облачного агента нет.
+Скриншоты не копируются в Git: на них присутствуют посторонние личные чаты.
+В репозитории нет токена, пароля, приватного ключа или полного webhook URL.
+
+## Зафиксированные артефакты
+
+| Объект | Значение |
+| --- | --- |
+| Исходники приложения | `316dc1615dea224bcf4bd595d87048d19820bd21`, PR #26 |
+| Исходники на VPS | `/home/acc-control/f32/source` |
+| Общий private state | `/home/acc-control/f30/state` |
+| Предыдущий F31 bundle | `1e151b2953b6debb4bb05096fba20aa6c740665015f31479a50fd25c6ef80106` |
+| F32 disabled bundle | `1e1fe4c2c179da1aa607017984a4413dc22dea83875feb2a9f98ce8d2971c165` |
+| План миграции | `24505630c47e38ec1ed46252a16fe7c9374b68e0ea4d04432739bb00abbb7774` |
+| Telegram connection digest | `0a98c8e21758e8da047febe9f7412a0a306989cb95883629b428143ee45df88e` |
+| Активный Telegram bundle | `0ee8a6023296fdacfe632c2f364c488b2564db399bfd15af357812e41004d64b` |
+| Активный каталог bundle | `/home/acc-control/f32/bundle-telegram` |
+
+PR #27/#28 остаются дополнительными облачными изменениями. Их project inbox
+и Telegram assignment не входят в этот развёрнутый app SHA. Слияний нет.
+
+## Выполнено и наблюдалось
+
+1. Повторно зарегистрирован существующий отдельный ephemeral runner без
+   скачивания пакета и без выдачи ему Docker socket или sudo.
+2. Владелец проверил root bootstrap SHA-256
+   `f2da4ce4738b5c05a087e90c820fdf4e7b286b2ba89ed983952bb57137bab909`.
+   Подготовительный канал вернул `PREPARE_CHANNEL_READY`. Runner получил
+   inspect receipt disabled bundle; этот receipt сам по себе не был установкой.
+3. Выполнен существующий `telegram_transition stage`, затем exact-plan `apply`.
+   Возвращено `telegram_schema_verified: true`, `telegram_live_enabled: false`.
+   Путь apply требует проверки восстановления копии в отдельном PostgreSQL.
+   Отдельного полного host-лога восстановления агент не получил.
+4. Владелец вошёл в панель и показал SUCCEEDED синтетической задачи после
+   миграции. Старый пароль не пересоздавался.
+5. Существующий offline provision сохранил credential binding для одного
+   owner ID; ответ содержал `api_contacted: false`, `live_enabled: false`.
+   Сам токен введён скрыто на VPS, не передавался облачному агенту.
+6. Первое включение остановилось на `service_not_running:telegram`.
+   Диагностика показала exit=1, OOM=false. Исправлена ошибка операторской
+   диагностической команды: перед Compose добавлен доступный рабочий каталог,
+   поскольку runuser наследовал `/root` (`stat .: permission denied`).
+7. Реальные getMe/getWebhookInfo подтвердили существующий webhook на
+   `script.google.com`. Runtime guard отказал с
+   `telegram_existing_webhook_requires_owner_review`; его не ослабляли.
+8. Владелец отдельно разрешил отключение прежнего обработчика своего бота.
+   Фиксированная операторская операция deleteWebhook использовала
+   `drop_pending_updates: false`; последующий getWebhookInfo подтвердил
+   отсутствие webhook, pending_updates=0. Runtime allowlist методов не менялся.
+9. Незавершённый deployment INTENT восстановлен существующим bounded rollback
+   на точный disabled predecessor и последующим update точного live bundle.
+   Отдельный последующий вывод подтвердил `phase: VERIFIED` и активный digest
+   из таблицы. Повтор recovery корректно отказал до изменений: его prerequisite
+   INTENT уже не выполнялся. Не редактировались deployment receipts и схема.
+10. В Telegram Web получены реальные ответы на `/start`, `/requests`.
+    Обычное синтетическое сообщение получило номер `131179125`;
+    `/request 131179125` вернул исходный текст, статус ожидания планирования
+    и явное отсутствие запуска бизнес-работы.
+11. После явного снятия обычной остановки в панели создана `/demo`-карточка,
+    владелец нажал одноразовое подтверждение. Для задачи
+    `33d667de-3f64-42ac-a512-d077bb555c52` пришли подтверждение и уведомление
+    `SUCCEEDED`, с отметкой независимой проверки и SHA-256 результата.
+    Это реальная доставка Telegram для синтетического executor, не AI coding.
+
+## Что этим не доказано
+
+- Ответы из приложения Telegram на iPhone после закрытия Windows SSH-туннеля
+  ещё не проверены на момент этого checkpoint. Telegram Web на Windows
+  не подменяет этот тест.
+- Перезагрузка VPS, долговременное наблюдение, восстановление после аварии,
+  offsite backup, RPO/RTO, MFA и production readiness этим этапом не приняты.
+- Acceptance flags `owner_mfa_verified`, `rootless_execution_smoke_verified`,
+  `offsite_verified` и `go_live` в deployment-ответах остаются false. Их нельзя
+  вручную менять по скриншоту отдельной успешной задачи.
+- Постоянного удалённого канала обновлений ещё нет. Ephemeral runner завершает
+  один job; текущий этап не даёт агенту постоянного доступа к VPS.
+- Обычный текст сохраняется в NEEDS_PLANNING; голос, настоящий AI-планировщик,
+  платные AI-вызовы, реальные coding PR и внешние CRM не подключены.
+- Публичного административного доступа не открывали. Локальная панель через
+  Windows SSH-туннель и автономный исходящий Telegram polling — разные каналы.
+
+Ближайший тест: завершить SSH-сеанс владельца и с iPhone запросить
+`/request 131179125`; проверить ответ без повторного входа на VPS.
+При ошибке сначала диагностировать фактический service/receipt, не повторять
+миграцию, bootstrap или update вслепую.
