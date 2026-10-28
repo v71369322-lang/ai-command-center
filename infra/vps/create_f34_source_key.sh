@@ -28,7 +28,7 @@ directory=/home/acc-control/f34-source-access
   printf "%s\n" "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" \
     > /home/acc-control/f34-source-access/github_known_hosts
   chmod 600 /home/acc-control/f34-source-access/github_known_hosts
+  /usr/bin/cat /home/acc-control/f34-source-access/id_ed25519.pub
+  /usr/bin/ssh-keygen -lf /home/acc-control/f34-source-access/id_ed25519.pub -E sha256
 '
-cat "$directory/id_ed25519.pub"
-/usr/bin/ssh-keygen -lf "$directory/id_ed25519.pub" -E sha256
 echo SOURCE_PUBLIC_KEY_READY_NOT_CONNECTED
