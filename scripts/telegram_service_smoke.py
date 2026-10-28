@@ -30,7 +30,8 @@ def handle(request):
     elif method=='getWebhookInfo':
         result={'url':'','has_custom_certificate':False,'pending_update_count':0}
     elif method=='getUpdates':
-        values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001']
+        values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
+                '/requests','/request 1']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -48,10 +49,14 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
 try:
     result=TelegramService(store,client,poll_seconds=0).run(max_cycles=2)
     assert result['completed_cycles']==2 and result['live_verified'] is False
-    assert calls.count('sendMessage')==3
+    assert calls.count('sendMessage')==5
     assert any('пока нет' in value for value in sent)
     assert any('не найдена' in value for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':2,'actual_telegram_contacted':False}))
+    assert any('Запрос №1 сохранён' in value for value in sent)
+    assert sum('Текст запроса (не команда):' in value and 'Synthetic container service request' in value
+               for value in sent)==2
+    assert all(len(value)<=4096 for value in sent)
+    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':4,'actual_telegram_contacted':False}))
 finally:
     client.close();store.engine.dispose()
 '''
@@ -113,7 +118,7 @@ def main():
                   'runtime_mode': 'CLOUD_ROOTFUL_TEST_ONLY', 'rootless_host_verified': False,
                   'connection_digest': digest(config.model_dump()), 'vps_contacted': False}
         Path('.runtime/telegram-container.json').write_text(json.dumps(report, indent=2) + '\n')
-        print('Telegram service container → actual PG → mock HTTP → durable request/status replies; no socket/ports: PASS')
+        print('Telegram service container → actual PG → mock HTTP → durable numbered requests/status replies; no socket/ports: PASS')
     finally:
         removed = docker('rm', '--force', name, timeout=15)
         absent = docker('inspect', name, timeout=5)

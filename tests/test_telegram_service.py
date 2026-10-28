@@ -94,6 +94,38 @@ def client_for(configured, fake, revision=None):
     )
 
 
+def test_saved_request_number_survives_source_revision_change(configured, store):
+    from command_center.store import Store
+    from test_telegram_task_status import response
+
+    path, config = configured
+    fake = FakeBot()
+    first_client = client_for(configured, fake)
+    try:
+        original = TelegramBridge(store, first_client, OWNER)
+        original.receive(update(1, 'Public request from the previous revision'))
+        profile = original.profile
+    finally:
+        first_client.close()
+    next_config = config.model_copy(update={'source_revision': 'c' * 40})
+    path.write_text(next_config.model_dump_json())
+    changed = Store(replace(store.settings, source_revision=next_config.source_revision))
+    next_client = client_for((path, next_config), fake)
+    try:
+        upgraded = TelegramBridge(changed, next_client, OWNER)
+        assert upgraded.profile == profile
+        reply = response(upgraded, update(2, '/request 1'))
+        assert 'Запрос №1' in reply and 'Public request from the previous revision' in reply
+        assert 'Выполнение не запускалось' in reply
+        assert changed.snapshot()['tasks'] == []
+        while upgraded.deliver_one():
+            pass
+        assert len(fake.sent) == 2
+    finally:
+        next_client.close()
+        changed.engine.dispose()
+
+
 def test_real_service_heartbeat_is_visible_only_until_service_stops(configured, store):
     from command_center.telegram_health import status
 
