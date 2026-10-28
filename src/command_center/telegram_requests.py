@@ -6,6 +6,23 @@ from .models import Audit, TelegramInbox
 from .store import Denied, digest
 
 
+def captured_text(session, row):
+    """Validate immutable intake before any reader copies its contents."""
+    number = row.id.removeprefix(row.profile + ':')
+    if (row.state != 'NEEDS_PLANNING' or not isinstance(row.intent, dict)
+            or set(row.intent) != {'kind', 'text'} or row.intent.get('kind') != 'capture'
+            or row.task_id is not None or row.fingerprint != digest(row.intent)
+            or not isinstance(row.intent.get('text'), str) or not 1 <= len(row.intent['text'].encode()) <= 2000
+            or not session.execute(select(Audit).where(
+                Audit.event['kind'].as_string() == 'telegram_update_received',
+                Audit.event['actor'].as_string() == 'owner',
+                Audit.event['profile'].as_string() == row.profile,
+                Audit.event['update_id'].as_string() == number,
+                Audit.event['intent_hash'].as_string() == row.fingerprint)).first()):
+        raise Denied('telegram_saved_request_integrity')
+    return row.intent['text']
+
+
 def capture_receipt(inbox_id):
     number = inbox_id.rsplit(':', 1)[1]
     return (f'Запрос №{number} сохранён.\nПроверить: /request {number}\n'
@@ -25,16 +42,7 @@ def request_reply(bridge, session, intent):
     parts = []
     for row in rows:
         number = row.id.removeprefix(bridge.profile + ':')
-        if (set(row.intent) != {'kind', 'text'} or row.task_id is not None
-                or row.fingerprint != digest(row.intent)
-                or not session.execute(select(Audit).where(
-                    Audit.event['kind'].as_string() == 'telegram_update_received',
-                    Audit.event['actor'].as_string() == 'owner',
-                    Audit.event['profile'].as_string() == bridge.profile,
-                    Audit.event['update_id'].as_string() == number,
-                    Audit.event['intent_hash'].as_string() == row.fingerprint)).first()):
-            raise Denied('telegram_saved_request_integrity')
-        value = row.intent['text']
+        value = captured_text(session, row)
         bridge.check_text(value)
         if intent['kind'] == 'requests':
             preview = ' '.join(value.split())

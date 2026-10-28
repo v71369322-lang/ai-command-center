@@ -51,6 +51,14 @@ class ApprovalRequest(BaseModel):
     seconds: int = Field(default=120, ge=1, le=300, strict=True)
 
 
+class ProjectAssignment(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_id: str = Field(pattern=r'^[a-f0-9]{64}:[0-9]{1,16}$')
+    project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'] | None
+    expected_version: int = Field(ge=0, le=1000, strict=True)
+    operation_id: str = Field(pattern=r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$')
+
+
 class ErrorResponse(BaseModel):
     detail: str
 
@@ -389,6 +397,17 @@ def create_app(settings=None, gateway_factory=None):
         if role != 'owner':
             raise Denied('owner_required')
         return status(store, os.environ.get('F1_TELEGRAM_SCOPE', ''))
+
+    @app.get('/api/project-inbox')
+    def project_inbox(project: Literal['all', 'unassigned', 'command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'] = 'all',
+                      role=Depends(identity)):
+        from .project_inbox import inbox
+        return inbox(store, role, project)
+
+    @app.post('/api/project-inbox/assign')
+    def project_assignment(body: ProjectAssignment, role=Depends(identity)):
+        from .project_inbox import classify
+        return classify(store, role, **body.model_dump())
 
     @app.get('/api/telegram/requests')
     def telegram_requests(role=Depends(identity)):
