@@ -88,6 +88,8 @@ Operator: 512 MiB, 1 CPU, 128 tasks, 15-minute timeout. Лимиты его пр
    VERIFIED baseline и неизменённый requirements.lock. Existing paths блокируют
    повтор вместо перезаписи. Работающее приложение и его Docker не меняются.
    Установка не регистрирует runner, не включает units и ничего не скачивает.
+   Public code/metadata directories получают явные 0755 независимо от umask
+   вызывающего root. Private key/directories сохраняют 0600/0700.
 5. Один свежий GitHub registration token вводится скрыто в доверенном SSH TTY,
    никогда не в чат/argv/Git. Регистрация persistent: без --ephemeral, с
    --no-default-labels --labels acc-ops-mailbox --disableupdate.
@@ -124,6 +126,31 @@ Workflow запускает облачную проверку запроса. Т
 Отзыв на хосте: остановить timer для новых операций; текущую операцию сначала
 сверить с durable intent. Принудительная остановка допускает UNCERTAIN, не success.
 
+## Возобновление после паузы
+
+Когда владелец уехал, серверные действия F33 были приостановлены. Последнее
+подтверждённое состояние: plan отказал до install, enrollment_files_present=false.
+Последний исправленный install-блок был выдан, но успешного результата от владельца
+не получено. Поэтому нельзя объявлять ни успешную установку, ни текущее отсутствие
+файлов доказанными после этой точки. Рабочий Telegram этим этапом не обновлялся.
+Установочное окно из ops-журнала истекло; автоматически оно не продлевается.
+Сохранённые команды с прежним deadline не являются новой инструкцией запуска.
+
+В новом проверенном bootstrap есть отдельный `--inspect`, без source/catalog
+аргументов. Он не вызывает Git/systemctl, не регистрирует runner, не читает bytes
+private key и не пишет файлы. Выдаёт NOT_INSTALLED, PARTIAL_OR_UNVERIFIED или
+FILES_PRESENT_RUNTIME_UNVERIFIED с отдельным policy_active. Последнее означает
+только наличие согласованных metadata/permissions, не проверку всех package hashes,
+подписи ключом, запущенных сервисов или готовности VPS.
+
+Важное условие: этот CLI находится в новой облачной версии, не в старом уже
+доставленном checkout. После возвращения сначала требуется короткая read-only
+проверка фактического состояния, затем новая точная инструкция доставки/продолжения.
+Не запускать старые root scripts с изменённым digest или искусственно продлённым
+deadline. Runtime grant, ключ и операционная история не сбрасываются при повторе.
+Ошибки plan/install теперь содержат безопасные stage и exception type без значений
+исключения/аргументов. Невалидные CLI arguments также не отражаются в stderr.
+
 ## Проверки
 
 Тесты используют настоящие файлы, SQLite, Ed25519/OpenSSL, конкурентные потоки
@@ -134,6 +161,15 @@ network=none, readonly rootfs и только capabilities для создани
 ownership и сброса привилегий. Docker socket не монтируется. Проверяется запрет
 чтения private key/runtime placeholder, изменения policy/receipts, подписанный
 roundtrip и exact replay. Это не запуск systemd/rootless/reboot на настоящем VPS.
+
+Отдельный root installation lifecycle в disposable Ubuntu использует настоящие
+UID, файловую систему и Ed25519 key generation, но synthetic application baseline
+и systemd adapter. Он проверяет полную запись code/policy/units при umask 077,
+чтение кода оператором, read-only inspection без открытия ключа/процессов,
+expired/partial metadata и отказ повторной установки без замены ключа/expiry.
+Только этот admin-fixture имеет дополнительные ownership/DAC capabilities;
+production operator/runner остаются с пустым CapabilityBoundingSet. Реального
+systemd boot, mount/registration или VPS acceptance этот сценарий не подтверждает.
 
 Итоговые количества, warnings и ссылки CI публикуются в PR; пересекающиеся
 targeted/full suites не суммируются. Host enrollment, mount/systemd compatibility,

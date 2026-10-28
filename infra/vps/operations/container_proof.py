@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -39,9 +40,113 @@ def role(uid, args, *, wait=True):
     return subprocess.Popen(command, **options)
 
 
+def installation_lifecycle():
+    """Real root filesystem/UID/key lifecycle; systemd and baseline are synthetic."""
+    if os.getuid() != 0:
+        raise ValueError('test_root_required')
+    fixture = Path('/var/lib/enrollment-proof')
+    fixture.mkdir(mode=0o755)
+    fixture.chmod(0o755)
+    enroll.LIB, enroll.ETC, enroll.STATE = (fixture / name for name in ('lib', 'etc', 'state'))
+    enroll.SYSTEMD = fixture / 'units'
+    enroll.SYSTEMD.mkdir(mode=0o755)
+    enroll.BASE_STATE = fixture / 'baseline.json'
+    enroll.DEPENDENCY_LOCK = fixture / 'requirements.lock'
+    enroll.TOOLS = '/usr/bin/python3'
+    if enroll.inspect_enrollment()['phase'] != 'NOT_INSTALLED':
+        raise ValueError('test_empty_inspection')
+    # An incomplete filesystem must not be reported as installed or repaired.
+    enroll.LIB.mkdir(mode=0o700)
+    if enroll.inspect_enrollment()['phase'] != 'PARTIAL_OR_UNVERIFIED':
+        raise ValueError('test_partial_inspection')
+    enroll.LIB.rmdir()
+    source = Path('/run/synthetic-source')
+    source.mkdir(mode=0o700)
+    os.chown(source, 2000, 2000)
+    generated = role(2000, [__file__, 'source'])
+    if generated.returncode:
+        raise ValueError('test_source_creation')
+    sha = generated.stdout.decode().strip()
+    files = enroll.package(source, sha)
+    enroll.DEPENDENCY_LOCK.write_bytes(files['requirements.lock'])
+    enroll.BASE_STATE.write_bytes(canonical({'phase': 'VERIFIED', 'bundle': OLD}))
+    scope = dict(schema=1, duration_seconds=3600, max_operations=32, max_updates=0,
+                 base_bundle=OLD, releases={OLD: {'directory': '/home/acc-control/old/bundle', 'revision': 'c' * 40}})
+    real_run, manager_calls = subprocess.run, []
+    def manager(argv, **kwargs):
+        if argv[0] == 'systemctl':
+            manager_calls.append(tuple(argv))
+            return SimpleNamespace(returncode=3 if 'is-active' in argv else 0)
+        return real_run(argv, **kwargs)
+    subprocess.run = manager
+    old_mask = os.umask(0o077)
+    try:
+        enrolled = enroll.install(files, scope, sha)
+        if enrolled['services_started'] or enrolled['runner_registered']:
+            raise ValueError('test_install_activated_services')
+        key = enroll.STATE / 'private/receipt.key'
+        before = key.stat().st_mtime_ns
+        read_program = 'import sys;open(sys.argv[1],"rb").read(1);print("READABLE")'
+        readable = role(1000, ['-c', read_program, str(enroll.LIB / 'source/src/command_center/coding/spec.py')])
+        if readable.returncode or readable.stdout.strip() != b'READABLE':
+            raise ValueError('test_umask_077_blocks_public_package')
+        # Inspection must never open the key or invoke any external command.
+        real_open, real_path_open, real_popen = os.open, Path.open, subprocess.Popen
+        def guarded_open(path, *args, **kwargs):
+            if str(path) == str(key):
+                raise AssertionError('test_inspection_read_private_key')
+            return real_open(path, *args, **kwargs)
+        def guarded_path_open(path, *args, **kwargs):
+            if path == key:
+                raise AssertionError('test_inspection_read_private_key')
+            return real_path_open(path, *args, **kwargs)
+        def no_process(*args, **kwargs):
+            raise AssertionError('test_inspection_started_process')
+        os.open, Path.open, subprocess.Popen = guarded_open, guarded_path_open, no_process
+        try:
+            inspected = enroll.inspect_enrollment()
+        finally:
+            os.open, Path.open, subprocess.Popen = real_open, real_path_open, real_popen
+        if (inspected['phase'] != 'FILES_PRESENT_RUNTIME_UNVERIFIED' or not inspected['policy_active']
+                or inspected['runtime_checked'] or inspected['credentials_read'] or inspected['changes_host']):
+            raise ValueError('test_metadata_inspection')
+        original_time = enroll.time.time
+        enroll.time.time = lambda: enrolled['expires_at'] + 1
+        try:
+            if enroll.inspect_enrollment().get('policy_active') is not False:
+                raise ValueError('test_expired_policy')
+        finally:
+            enroll.time.time = original_time
+        try:
+            enroll.install(files, scope, sha)
+        except ValueError as error:
+            if str(error) != 'existing_channel_requires_reconciliation':
+                raise
+        else:
+            raise ValueError('test_install_replaced_existing_state')
+        after = json.loads((enroll.ETC / 'enrollment.json').read_bytes())
+        if after != enrolled or key.stat().st_mtime_ns != before:
+            raise ValueError('test_repeat_reset_key_or_policy')
+        key.chmod(0o644)
+        if enroll.inspect_enrollment()['phase'] != 'PARTIAL_OR_UNVERIFIED':
+            raise ValueError('test_inspection_accepted_public_key_file')
+        key.chmod(0o600)
+        if manager_calls != [('systemctl', 'is-active', '--quiet', 'acc-gh-runner.service'),
+                              ('systemctl', 'daemon-reload')]:
+            raise ValueError('test_unexpected_service_operation')
+        print(json.dumps({'status': 'PASS', 'root_install_umask_077': True, 'inspection_read_only': True,
+                          'repeat_preserved_key_and_expiry': True, 'systemd': 'synthetic',
+                          'services_started': False, 'vps_test': False}))
+    finally:
+        os.umask(old_mask)
+        subprocess.run = real_run
+
+
 def main():
     if len(sys.argv) > 1:
-        if sys.argv[1] == 'operator':
+        if sys.argv[1] == 'install-lifecycle':
+            installation_lifecycle()
+        elif sys.argv[1] == 'operator':
             if os.getuid() != 1000:
                 raise ValueError('test_operator_identity')
             print(json.dumps(Channel(Layout(ROOT, POLICY, runner_uid=2000),

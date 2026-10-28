@@ -630,3 +630,30 @@ def test_workflow_cannot_start_vps_on_pr_or_ordinary_feature_push():
     assert 'contents: read' in text and 'cancel-in-progress: false' in text
     assert 'runs-on: [acc-ops-mailbox]' in text
     assert '/usr/local/lib/acc-operations/submit.py' in text
+
+
+def test_inspect_cli_needs_no_source_or_credentials():
+    if os.getuid() == 0:
+        pytest.skip('Root behavior is exercised in the isolated Ubuntu fixture')
+    result = subprocess.run([sys.executable, '-I', str(OPS / 'enroll.py'), '--inspect'],
+                            capture_output=True, check=False, timeout=10)
+    assert result.returncode == 1
+    output = json.loads(result.stdout)
+    assert output == {'status': 'UNCONFIRMED', 'phase': 'inspect', 'error_type': 'ValueError'}
+    assert b'invalid enrollment arguments' not in result.stderr
+
+
+def test_enrollment_parser_does_not_echo_accidental_credential():
+    secret = 'synthetic-do-not-echo-value'
+    result = subprocess.run([sys.executable, '-I', str(OPS / 'enroll.py'), '--unexpected', secret],
+                            capture_output=True, check=False, timeout=10)
+    assert result.returncode == 2
+    assert secret.encode() not in result.stdout + result.stderr
+    assert b'values not displayed' in result.stderr
+
+
+def test_inspection_cannot_be_combined_with_install():
+    result = subprocess.run([sys.executable, '-I', str(OPS / 'enroll.py'), '--inspect', '--install'],
+                            capture_output=True, check=False, timeout=10)
+    assert result.returncode == 2
+    assert result.stdout == b''

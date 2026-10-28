@@ -28,6 +28,8 @@ UNITS = ('acc-operations.service', 'acc-operations.timer', 'acc-operations-runne
 MOUNT_UNIT = r'var-lib-acc\x2doperations-inbox.mount'
 TOOLS = '/home/acc-control/f30/tools/bin/python'
 BASE_STATE = Path('/home/acc-control/f30/state/deployment.json')
+DEPENDENCY_LOCK = Path('/home/acc-control/f32/source/requirements.lock')
+SYSTEMD = Path('/etc/systemd/system')
 KEY_PROGRAM = '''import base64,os,sys
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 k=Ed25519PrivateKey.generate()
@@ -177,7 +179,7 @@ def install(files, scope, revision):
         raise ValueError('host_roles_changed')
     if os.getgrouplist(runner.pw_name, runner.pw_gid) != [runner.pw_gid]:
         raise ValueError('runner_supplementary_groups_require_review')
-    for target in (LIB, ETC, STATE, *(Path('/etc/systemd/system') / unit for unit in (*UNITS, MOUNT_UNIT))):
+    for target in (LIB, ETC, STATE, *(SYSTEMD / unit for unit in (*UNITS, MOUNT_UNIT))):
         if target.exists() or target.is_symlink():
             raise ValueError('existing_channel_requires_reconciliation')
     if subprocess.run(['systemctl', 'is-active', '--quiet', 'acc-gh-runner.service'], check=False).returncode == 0:
@@ -187,13 +189,13 @@ def install(files, scope, revision):
     state = json.loads(BASE_STATE.read_bytes())
     if state.get('phase') != 'VERIFIED' or state.get('bundle') != scope['base_bundle']:
         raise ValueError('host_baseline_changed')
-    if files['requirements.lock'] != Path('/home/acc-control/f32/source/requirements.lock').read_bytes():
+    if files['requirements.lock'] != DEPENDENCY_LOCK.read_bytes():
         raise ValueError('operator_dependencies_require_separate_review')
     if not Path('/usr/bin/openssl').is_file():
         raise ValueError('system_openssl_required')
-    LIB.mkdir(mode=0o755)
-    ETC.mkdir(mode=0o755)
-    STATE.mkdir(mode=0o755)
+    for directory in (LIB, ETC, STATE):
+        directory.mkdir(mode=0o755)
+        directory.chmod(0o755)  # Public code/metadata must not depend on the caller's umask.
     for name, mode, gid in [('inbox', 0o2770, runner.pw_gid), ('receipts', 0o2750, runner.pw_gid),
                             ('private', 0o700, control.pw_gid)]:
         path = STATE / name
@@ -211,13 +213,16 @@ def install(files, scope, revision):
             target.write_bytes(raw)
             target.chmod(0o444)
         elif name.endswith('/inbox.mount.template'):
-            target = Path('/etc/systemd/system') / MOUNT_UNIT
+            target = SYSTEMD / MOUNT_UNIT
             target.write_bytes(raw.replace(b'__RUNNER_GID__', str(runner.pw_gid).encode()))
             target.chmod(0o644)
         elif name != 'requirements.lock':
-            target = Path('/etc/systemd/system') / Path(name).name
+            target = SYSTEMD / Path(name).name
             target.write_bytes(raw)
             target.chmod(0o644)
+    # Only code directories. Never recurse into STATE/private or broaden its modes.
+    for directory in [LIB / 'source', *(p for p in (LIB / 'source').rglob('*') if p.is_dir())]:
+        directory.chmod(0o755)
     public = subprocess.check_output(['/usr/sbin/runuser', '-u', 'acc-control', '--', TOOLS, '-c', KEY_PROGRAM,
                                      str(STATE / 'private/receipt.key')], env={
         'PATH': '/usr/bin:/bin', 'HOME': '/home/acc-control', 'PYTHONNOUSERSITE': '1'},
@@ -239,19 +244,110 @@ def install(files, scope, revision):
     return enrollment
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', required=True)
-    parser.add_argument('--approved-source', required=True)
-    parser.add_argument('--catalog-file', required=True)
-    parser.add_argument('--approved-catalog')
-    parser.add_argument('--install', action='store_true')
-    args = parser.parse_args()
+def inspect_enrollment():
+    """Read metadata only: no Git, secret reads, registration, systemctl or writes."""
+    result = dict(changes_host=False, runtime_checked=False, credentials_read=False)
+    if os.getuid() != 0:
+        raise ValueError('explicit_host_administrator_required')
+    targets = (LIB, ETC, STATE, *(SYSTEMD / unit for unit in (*UNITS, MOUNT_UNIT)))
+    if not any(p.exists() or p.is_symlink() for p in targets):
+        return {**result, 'phase': 'NOT_INSTALLED'}
+    component = 'directories'
     try:
+        public = (LIB, ETC, STATE, LIB / 'source', LIB / 'source/src', LIB / 'source/src/command_center')
+        for path in public:
+            m = path.lstat()
+            if not stat.S_ISDIR(m.st_mode) or m.st_uid != 0 or stat.S_IMODE(m.st_mode) != 0o755:
+                raise ValueError('public_directory_permissions')
+
+        def metadata(path):
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, 'rb') as stream:
+                m = os.fstat(stream.fileno())
+                if (not stat.S_ISREG(m.st_mode) or m.st_uid != 0 or m.st_nlink != 1
+                        or m.st_mode & 0o022 or m.st_size > 16384):
+                    raise ValueError('metadata_custody')
+                raw = stream.read(16385)
+            def pairs(items):
+                value = {}
+                for k, v in items:
+                    if k in value:
+                        raise ValueError('metadata_duplicate_key')
+                    value[k] = v
+                return value
+            return json.loads(raw, object_pairs_hook=pairs)
+
+        component = 'policy_binding'
+        policy, receipt = metadata(ETC / 'policy.json'), metadata(ETC / 'enrollment.json')
+        if (not isinstance(receipt, dict) or not isinstance(policy, dict)
+                or set(receipt) != {'source_revision', 'policy_digest', 'receipt_public_key', 'expires_at',
+                                   'installed', 'services_started', 'runner_registered'}
+                or receipt['installed'] is not True
+                or not isinstance(receipt['source_revision'], str)
+                or not re.fullmatch('[a-f0-9]{40}', receipt['source_revision'])
+                or hashlib.sha256(canonical(policy)).hexdigest() != receipt['policy_digest']
+                or policy.get('receipt_public_key') != receipt['receipt_public_key']
+                or policy.get('expires_at') != receipt['expires_at']
+                or len(base64.b64decode(receipt['receipt_public_key'], validate=True)) != 32):
+            raise ValueError('metadata_binding')
+        if set(policy) != {'schema', 'issued_at', 'expires_at', 'max_operations', 'max_updates',
+                           'receipt_public_key', 'releases'}:
+            raise ValueError('metadata_policy_schema')
+        if any(type(policy[k]) is not int for k in ('issued_at', 'expires_at')):
+            raise ValueError('metadata_clock')
+        catalog(dict(schema=policy['schema'], duration_seconds=policy['expires_at'] - policy['issued_at'],
+                     max_operations=policy['max_operations'], max_updates=policy['max_updates'],
+                     base_bundle=next(iter(policy['releases'])), releases=policy['releases']))
+        component = 'code_and_units'
+        for path, mode in [(LIB / 'submit.py', 0o444),
+                           (LIB / 'source/src/command_center/operations_channel.py', 0o444),
+                           (LIB / 'source/src/command_center/coding/spec.py', 0o444),
+                           *((SYSTEMD / unit, 0o644) for unit in (*UNITS, MOUNT_UNIT))]:
+            m = path.lstat()
+            if not stat.S_ISREG(m.st_mode) or m.st_uid != 0 or stat.S_IMODE(m.st_mode) != mode or m.st_nlink != 1:
+                raise ValueError('installed_file_custody')
+        component = 'private_key_metadata'
+        parent = (STATE / 'private').lstat()
+        key = (STATE / 'private/receipt.key').lstat()  # Metadata only; never open/read key bytes.
+        if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 1000 or stat.S_IMODE(parent.st_mode) != 0o700
+                or not stat.S_ISREG(key.st_mode) or key.st_uid != 1000 or key.st_nlink != 1
+                or stat.S_IMODE(key.st_mode) != 0o600 or key.st_size != 32):
+            raise ValueError('private_key_custody')
+        return {**result, 'phase': 'FILES_PRESENT_RUNTIME_UNVERIFIED',
+                'source_revision': receipt['source_revision'], 'policy_digest': receipt['policy_digest'],
+                'receipt_public_key': receipt['receipt_public_key'], 'expires_at': receipt['expires_at'],
+                'policy_active': policy['issued_at'] <= int(time.time()) < policy['expires_at'],
+                'package_hashes_verified': False}
+    except Exception:
+        return {**result, 'phase': 'PARTIAL_OR_UNVERIFIED', 'component': component}
+
+
+def main():
+    class SafeParser(argparse.ArgumentParser):
+        def error(self, message):
+            self.exit(2, 'invalid enrollment arguments; values not displayed\n')
+    parser = SafeParser(description=__doc__)
+    parser.add_argument('--source')
+    parser.add_argument('--approved-source')
+    parser.add_argument('--catalog-file')
+    parser.add_argument('--approved-catalog')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--install', action='store_true')
+    group.add_argument('--inspect', action='store_true')
+    args = parser.parse_args()
+    phase = 'inspect' if args.inspect else 'catalog'
+    try:
+        if args.inspect:
+            print(json.dumps(inspect_enrollment(), sort_keys=True))
+            return
+        if not args.source or not args.approved_source or not args.catalog_file:
+            parser.error('source, approved-source and catalog-file required')
         scope = read_catalog(args.catalog_file)
         digest = hashlib.sha256(canonical(scope)).hexdigest()
+        phase = 'package'
         files = package(args.source, args.approved_source)
         if args.install:
+            phase = 'install'
             if args.approved_catalog != digest:
                 raise ValueError('exact_catalog_approval_required')
             result = install(files, scope, args.approved_source)
@@ -259,7 +355,9 @@ def main():
             result = dict(source_revision=args.approved_source, catalog_digest=digest, files=len(files),
                           max_updates=scope['max_updates'], changes_host=False, services_started=False)
         print(json.dumps(result, sort_keys=True))
-    except Exception:
+    except Exception as error:
+        # Exception values may contain Git URLs or credentials: expose stage/type only.
+        print(json.dumps({'status': 'UNCONFIRMED', 'phase': phase, 'error_type': type(error).__name__}))
         parser.exit(1, 'operations_enrollment_unconfirmed; inspect existing files; do not overwrite or retry blindly\n')
 
 
