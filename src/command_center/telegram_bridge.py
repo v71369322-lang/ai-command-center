@@ -12,6 +12,7 @@ from sqlalchemy import select, func
 from .api import Command
 from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit, Task
 from .store import Denied, digest
+from .telegram_requests import capture_receipt, request_reply
 from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
 
 
@@ -111,14 +112,7 @@ class TelegramBridge:
                 intent['callback_query_id'] = query_id
             return str(uid), intent
         value = message.get('text')
-        if not isinstance(value, str) or not 1 <= len(value.encode()) <= 2000:
-            raise Denied('telegram_text_only')
-        known = [*self.store.settings.identities.values(), self.store.settings.redis_password,
-                 self.store.settings.database_url.password]
-        if (any(v and v in value for v in known)
-                or (isinstance(self.client, ConfiguredTelegramHTTP) and self.client.sensitive(value))
-                or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b[0-9]{6,20}:[A-Za-z0-9_-]{30,128}', value)):
-            raise Denied('telegram_secret_content_forbidden')
+        self.check_text(value)
         if value.startswith('/demo '):
             try:
                 payload = Command(kind='approved_render', values={'request': value[6:]}).model_dump()
@@ -135,15 +129,36 @@ class TelegramBridge:
             return str(uid), {'kind': 'stop'}
         if value == '/tasks':
             return str(uid), {'kind': 'tasks'}
+        if value == '/requests':
+            return str(uid), {'kind': 'requests'}
+        if value.startswith('/request '):
+            number = value[9:]
+            if not re.fullmatch(r'0|[1-9][0-9]{0,15}', number) or int(number) >= 2**53:
+                raise Denied('telegram_request_number_invalid')
+            return str(uid), {'kind': 'request', 'number': number}
         if value.startswith('/status '):
             try:
                 task_id = str(UUID(value[8:]))
             except ValueError:
                 raise Denied('telegram_task_id_invalid') from None
             return str(uid), {'kind': 'status', 'task_id': task_id}
-        if value in {'/start', '/help', '/status'}:
+        if value in {'/start', '/help', '/status', '/request'}:
             return str(uid), {'kind': 'help'}
-        return str(uid), {'kind': 'capture', 'text': value.removeprefix('/task ')}
+        captured = value.removeprefix('/task ')
+        if not captured.strip():
+            raise Denied('telegram_empty_request')
+        return str(uid), {'kind': 'capture', 'text': captured}
+
+    def check_text(self, value):
+        """Same limits and secret guard for incoming text and stored previews."""
+        if not isinstance(value, str) or not 1 <= len(value.encode()) <= 2000:
+            raise Denied('telegram_text_only')
+        known = [*self.store.settings.identities.values(), self.store.settings.redis_password,
+                 self.store.settings.database_url.password]
+        if (any(v and v in value for v in known)
+                or (isinstance(self.client, ConfiguredTelegramHTTP) and self.client.sensitive(value))
+                or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b[0-9]{6,20}:[A-Za-z0-9_-]{30,128}', value)):
+            raise Denied('telegram_secret_content_forbidden')
 
     def finish(self, session, iid, text):
         self.guard()
@@ -239,7 +254,7 @@ class TelegramBridge:
         elif kind == 'stop':
             self.store.halt('owner', _scope_installer=lambda session, control:
                             self.finish(session, iid, 'Новые запуски остановлены; активные исполнения требуют сверки.'))
-        elif kind in {'tasks', 'status'}:
+        elif kind in {'tasks', 'status', 'requests', 'request'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -247,23 +262,26 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                 if row.state != 'RECEIVED':
                     raise Denied('telegram_query_not_pending')
-                # Scope is derived from the durable F1 request key, never from a
-                # supplied UUID alone or a mutable inbox task_id link alone.
-                query = select(Task).join(TelegramInbox,
-                    (TelegramInbox.task_id == Task.id)
-                    & (Task.request_key == 'owner:tg:' + TelegramInbox.id)).where(
-                        TelegramInbox.profile == self.profile, TelegramInbox.state == 'DONE',
-                        TelegramInbox.intent['kind'].as_string() == 'demo',
-                        Task.owner_role == 'owner', Task.payload['kind'].as_string() == 'approved_render')
-                if kind == 'status':
-                    query = query.where(Task.id == intent['task_id'])
-                tasks = session.execute(query.order_by(Task.created_at.desc(), Task.id.desc()).limit(5)).scalars().all()
-                if not tasks:
-                    reply = ('Синтетических тестов в этом Telegram-подключении пока нет.' if kind == 'tasks'
-                             else 'Задача не найдена среди синтетических тестов этого Telegram-подключения.')
+                if kind in {'requests', 'request'}:
+                    reply = request_reply(self, session, intent)
                 else:
-                    reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
-                    reply += '\n\n'.join(self.task_summary(session, task) for task in tasks)
+                    # Scope is derived from the durable F1 request key, never from a
+                    # supplied UUID alone or a mutable inbox task_id link alone.
+                    query = select(Task).join(TelegramInbox,
+                        (TelegramInbox.task_id == Task.id)
+                        & (Task.request_key == 'owner:tg:' + TelegramInbox.id)).where(
+                            TelegramInbox.profile == self.profile, TelegramInbox.state == 'DONE',
+                            TelegramInbox.intent['kind'].as_string() == 'demo',
+                            Task.owner_role == 'owner', Task.payload['kind'].as_string() == 'approved_render')
+                    if kind == 'status':
+                        query = query.where(Task.id == intent['task_id'])
+                    tasks = session.execute(query.order_by(Task.created_at.desc(), Task.id.desc()).limit(5)).scalars().all()
+                    if not tasks:
+                        reply = ('Синтетических тестов в этом Telegram-подключении пока нет.' if kind == 'tasks'
+                                 else 'Задача не найдена среди синтетических тестов этого Telegram-подключения.')
+                    else:
+                        reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
+                        reply += '\n\n'.join(self.task_summary(session, task) for task in tasks)
                 reply += '\n\nРабота по реальной бизнес-задаче не выполнялась.'
                 control = session.get(Control, 1)
                 if control.halted or control.recovery:
@@ -273,10 +291,20 @@ class TelegramBridge:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 if kind == 'capture':
-                    session.get(TelegramInbox, iid).state = 'NEEDS_PLANNING'
-                    self.enqueue(session, iid + ':reply', 'Запрос сохранён. AI-планирование ещё не подключено; бизнес-действия не выполнялись.')
+                    row = session.get(TelegramInbox, iid)
+                    if row.state == 'NEEDS_PLANNING':
+                        return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+                    if row.state != 'RECEIVED':
+                        raise Denied('telegram_capture_not_pending')
+                    self.check_text(intent.get('text'))
+                    if not intent['text'].strip():
+                        raise Denied('telegram_empty_request')
+                    self.guard()
+                    row.state = 'NEEDS_PLANNING'
+                    self.enqueue(session, iid + ':reply', capture_receipt(iid))
                 else:
                     self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; '
+                        '/requests — сохранённые запросы; /request номер — открыть запрос; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
                         'Голос и реальные AI пока отключены.')
         with self.store.transaction() as session:
