@@ -577,6 +577,25 @@ def test_enrollment_bounds_git_output_before_copying_or_execution(source_reposit
         module('enroll').package(source, revision)
 
 
+def test_root_git_uses_absolute_runuser_with_restricted_path(monkeypatch, source_repository):
+    source, revision = source_repository
+    enroll = module('enroll')
+    calls = []
+    def spawn(command, **kwargs):
+        calls.append((command, kwargs['env']))
+        assert command[0] == '/usr/sbin/runuser'
+        assert os.access(command[0], os.X_OK)
+        assert command[4:9] == ['/usr/bin/prlimit', '--as=268435456:268435456',
+                                 '--cpu=30:30', '--fsize=8388608:8388608', '--']
+        assert kwargs['env']['PATH'] == '/usr/bin:/bin'
+        raise OSError('synthetic_stop_before_execution')
+    monkeypatch.setattr(enroll.os, 'getuid', lambda: 0)
+    monkeypatch.setattr(enroll.subprocess, 'Popen', spawn)
+    with pytest.raises(OSError, match='synthetic_stop'):
+        enroll.git(source, 'cat-file', 'commit', revision)
+    assert len(calls) == 1
+
+
 def test_enrollment_rejects_tampered_tree_before_install(source_repository, monkeypatch):
     source, revision = source_repository
     enroll = module('enroll')

@@ -11,6 +11,7 @@ from uuid import uuid4
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from command_center.operations_channel import Channel, Layout, canonical, checksum
+import enroll
 
 ROOT = Path('/var/lib/acc-operations')
 POLICY = Path('/etc/acc-operations/policy.json')
@@ -60,6 +61,28 @@ def main():
             print('DENIED_AS_EXPECTED')
         elif sys.argv[1] == 'count':
             print((ROOT / 'private/synthetic_executions').read_text())
+        elif sys.argv[1] == 'source':
+            if os.getuid() != 2000:
+                raise ValueError('test_source_identity')
+            source = Path('/run/synthetic-source')
+            names = ['src/command_center/__init__.py', 'src/command_center/deployment.py',
+                     'src/command_center/operations_channel.py', 'src/command_center/coding/__init__.py',
+                     'src/command_center/coding/spec.py', 'requirements.lock',
+                     'infra/vps/operations/submit.py', 'infra/vps/operations/inbox.mount.template']
+            names += ['infra/vps/operations/' + name for name in enroll.UNITS]
+            for name in names:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('# synthetic data, never executed\n')
+                path.chmod(0o644)
+            def git(*args):
+                return subprocess.check_output(['/usr/bin/git', '-C', str(source), *args],
+                                               stderr=subprocess.DEVNULL, timeout=10)
+            git('init', '--quiet', '--template=')
+            git('add', '.')
+            git('-c', 'user.name=Synthetic Test', '-c', 'user.email=synthetic@example.invalid',
+                'commit', '-qm', 'synthetic source')
+            print(git('rev-parse', 'HEAD').decode().strip())
         else:
             raise ValueError('test_action')
         return
@@ -68,6 +91,19 @@ def main():
     release = dict(line.split('=', 1) for line in Path('/etc/os-release').read_text().splitlines() if '=' in line)
     if release.get('ID', '').strip('"') != 'ubuntu' or release.get('VERSION_ID', '').strip('"') != '24.04':
         raise ValueError('test_ubuntu_release')
+    source = Path('/run/synthetic-source')
+    source.mkdir(mode=0o700)
+    os.chown(source, 2000, 2000)
+    generated = role(2000, [__file__, 'source'])
+    if generated.returncode:
+        raise ValueError('test_source_creation')
+    sha = generated.stdout.decode().strip()
+    planned = subprocess.run(['/usr/bin/python3', '-I', '/opt/proof/enroll.py', '--source', str(source),
+                              '--approved-source', sha, '--catalog-file', '/opt/proof/catalog.json'],
+                             env={'PATH': '/usr/bin:/bin', 'HOME': '/'},
+                             capture_output=True, check=False, timeout=60)
+    if planned.returncode or json.loads(planned.stdout).get('changes_host') is not False:
+        raise ValueError('test_root_enrollment_plan_with_restricted_path')
     for name, mode, gid in [('inbox', 0o2770, 2000), ('receipts', 0o2750, 2000), ('private', 0o700, 1000)]:
         path = ROOT / name
         path.mkdir(mode=mode)
@@ -84,6 +120,12 @@ def main():
                             capture_output=True, check=False, timeout=10)
     if result.returncode:
         raise ValueError('test_key_creation')
+    generated_key = subprocess.run(['/usr/sbin/runuser', '-u', 'acc-control', '--', '/usr/bin/python3',
+                                    '-c', enroll.KEY_PROGRAM, str(ROOT / 'private/enrollment-test.key')],
+                                   env={'PATH': '/usr/bin:/bin', 'HOME': '/'},
+                                   capture_output=True, check=False, timeout=20)
+    if generated_key.returncode or len(base64.b64decode(generated_key.stdout.strip(), validate=True)) != 32:
+        raise ValueError('test_root_enrollment_key_generation')
     now = int(time.time())
     public = base64.b64encode(key.public_key().public_bytes_raw()).decode()
     policy = dict(schema=1, issued_at=now - 5, expires_at=now + 600, max_operations=8, max_updates=1,
@@ -126,6 +168,7 @@ def main():
         if repeated.returncode or count.returncode or count.stdout.strip() != b'1':
             raise ValueError('test_duplicate_execution')
         print(json.dumps({'status': 'PASS', 'ubuntu': '24.04', 'actual_uids': [1000, 2000],
+                          'root_enrollment_plan': True, 'root_enrollment_key_generation': True,
                           'runner_private_key_policy_receipts_runtime_denied': True,
                           'signed_roundtrip': True, 'duplicate_executions': 0,
                           'backend': 'synthetic', 'vps_test': False}))

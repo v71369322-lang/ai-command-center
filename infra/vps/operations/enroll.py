@@ -83,7 +83,9 @@ def git(source, *args):
     # Git configuration nor Python from acc-control executes with root rights.
     command = ['git', '--no-replace-objects', '-c', 'safe.directory=*', '-C', str(source), *args]
     if os.getuid() == 0:
-        command = ['runuser', '-u', 'acc-gh-runner', '--', *command]
+        # runuser can reset resource limits. Apply them after the UID switch.
+        command = ['/usr/sbin/runuser', '-u', 'acc-gh-runner', '--', '/usr/bin/prlimit',
+                   '--as=268435456:268435456', '--cpu=30:30', '--fsize=8388608:8388608', '--', *command]
     env = {
         'PATH': '/usr/bin:/bin', 'HOME': '/var/lib/acc-gh-runner', 'LANG': 'C.UTF-8',
         'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_NO_REPLACE_OBJECTS': '1',
@@ -94,7 +96,7 @@ def git(source, *args):
         resource.setrlimit(resource.RLIMIT_FSIZE, (8 * 1024 * 1024, 8 * 1024 * 1024))
     process = subprocess.Popen(command, env=env, stdin=subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               start_new_session=True, preexec_fn=limits)
+                               start_new_session=True, preexec_fn=limits if os.getuid() != 0 else None)
     output = bytearray()
     deadline = time.monotonic() + 30
     try:
@@ -216,7 +218,7 @@ def install(files, scope, revision):
             target = Path('/etc/systemd/system') / Path(name).name
             target.write_bytes(raw)
             target.chmod(0o644)
-    public = subprocess.check_output(['runuser', '-u', 'acc-control', '--', TOOLS, '-c', KEY_PROGRAM,
+    public = subprocess.check_output(['/usr/sbin/runuser', '-u', 'acc-control', '--', TOOLS, '-c', KEY_PROGRAM,
                                      str(STATE / 'private/receipt.key')], env={
         'PATH': '/usr/bin:/bin', 'HOME': '/home/acc-control', 'PYTHONNOUSERSITE': '1'},
         stderr=subprocess.DEVNULL, timeout=30).decode().strip()
