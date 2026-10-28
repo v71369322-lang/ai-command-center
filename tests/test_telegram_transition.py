@@ -1,6 +1,7 @@
 """Real isolated legacy PG + restore; fake host orchestration is explicitly scoped."""
 import copy
 import json
+from pathlib import Path
 
 import pytest
 from cryptography.exceptions import InvalidTag
@@ -8,7 +9,7 @@ from cryptography.exceptions import InvalidTag
 from test_deployment import release as release
 from test_telegram_migration import isolated_pg as isolated_pg, legacy as legacy, KEY
 
-from command_center.deployment import Deployment
+from command_center.deployment import Deployment, migration_hash
 from command_center.deployment_profile import atomic_json, checksum, render
 from command_center.runtime_policy import RuntimeBackend
 from command_center.telegram_migration import fingerprints
@@ -249,3 +250,30 @@ def test_final_receipt_write_loss_does_not_repeat_migration(transition, monkeypa
     monkeypatch.setattr(module, 'atomic_json', actual)
     assert t.reconcile(approval)['telegram_schema_verified']
     assert calls.count(('job', 'apply')) == 1
+
+
+def test_known_schema_hash_cannot_silently_expand_with_future_models():
+    assert migration_hash(Path(__file__).resolve().parents[1]) == NEW_SCHEMA
+
+
+def test_unresolved_maintenance_container_blocks_stage_before_mutation(transition, monkeypatch):
+    t, _, calls, before = transition
+    real = t.current.engine.run
+
+    def busy(*args, **kwargs):
+        return b'uncertain-job-id' if args[0] == 'ps' else real(*args, **kwargs)
+
+    monkeypatch.setattr(t.current.engine, 'run', busy)
+    with pytest.raises(ValueError, match='job_unresolved'):
+        t.stage(checksum(t.current.bundle), before['bundle'])
+    assert not calls and state(t) == before
+
+
+def test_publicly_readable_transition_receipt_is_not_trusted(transition):
+    t, _, calls, before = transition
+    approval = checksum(t.current.bundle)
+    plan = t.stage(approval, before['bundle'])
+    t.journal.chmod(0o644)
+    with pytest.raises(ValueError, match='custody_invalid'):
+        t.apply(approval, plan['plan_digest'])
+    assert ('job', 'apply') not in calls
