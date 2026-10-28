@@ -13,6 +13,7 @@ from .api import Command
 from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit, Task
 from .store import Denied, digest
 from .telegram_requests import capture_receipt, request_reply
+from .telegram_menu import BUTTONS, keyboard
 from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
 
 
@@ -113,6 +114,7 @@ class TelegramBridge:
             return str(uid), intent
         value = message.get('text')
         self.check_text(value)
+        value = dict(BUTTONS).get(value, value)
         if value.startswith('/demo '):
             try:
                 payload = Command(kind='approved_render', values={'request': value[6:]}).model_dump()
@@ -163,7 +165,7 @@ class TelegramBridge:
             except ValueError:
                 raise Denied('telegram_task_id_invalid') from None
             return str(uid), {'kind': 'status', 'task_id': task_id}
-        if value in {'/start', '/help', '/status', '/request', '/assign'}:
+        if value in {'/start', '/help', '/menu', '/status', '/request', '/assign'}:
             return str(uid), {'kind': 'help'}
         captured = value.removeprefix('/task ')
         if not captured.strip():
@@ -181,14 +183,14 @@ class TelegramBridge:
                 or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b[0-9]{6,20}:[A-Za-z0-9_-]{30,128}', value)):
             raise Denied('telegram_secret_content_forbidden')
 
-    def finish(self, session, iid, text):
+    def finish(self, session, iid, text, markup=None):
         self.guard()
         self.store.check_audit(session)
         row = session.get(TelegramInbox, iid)
         if row.state == 'DONE':
             raise Denied('telegram_update_already_committed')
         row.state = 'DONE'
-        self.enqueue(session, iid + ':reply', text)
+        self.enqueue(session, iid + ':reply', text, markup)
 
     def receive(self, update):
         self.guard()
@@ -353,13 +355,20 @@ class TelegramBridge:
                     row.state = 'NEEDS_PLANNING'
                     self.enqueue(session, iid + ':reply', capture_receipt(iid))
                 else:
-                    self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; '
+                    row = session.get(TelegramInbox, iid)
+                    if row.state == 'DONE':
+                        return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+                    if row.state != 'RECEIVED':
+                        raise Denied('telegram_help_not_pending')
+                    self.finish(session, iid, 'Выберите кнопку меню или напишите запрос обычным текстом. '
+                        'Текст сохраняется и ожидает планирования.\n\n'
+                        '/menu — показать меню; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
-                        'Голос и реальные AI пока отключены.')
+                        'Голос и реальные AI пока отключены.', keyboard())
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
             return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}

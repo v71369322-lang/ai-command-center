@@ -13,6 +13,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from .store import Denied, canonical, digest
+from .telegram_menu import keyboard
 
 
 class TelegramConnection(BaseModel):
@@ -133,7 +134,9 @@ class ConfiguredTelegramHTTP:
                 and type(body.get('chat_id')) is int and body['chat_id'] == self.owner
                 and isinstance(body.get('text'), str) and 1 <= len(body['text']) <= 4096)
             markup = body.get('reply_markup')
-            if markup is not None:
+            # Only this exact read-only menu is added; arbitrary reply keyboards,
+            # contact/location requests, Web Apps and URLs remain forbidden.
+            if markup is not None and canonical(markup) != canonical(keyboard()):
                 valid = valid and (isinstance(markup, dict) and set(markup) == {'inline_keyboard'})
                 rows = markup.get('inline_keyboard') if isinstance(markup, dict) else None
                 valid = valid and isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], list) and len(rows[0]) == 1
