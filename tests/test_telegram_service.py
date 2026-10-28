@@ -94,6 +94,31 @@ def client_for(configured, fake, revision=None):
     )
 
 
+def test_real_service_heartbeat_is_visible_only_until_service_stops(configured, store):
+    from command_center.telegram_health import status
+
+    _, config = configured
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    approved = json.dumps({'mode': config.mode, 'bot_id': config.bot_id, 'owner_id': config.owner_id,
+                           'connection_digest': digest(config.model_dump())})
+    service = TelegramService(store, client, poll_seconds=0)
+    real_heartbeat = service.heartbeat
+    seen = []
+
+    def observe():
+        real_heartbeat()
+        seen.append(status(store, approved))
+
+    service.heartbeat = observe
+    try:
+        service.run(max_cycles=1)
+        assert seen[0]['status'] == 'polling' and seen[0]['live_connected'] is False
+        assert status(store, approved)['status'] == 'stopped'
+    finally:
+        client.close()
+
+
 @pytest.mark.parametrize(
     "attack", ["approval", "revision", "disabled", "live_mock", "permissions", "symlink"]
 )

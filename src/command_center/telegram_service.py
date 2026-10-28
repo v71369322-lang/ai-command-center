@@ -6,6 +6,7 @@ import os
 import re
 import signal
 import threading
+import time
 
 from sqlalchemy import inspect, text, URL
 
@@ -36,6 +37,7 @@ class TelegramService:
         self.bridge = TelegramBridge(store, client, client.owner)
         self._leader, self._pid = None, None
         self._stop = None
+        self._heartbeat_at = None
         raw = digest({'bot': client.bot_id, 'mode': client.mode})[:16]
         self._key = int(raw, 16) % (2**63 - 1)
 
@@ -57,6 +59,14 @@ class TelegramService:
         self._leader.commit()
         if value['pid'] != self._pid or not value['held']:
             raise Denied('telegram_leadership_lost')
+
+    def heartbeat(self):
+        now = time.monotonic()
+        if self._heartbeat_at is None or now - self._heartbeat_at >= 15:
+            self.guard()
+            self.event('telegram_service_heartbeat', bot_id=self.client.bot_id,
+                       connection_digest=self.client.approved)
+            self._heartbeat_at = now
 
     @contextmanager
     def leader(self):
@@ -98,6 +108,7 @@ class TelegramService:
                     self.guard()
                     try:
                         self.bridge.poll_once(timeout=self.poll_seconds)
+                        self.heartbeat()
                         failures = 0
                         cycles += 1
                     except TelegramHTTPError as error:

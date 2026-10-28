@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from psycopg import sql
 
-from .deployment_profile import PROJECT, SECRETS, SERVICES, atomic_json, checksum, render, validate_manifest, validate_profile
+from .deployment_profile import PROJECT, SECRETS, services, atomic_json, checksum, render, validate_manifest, validate_profile
 from .local_docker import environment
 from .recovery import seal, unseal
 from .runtime_ledger import RuntimeLedger
@@ -95,7 +95,7 @@ def image_check(engine, images, revision):
 
 
 def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_password_origin=None,
-            password_loopback_http=False):
+            password_loopback_http=False, telegram_connection_digest=None):
     source = Path(source).resolve()
     engine = Engine(control_uid)
     # config does not start containers. Keep all input paths in the exact checkout.
@@ -117,6 +117,9 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
         manifest['owner_login'] = {'origin': owner_password_origin, 'loopback_http': password_loopback_http}
     elif password_loopback_http:
         raise ValueError('password_origin_required')
+    if telegram_connection_digest:
+        from .telegram_release import binding
+        manifest['telegram'] = binding(manifest['data_root'], revision, telegram_connection_digest)
     source_check(manifest)
     image_check(engine, images, revision)
     bundle = {'manifest': manifest, 'compose': render(base, manifest)}
@@ -173,6 +176,9 @@ class Deployment:
         if 'owner_login' in self.m:
             from .password_auth import load
             load(str(self.root / 'secrets/owner_password'))
+        if 'telegram' in self.m:
+            from .telegram_release import preflight
+            preflight(self.m)
         self.compose('config', '--quiet')
 
     def tool(self, code):
@@ -191,6 +197,7 @@ class Deployment:
         return self.engine.run(*args, self.m['images']['api'], 'python', '-c', code)
 
     def quiesce(self):
+        self.pause_telegram()
         self.tool("from command_center.config import Settings;from command_center.store import Store;"
                   "Store(Settings.load()).halt('owner')")
         deadline = time.monotonic() + 45
@@ -209,6 +216,25 @@ class Deployment:
                     return
             time.sleep(.5)
         raise ValueError('unresolved_execution_blocks_update')
+
+    def pause_telegram(self):
+        """Stop the active release's poller, including when the target disables it."""
+        path = self.root / 'deployment.json'
+        if not path.exists():
+            return
+        state = json.loads(path.read_text())
+        if not state.get('directory'):
+            if 'telegram' in self.m:
+                raise ValueError('telegram_active_release_receipt_required')
+            return
+        previous = load_bundle(state['directory'])
+        if checksum(previous) != state['bundle']:
+            raise ValueError('telegram_active_release_changed')
+        if 'telegram' in previous['manifest']:
+            active = Deployment(previous, state['directory'], self.engine, self.execution)
+            active.compose('stop', 'telegram')
+            if self.engine.run('ps', '-q', '--filter', 'name=^' + PROJECT + '-telegram-1$').strip():
+                raise ValueError('telegram_stop_unconfirmed')
 
     def backup(self):
         checkpoint = json.loads(self.tool('import json;from command_center.config import Settings;'
@@ -326,6 +352,7 @@ class Deployment:
         state = json.loads((self.root / 'deployment.json').read_text())
         if state.get('phase') != 'VERIFIED' or state['bundle'] != checksum(self.bundle):
             raise ValueError('boot_only_verified_release')
+        self.pause_telegram()
         self.compose('up', '-d', '--no-build', '--pull', 'never', '--wait', 'db', 'redis')
         # A reboot is not consent to resume cancelled/uncertain work.
         self.tool("from command_center.config import Settings;from command_center.store import Store;"
@@ -337,13 +364,18 @@ class Deployment:
         # Does not require an owner assertion or manufacture a session/MFA claim.
         self.tool('from command_center.config import Settings;from command_center.store import Store;'
                   'from command_center.worker import broker;s=Settings.load();Store(s).checkpoint();assert broker(s).ping()')
-        for name in SERVICES:
+        for name in services(self.m):
             metadata = self.engine.json('inspect', PROJECT + '-' + name + '-1')[0]
             if not metadata['State']['Running']:
                 raise ValueError('service_not_running:' + name)
         self.engine.run('exec', PROJECT + '-watchdog-1', 'python', '-c',
             'import os;from command_center.runtime_ledger import RuntimeLedger;'
             'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);l.verify();assert l.watchdog_ready()')
+        if 'telegram' in self.m:
+            code = ('from command_center.config import Settings;from command_center.store import Store;'
+                    'from command_center.telegram_health import status;'
+                    f'assert status(Store(Settings.load()),{json.dumps(self.m["telegram"])!r})["live_connected"]')
+            self.tool(code)
         return {'state': 'CLOSED_SYNTHETIC_SERVICES_RUNNING', 'owner_mfa_verified': False,
                 'rootless_execution_smoke_verified': False, 'offsite_verified': False, 'go_live': False}
 
@@ -371,7 +403,7 @@ class Deployment:
             if previous:
                 self.quiesce()
                 self.backup()
-                self.compose('stop', 'api', 'worker', 'runtime-broker', 'watchdog')
+                self.compose('stop', *sorted(services(self.m) - {'db', 'redis'}))
             intent = {'phase': 'INTENT', 'bundle': checksum(self.bundle), 'revision': self.m['revision'],
                       'migration_hash': self.m['migration_hash'], 'database_image': self.m['database_image'],
                       'previous_bundle': previous['bundle'] if previous and previous['phase'] == 'VERIFIED' else None,
@@ -412,6 +444,7 @@ def main():
     parser.add_argument('--backup-file')
     parser.add_argument('--owner-password-origin')
     parser.add_argument('--password-loopback-http', action='store_true')
+    parser.add_argument('--telegram-connection-digest')
     args = parser.parse_args()
     if args.action == 'init-state':
         initialize_state(args.data_root)
@@ -433,7 +466,8 @@ def main():
         if None in (args.control_uid, args.execution_uid, args.data_root):
             parser.error('prepare requires both UIDs and data root')
         print(json.dumps({'bundle_digest': prepare(args.source, args.bundle, args.control_uid, args.execution_uid, args.data_root,
-            owner_password_origin=args.owner_password_origin, password_loopback_http=args.password_loopback_http)}))
+            owner_password_origin=args.owner_password_origin, password_loopback_http=args.password_loopback_http,
+            telegram_connection_digest=args.telegram_connection_digest)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())

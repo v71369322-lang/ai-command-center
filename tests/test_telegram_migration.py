@@ -278,6 +278,8 @@ def test_restore_waits_for_sql_even_when_postgres_process_exists(monkeypatch):
     class DelayedSQLRuntime:
         def call(self, *args, **kwargs):
             nonlocal probes
+            if args[0] == 'run':
+                assert '--pull=never' in args
             if args[0] == "inspect":
                 if events[-1] == "removed":
                     return CompletedProcess(args, 1, b"", b"No such container")

@@ -27,9 +27,18 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
+    if 'telegram' in m:
+        from .telegram_health import scope
+        from .store import Denied
+        try:
+            binding = scope(canonical(m['telegram']))
+            if binding['mode'] != 'live':
+                raise ValueError('live_binding_required')
+        except (Denied, ValueError, TypeError):
+            raise ValueError('telegram_release_binding_invalid') from None
     if 'owner_login' in m:
         from .password_auth import origin_valid
         login = m['owner_login']
@@ -50,6 +59,32 @@ def validate_manifest(m):
         raise ValueError('separate_unprivileged_users_required')
     for key in ('data_root', 'source_root'):
         absolute(m[key])
+
+
+def services(m):
+    return SERVICES | ({'telegram'} if 'telegram' in m else set())
+
+
+def telegram_service(m):
+    """One fixed client process, not an arbitrary service or HTTP proxy."""
+    return {
+        'image': m['images']['api'], 'user': '0:0', 'restart': 'no',
+        'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
+        'command': ['python', '-m', 'command_center.telegram_service', 'run',
+                    '--config', '/run/telegram/connection.json', '--approved-connection',
+                    m['telegram']['connection_digest']],
+        'environment': {'F1_SOURCE_REVISION': m['revision'], 'F1_DB_USER': 'f1_app', 'F1_DB_HOST': 'db',
+                        'F1_DB_PASSWORD_FILE': '/run/secrets/db_password'},
+        'secrets': ['db_password'],
+        'volumes': [{'type': 'bind', 'source': str(Path(m['data_root']) / 'telegram'),
+                     'target': '/run/telegram', 'read_only': True}],
+        'networks': {'control': None, 'telegram-access': None},
+        'mem_limit': '128m', 'cpus': .25, 'pids_limit': 32,
+        # Compose syntax for a private bounded tmpfs, not a host tempfile operation.
+        'tmpfs': ['/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777'], 'stop_grace_period': '30s',  # nosec B108
+        'depends_on': {'db': {'condition': 'service_healthy'}},
+        'logging': {'driver': 'local', 'options': {'max-size': '1m', 'max-file': '2'}},
+    }
 
 
 def render(base, m):
@@ -114,6 +149,8 @@ def render(base, m):
                            F1_PASSWORD_LOOPBACK_HTTP='1' if m['owner_login']['loopback_http'] else '0')
                 service['volumes'] = [{'type': 'bind', 'source': str(root / 'secrets/owner_password'),
                                       'target': OWNER_VERIFIER_PATH, 'read_only': True}]
+            if 'telegram' in m:
+                env['F1_TELEGRAM_SCOPE'] = canonical(m['telegram'])
             service['ports'] = [{'target': 8000, 'published': '8000', 'host_ip': '127.0.0.1', 'protocol': 'tcp'}]
         if name in {'worker', 'runtime-broker'}:
             service['volumes'].append({'type': 'bind', 'source': str(root / 'broker-socket'),
@@ -124,16 +161,23 @@ def render(base, m):
             service['volumes'] += [
                 {'type': 'bind', 'source': f'/run/user/{m["execution_uid"]}/docker.sock', 'target': '/var/run/docker.sock'},
                 {'type': 'bind', 'source': str(root / 'runtime-ledger'), 'target': '/var/lib/f1-runtime'}]
+    if 'telegram' in m:
+        profile['networks']['telegram-access'] = {'internal': False}
+        profile['services']['telegram'] = telegram_service(m)
     validate_profile(profile, m)
     return profile
 
 
 def validate_profile(p, m):
-    if p['name'] != PROJECT or set(p['services']) != SERVICES or not p['networks']['control']['internal']:
+    if p['name'] != PROJECT or set(p['services']) != services(m) or not p['networks']['control']['internal']:
         raise ValueError('deployment_boundary_invalid')
     if p['secrets'] != {k: {'file': str(Path(m['data_root']) / 'secrets' / k)} for k in SECRETS}:
         raise ValueError('secret_source_changed')
     for name, s in p['services'].items():
+        if name == 'telegram':
+            if s != telegram_service(m) or p['networks'].get('telegram-access') != {'internal': False}:
+                raise ValueError('telegram_service_boundary_changed')
+            continue
         if s.get('restart') != ('unless-stopped' if name in {'db', 'redis'} else 'no'):
             raise ValueError('restart_bypasses_boot_interlock')
         expected_image = (m['database_image'] if name == 'db' else m['redis_image'] if name == 'redis'
@@ -177,6 +221,9 @@ def validate_profile(p, m):
         if actual != allowed[name]:
             raise ValueError('unapproved_mount')
         env = s.get('environment', {})
+        expected_scope = canonical(m['telegram']) if name == 'api' and 'telegram' in m else None
+        if env.get('F1_TELEGRAM_SCOPE') != expected_scope:
+            raise ValueError('telegram_api_scope_changed')
         if any(k.startswith(('F21_', 'F2_INTEGRATION')) for k in env):
             raise ValueError('external_integration_not_authorized')
         if name == 'api' and env.get('F1_AUTH_MODE') != ('password' if 'owner_login' in m else 'oidc'):
