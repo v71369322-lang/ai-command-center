@@ -26,7 +26,8 @@ def captured_text(session, row):
 def capture_receipt(inbox_id):
     number = inbox_id.rsplit(':', 1)[1]
     return (f'Запрос №{number} сохранён.\nПроверить: /request {number}\n'
-            'Ожидает планирования. AI-планирование ещё не подключено; бизнес-действия не выполнялись.')
+            'Ожидает планирования. AI-планирование ещё не подключено; бизнес-действия не выполнялись.\n'
+            'Выберите проект кнопкой ниже. Это только категория запроса.')
 
 
 def project_queue(bridge, session, project='all'):

@@ -67,7 +67,9 @@ def bridge(store):
 def card_callback(service, fake, uid=2):
     while service.deliver_one():
         pass
-    index, card = next((i, m) for i, m in enumerate(fake.sent, 1) if "reply_markup" in m)
+    index, card = next((i, m) for i, m in enumerate(fake.sent, 1)
+                       if 'inline_keyboard' in m.get('reply_markup', {})
+                       and m['reply_markup']['inline_keyboard'][0][0]['callback_data'].startswith('tg:'))
     token = card["reply_markup"]["inline_keyboard"][0][0]["callback_data"]
     return {
         "update_id": uid,

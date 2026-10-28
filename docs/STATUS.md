@@ -27,6 +27,12 @@ source/test checkpoint `974430a260cde68d4e75f50cfd73e2cee886bede`.
 Итоговые HEAD/полный CI этой отдельной ветки сверять в её Draft PR.
 На VPS меню пока не доставлено; F33 по-прежнему требует reconciliation.
 
+Следующая доработка поверх меню: [кнопки выбора проекта запроса](telegram/PROJECT_PICKER.md),
+checkpoint `bbd4d08092a214ada2fd284b4905101b2085d18b`.
+Локально 203 targeted / 105 infrastructure PASS; назначение остаётся метаданными,
+source/version/delivery/audit checks сохраняются. Итоговый полный CI — в Draft PR
+этой отдельной ветки. Это также ещё не обновление действующего бота/VPS.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).

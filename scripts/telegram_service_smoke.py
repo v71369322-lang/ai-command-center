@@ -18,11 +18,13 @@ from command_center.store import Store
 from command_center.telegram_service import TelegramService, service_settings
 from command_center.telegram_transport import ConfiguredTelegramHTTP, connection
 from command_center.telegram_menu import BUTTONS, keyboard
+from command_center.telegram_project_picker import keyboard as picker_keyboard
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
 sent=[]
 menus=[]
+pickers=[]
 def handle(request):
     method=request.url.path.rsplit('/',1)[-1]
     body=json.loads(request.content)
@@ -40,11 +42,24 @@ def handle(request):
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
             for i,value in enumerate(values,1) if i>=body['offset']]
+        if body['offset']==0:
+            result=result[:1]  # The picker must be observed SENT before its callback.
+        else:
+            for index,value in enumerate(result):
+                if value['update_id']==7:
+                    result[index]={'update_id':7,'callback_query':{'id':'public-project-choice',
+                        'from':{'id':owner,'is_bot':False},'data':'pj:1:0:lnauto',
+                        'message':{'message_id':1,'chat':{'id':owner,'type':'private'}}}}
+    elif method=='answerCallbackQuery':
+        assert body=={'callback_query_id':'public-project-choice'}
+        result=True
     elif method=='sendMessage':
         assert body['chat_id']==owner
         sent.append(body['text'])
-        if 'reply_markup' in body:
+        if 'keyboard' in body.get('reply_markup',{}):
             menus.append(body['reply_markup'])
+        elif 'inline_keyboard' in body.get('reply_markup',{}):
+            pickers.append(body['reply_markup'])
         result={'message_id':len(sent),'date':1700000000,'chat':{'id':owner,'type':'private'}}
     else: raise AssertionError('unexpected method')
     return httpx.Response(200,json={'ok':True,'result':result})
@@ -58,6 +73,8 @@ try:
     assert result['completed_cycles']==40 and result['live_verified'] is False
     assert calls.count('sendMessage')==21
     assert menus==[keyboard(),keyboard()]
+    assert pickers==[picker_keyboard('1',0),picker_keyboard('1',0),picker_keyboard('1',1)]
+    assert calls.count('answerCallbackQuery')==1
     assert any('пока нет' in value for value in sent)
     assert any('не найдена' in value for value in sent)
     assert any('Запрос №1 сохранён' in value for value in sent)
@@ -83,6 +100,7 @@ try:
     assert all(len(value)<=4096 for value in sent)
     print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':17,'project_assignments':1,
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
+        'project_picker_cards':len(pickers),'project_choice_callbacks':1,
         'coding_task_id':task_id,'coding_repair_checks':[False,True],'mock_pr_published':False,
         'actual_telegram_contacted':False}))
 finally:

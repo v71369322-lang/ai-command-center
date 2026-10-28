@@ -29,7 +29,14 @@ def response(service, update):
     with service.store.transaction() as session:
         row = session.get(TelegramDelivery, service_reply_id(service, result['inbox_id']))
         assert row.body['chat_id'] == OWNER
-        assert 'parse_mode' not in row.body and 'reply_markup' not in row.body
+        assert 'parse_mode' not in row.body
+        if 'reply_markup' in row.body:
+            from command_center.telegram_project_picker import allowed_markup, parse_callback
+            intent = service.normalize(update)[1]
+            assert intent['kind'] in {'request', 'capture'}
+            assert allowed_markup(row.body['reply_markup'])
+            choice = parse_callback(row.body['reply_markup']['inline_keyboard'][0][0]['callback_data'])
+            assert choice['number'] == (intent['number'] if intent['kind'] == 'request' else str(update['update_id']))
         return row.body['text']
 
 
