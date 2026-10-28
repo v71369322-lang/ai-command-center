@@ -1,0 +1,6 @@
+[Unit]
+Description=Bounded ACC preparation request, not arbitrary command execution
+
+[Path]
+PathChanged=/var/lib/acc-gh-runner/bootstrap-telegram/request
+Unit=acc-telegram-prepare-fixed.service

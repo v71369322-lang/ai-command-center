@@ -1,0 +1,29 @@
+[Unit]
+Description=Prepare only the approved ACC 59d1260 disabled Telegram release
+StartLimitIntervalSec=3600
+StartLimitBurst=2
+
+[Service]
+Type=oneshot
+User=acc-control
+Group=acc-control
+Environment=HOME=/home/acc-control
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+ExecStart=/bin/bash /usr/local/libexec/acc-telegram-prepare-fixed.sh
+UMask=0027
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/acc-control/f32 /var/lib/acc-telegram-prepare-receipt
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+TimeoutStartSec=2h
+KillMode=control-group
+
+# Docker builds run in existing separate daemons; this unit does not enforce
+# memory/CPU quotas on those daemons. Exactly one build is allowed by the lock.

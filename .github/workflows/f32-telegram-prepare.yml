@@ -1,0 +1,58 @@
+name: F32 one-shot VPS release preparation
+on:
+  push:
+    branches: [ops/f32-telegram-prepare]
+permissions:
+  contents: read
+concurrency:
+  group: f32-password-prepare
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: contains(github.event.head_commit.message, '[run-f32]')
+    runs-on: [acc-bootstrap-only]
+    timeout-minutes: 115
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          path: operations
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 59d12601ea28475264a18e44c6f1ead0ff5e548f
+          persist-credentials: false
+          path: approved-source
+      - name: Stage non-secret source and wait for administrator handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          stage=/var/lib/acc-gh-runner/bootstrap-telegram
+          test ! -e "$stage"
+          mkdir -m 700 "$stage"
+          python3 operations/infra/vps/f32/prepare_channel.py pack approved-source "$stage/source.json"
+          for name in prepare_channel.py prepare_fixed_release.sh acc-prepare-fixed.service acc-prepare-fixed.path enable_prepare_channel.sh; do
+            cp "operations/infra/vps/f32/$name" "$stage/$name"
+          done
+          echo BOOTSTRAP_FILES_READY
+          for attempt in $(seq 1 900); do
+            test ! -f "$stage/operator.ready" || break
+            sleep 2
+          done
+          test -f "$stage/operator.ready"
+          printf 'prepare-59d1260\n' > "$stage/request"
+          for attempt in $(seq 1 2400); do
+            receipt=/var/lib/acc-telegram-prepare-receipt/status
+            if test -f "$receipt"; then
+              if grep -q FAILED "$receipt" || grep -q Reconciliation "$receipt"; then
+                cat "$receipt"
+                exit 1
+              fi
+              if python3 -c 'import json,sys;p=json.load(open(sys.argv[1]));assert p["revision"]=="59d12601ea28475264a18e44c6f1ead0ff5e548f";assert p["go_live"] is False;print(p)' "$receipt" 2>/dev/null; then
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          echo 'Preparation unconfirmed; inspect protected operator log. Do not retry blindly.'
+          exit 1
