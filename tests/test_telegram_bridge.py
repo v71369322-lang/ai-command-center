@@ -92,11 +92,15 @@ def test_telegram_full_mock_http_cycle(bridge, store, queue, client, headers):
     event = json.loads(queue.rpop("f1:work"))
     Runner(store).execute(store.claim(event["task_id"]))
     assert store.get(first["task_id"])["state"] == "SUCCEEDED"
+    service.receive(message(100, '/status ' + first['task_id']))
+    service.receive(message(101, '/tasks'))
     service.poll_once()
     before = len(fake.sent)
     service.poll_once()
     assert len(fake.sent) == before
     assert any("Результат независимо проверен" in m["text"] for m in fake.sent)
+    assert any('Подробнее: /status ' + first['task_id'] in m['text']
+               and 'Результат независимо проверен' in m['text'] for m in fake.sent)
     assert all(
         "Работа по реальной бизнес-задаче не выполнялась" in m["text"]
         for m in fake.sent
