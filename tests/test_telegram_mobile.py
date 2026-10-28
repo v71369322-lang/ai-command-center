@@ -8,12 +8,14 @@ import threading
 import time
 
 import httpx
+import json
 from playwright.sync_api import sync_playwright, expect
 import pytest
 import uvicorn
 
 from command_center.api import create_app
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
+from command_center.store import digest
 
 OWNER = 1234567
 PUBLIC = {role: f"public-telegram-browser-{role}-fixture-only" for role in ("owner", "operator", "agent")}
@@ -176,3 +178,28 @@ def test_telegram_owner_data_disappears_on_logout_and_operator_cannot_read(setti
         login(page, "operator")
         expect(page.get_by_role("region", name="Telegram", exact=True).get_by_role("alert")).to_be_visible()
         assert page.get_by_text("Owner-only synthetic request", exact=True).count() == 0
+
+
+@pytest.mark.parametrize('mode', ['http_mock', 'live'])
+def test_mobile_displays_scoped_service_evidence_and_stop(settings, store, monkeypatch, mode):
+    # Synthetic audit fixture validates presentation only, not real Bot API connectivity.
+    approved = {'mode': mode, 'bot_id': 123456789, 'owner_id': OWNER, 'connection_digest': 'a' * 64}
+    monkeypatch.setenv('F1_TELEGRAM_SCOPE', json.dumps(approved))
+    profile = digest({'mode': mode, 'bot_id': approved['bot_id'], 'owner': OWNER})
+    with store.transaction() as session:
+        store.audit(session, 'telegram_service_heartbeat', 'telegram_service', profile=profile,
+                    bot_id=approved['bot_id'], connection_digest=approved['connection_digest'])
+    with mobile(settings, 320) as (page, _):
+        login(page)
+        panel = page.get_by_role('region', name='Telegram', exact=True)
+        message = ('Тестовый HTTP-адаптер. Настоящий бот не подключён.' if mode == 'http_mock'
+                   else 'Бот подключён; обработчик получает сообщения.')
+        expect(panel.get_by_text(message, exact=True)).to_be_visible()
+        assert panel.locator('input,textarea').count() == 0
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        with store.transaction() as session:
+            store.audit(session, 'telegram_service_stopped', 'telegram_service', profile=profile)
+        panel.get_by_role('button', name='Обновить Telegram', exact=True).click()
+        expected = ('Тестовый HTTP-адаптер. Настоящий бот не подключён.' if mode == 'http_mock'
+                    else 'Обработчик Telegram остановлен.')
+        expect(panel.get_by_text(expected, exact=True)).to_be_visible()

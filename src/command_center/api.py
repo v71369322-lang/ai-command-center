@@ -1,5 +1,6 @@
 import hmac
 import json
+import os
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -384,10 +385,10 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.get('/api/telegram/status')
     def telegram_status(role=Depends(identity)):
+        from .telegram_health import status
         if role != 'owner':
             raise Denied('owner_required')
-        return {'mode': 'disabled', 'live_connected': False, 'voice_enabled': False,
-                'description': 'Synthetic HTTP-mock bridge is tested separately; no real bot is configured.'}
+        return status(store, os.environ.get('F1_TELEGRAM_SCOPE', ''))
 
     @app.get('/api/telegram/requests')
     def telegram_requests(role=Depends(identity)):

@@ -47,7 +47,7 @@ def restored_fingerprints(dump, runtime):
     def run(*args, data=None):
         return command(runtime, *args, data=data)
     try:
-        run('run', '-d', '--name', name, '--label=acc.scope=telegram-migration-restore',
+        run('run', '-d', '--pull=never', '--name', name, '--label=acc.scope=telegram-migration-restore',
                 '--network=none', '--read-only', '--user=999:999',
                 '--cap-drop=ALL', '--security-opt=no-new-privileges', '--memory=512m', '--cpus=.5',
                 '--pids-limit=128', '--tmpfs=/tmp:size=16m,uid=999,gid=999',

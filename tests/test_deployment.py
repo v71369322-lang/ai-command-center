@@ -61,6 +61,87 @@ def test_password_profile_is_explicit_and_api_only(release):
         validate_manifest(m)
 
 
+def telegram_release(release):
+    bundle, _ = release
+    m = copy.deepcopy(bundle['manifest'])
+    m['telegram'] = {'mode': 'live', 'owner_id': 1234567, 'bot_id': 123456789,
+                     'connection_digest': 'c' * 64}
+    env = dict(os.environ, F1_SOURCE_REVISION='a' * 40, F1_DOCKER_GID='0')
+    base = json.loads(subprocess.check_output(['docker', 'compose', '--profile', 'worker', '-f',
+        str(Path(m['source_root']) / 'compose.yaml'), 'config', '--format', 'json'], env=env))
+    return m, render(base, m)
+
+
+def test_telegram_profile_is_explicit_db_only_and_default_stays_closed(release):
+    m, profile = telegram_release(release)
+    service = profile['services']['telegram']
+    assert service['secrets'] == ['db_password'] and service['restart'] == 'no'
+    assert not service.get('ports') and not service.get('privileged')
+    assert all('docker.sock' not in v['source'] for v in service['volumes'])
+    assert set(service['environment']) == {'F1_SOURCE_REVISION', 'F1_DB_USER', 'F1_DB_HOST', 'F1_DB_PASSWORD_FILE'}
+    assert json.loads(profile['services']['api']['environment']['F1_TELEGRAM_SCOPE']) == m['telegram']
+    assert 'telegram' not in release[0]['compose']['services']
+
+
+@pytest.mark.parametrize('attack', ['socket', 'ports', 'network', 'secrets', 'cpu', 'memory', 'pids', 'restart', 'command', 'scope'])
+def test_telegram_profile_rejects_extra_authority_and_unbounded_resources(release, attack):
+    m, p = telegram_release(release)
+    t = p['services']['telegram']
+    if attack == 'socket':
+        t['volumes'].append({'source': '/var/run/docker.sock', 'target': '/var/run/docker.sock'})
+    elif attack == 'ports':
+        t['ports'] = ['8001:8001']
+    elif attack == 'network':
+        t['networks']['access'] = None
+    elif attack == 'secrets':
+        t['secrets'].append('db_admin_password')
+    elif attack == 'cpu':
+        t['cpus'] = 4
+    elif attack == 'memory':
+        t['mem_limit'] = '8g'
+    elif attack == 'pids':
+        t['pids_limit'] = 99999
+    elif attack == 'restart':
+        t['restart'] = 'always'
+    elif attack == 'command':
+        t['command'] = ['sh']
+    else:
+        p['services']['api']['environment']['F1_TELEGRAM_SCOPE'] = '{}'
+    with pytest.raises(ValueError):
+        validate_profile(p, m)
+
+
+def test_telegram_release_rejects_mock_or_extra_manifest_scope(release):
+    m, _ = telegram_release(release)
+    for value in ({**m['telegram'], 'mode': 'http_mock'}, {**m['telegram'], 'endpoint': 'https://other.invalid'}):
+        with pytest.raises(ValueError, match='telegram_release_binding_invalid'):
+            validate_manifest({**m, 'telegram': value})
+
+
+def test_disabling_telegram_stops_previous_poller_and_blocks_unconfirmed_stop(release, tmp_path):
+    m, old_profile = telegram_release(release)
+    directory = tmp_path / 'telegram-old'
+    directory.mkdir(mode=0o700)
+    old = {'manifest': m, 'compose': old_profile}
+    atomic_json(directory / 'bundle.json', old)
+    atomic_json(directory / 'compose.json', old_profile)
+    atomic_json(Path(m['data_root']) / 'deployment.json', {
+        'phase': 'VERIFIED', 'bundle': checksum(old), 'directory': str(directory)})
+
+    class StubbornEngine(FakeEngine):
+        def run(self, *args, **kwargs):
+            super().run(*args, **kwargs)
+            return b'container-still-running' if args[0] == 'ps' else b''
+
+    engine = StubbornEngine()
+    target, target_dir = release
+    controller = Deployment(target, target_dir, engine, engine)
+    with pytest.raises(ValueError, match='stop_unconfirmed'):
+        controller.pause_telegram()
+    assert str(directory / 'compose.json') in engine.calls[0] and engine.calls[0][-2:] == ('stop', 'telegram')
+    assert not any('up' in c for c in engine.calls)
+
+
 class FakeEngine:
     def __init__(self):
         self.calls = []
