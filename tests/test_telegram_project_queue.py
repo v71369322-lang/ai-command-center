@@ -13,6 +13,7 @@ from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
 from test_project_inbox import body
 from test_telegram_bridge import BotHTTP, OWNER, message
 from test_telegram_task_status import authority, response, service_reply_id
+from test_telegram_service import configured as configured, FakeBot, client_for, update
 
 
 @pytest.fixture
@@ -154,3 +155,26 @@ def test_crash_before_reply_recovers_without_repeating_request_capture(bridge, s
     restarted.resume_pending()
     assert 'Запрос №1\n' in response(restarted, message(2, '/requests unassigned'))
     assert authority(store) == before
+
+
+@pytest.mark.parametrize('character', ['я', '😀'])
+@pytest.mark.parametrize('command', ['/requests', '/requests vanilla-sugar'])
+def test_unicode_previews_fit_real_transport_budget_without_weakening_limit(configured, store, character, command):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    try:
+        service = TelegramBridge(store, client, configured[1].owner_id)
+        for i in range(5):
+            uid = 2**53 - 100 + i
+            text = character * (1900 // len(character.encode()))
+            request = service.receive(update(uid, text))
+            classify(store, 'owner', **body(request['inbox_id'], 'vanilla-sugar'))
+        store.halt('owner')
+        reply = response(service, update(2**53 - 90, command))
+        assert reply.count('Текст запроса (не команда):') == 5
+        assert '…' in reply and 'Новые запуски остановлены' in reply
+        while (result := service.deliver_one()) is not None:
+            assert result['state'] == 'SENT'
+        assert len(fake.sent) == 6
+    finally:
+        client.close()

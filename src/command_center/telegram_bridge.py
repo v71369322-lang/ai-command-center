@@ -293,13 +293,17 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                 if row.state != 'RECEIVED':
                     raise Denied('telegram_query_not_pending')
+                suffix = '\n\nРабота по реальной бизнес-задаче не выполнялась.'
+                control = session.get(Control, 1)
+                if control.halted or control.recovery:
+                    suffix += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
                 if kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
                     reply += '\n/assign номер project-id версия — выбрать проект; none — снять назначение. '
                     reply += 'Номер и текущая версия: /request номер. AI-разработка проектов не подключена.'
                 elif kind in {'requests', 'request'}:
-                    reply = request_reply(self, session, intent)
+                    reply = request_reply(self, session, intent, suffix=suffix)
                 else:
                     # Scope is derived from the durable F1 request key, never from a
                     # supplied UUID alone or a mutable inbox task_id link alone.
@@ -318,11 +322,7 @@ class TelegramBridge:
                     else:
                         reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
                         reply += '\n\n'.join(self.task_summary(session, task) for task in tasks)
-                reply += '\n\nРабота по реальной бизнес-задаче не выполнялась.'
-                control = session.get(Control, 1)
-                if control.halted or control.recovery:
-                    reply += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
-                self.finish(session, iid, reply)
+                self.finish(session, iid, reply + suffix)
         else:
             with self.store.transaction() as session:
                 self.store.check_audit(session)

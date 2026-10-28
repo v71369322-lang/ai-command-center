@@ -3,7 +3,7 @@
 from sqlalchemy import select
 
 from .models import Audit, TelegramInbox
-from .store import Denied, digest
+from .store import Denied, canonical, digest
 
 
 def captured_text(session, row):
@@ -65,7 +65,7 @@ def projects_reply(bridge, session):
             'Ожидают планирования; выполнение не запускалось.\n\n' + '\n\n'.join(parts))
 
 
-def request_reply(bridge, session, intent):
+def request_reply(bridge, session, intent, *, suffix=''):
     """Called under the existing admission/audit lock after audit validation."""
     query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
         TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
@@ -99,14 +99,22 @@ def request_reply(bridge, session, intent):
     if not selected:
         return ('Сохранённых запросов в этом Telegram-подключении пока нет.' if intent['kind'] == 'requests'
                 else 'Запрос не найден среди сохранённых запросов этого Telegram-подключения.')
-    parts = []
-    for row, value, pid, version in selected:
-        number = row.id.removeprefix(bridge.profile + ':')
-        project_label = dict(PROJECTS).get(pid, 'Не распределён')
-        if intent['kind'] == 'requests':
-            preview = ' '.join(value.split())
-            value = preview[:160] + ('…' if len(preview) > 160 else '')
-        parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
-                     f'Проект: {project_label}. Версия назначения: {version}.\n'
-                     f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')
-    return header + '\n\n'.join(parts)
+    # Transport limits apply to escaped JSON bytes as well as text characters.
+    # Shrink previews only; keep request numbers, labels and safety notices.
+    widths = range(160, -1, -16) if intent['kind'] == 'requests' else (None,)
+    for width in widths:
+        parts = []
+        for row, value, pid, version in selected:
+            number = row.id.removeprefix(bridge.profile + ':')
+            project_label = dict(PROJECTS).get(pid, 'Не распределён')
+            if width is not None:
+                preview = ' '.join(value.split())
+                value = preview[:width] + ('…' if len(preview) > width else '')
+            parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
+                         f'Проект: {project_label}. Версия назначения: {version}.\n'
+                         f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')
+        reply = header + '\n\n'.join(parts)
+        full = reply + suffix
+        if len(full) <= 4096 and len(canonical({'chat_id': bridge.owner, 'text': full}).encode()) <= 8192:
+            return reply
+    raise Denied('telegram_saved_reply_size')
