@@ -52,6 +52,18 @@ LOW rule блокируют verify_cloud.sh. Для текущих LOW rule вы
   и не объявляют success; исполнение останавливается, evidence удерживается.
 - B105: boolean `admin_db_secret_mounted: False` — факт проверки mounts, не пароль.
 
+Последующая итерация bounded operations добавляет в тот же scan также
+`infra/vps/operations`, без расширения списка разрешённых LOW rules. Subprocess
+там ограничены fixed argv Git/OpenSSL/systemd и test-only UID proof. Enrollment
+проверяет Git commit/tree/blob identities и выполняет Git как unprivileged runner.
+SHA-1 с usedforsecurity=False используется только как формат Git object ID;
+владельческое разрешение дополнительно фиксирует SHA-256 bootstrap/catalog.
+Private receipt key создаётся как acc-control; root не запускает его Python venv.
+Результаты операций подписываются стандартным Ed25519, проверяются cryptography
+и OpenSSL. Ключ не доступен runner, API или coding executor. Shared host/daemon
+compromise не исключён этой схемой. Полномочия и resource limits описаны в
+[BOUNDED_OPERATIONS_CHANNEL.md](../infrastructure/BOUNDED_OPERATIONS_CHANNEL.md).
+
 SQL interlock строится через psycopg.sql.SQL/Literal, не через конкатенацию
 неэкранированных данных. Полный набор LOW наблюдений не удаляется из отчёта.
 Это triage текущего кода, а не независимое security certification.
