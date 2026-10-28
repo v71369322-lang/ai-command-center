@@ -17,10 +17,12 @@ import httpx
 from command_center.store import Store
 from command_center.telegram_service import TelegramService, service_settings
 from command_center.telegram_transport import ConfiguredTelegramHTTP, connection
+from command_center.telegram_menu import BUTTONS, keyboard
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
 sent=[]
+menus=[]
 def handle(request):
     method=request.url.path.rsplit('/',1)[-1]
     body=json.loads(request.content)
@@ -33,7 +35,7 @@ def handle(request):
         values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
                 '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1',
                 '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all',
-                '/coding_plan','/coding_demo']
+                '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS]]
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -41,6 +43,8 @@ def handle(request):
     elif method=='sendMessage':
         assert body['chat_id']==owner
         sent.append(body['text'])
+        if 'reply_markup' in body:
+            menus.append(body['reply_markup'])
         result={'message_id':len(sent),'date':1700000000,'chat':{'id':owner,'type':'private'}}
     else: raise AssertionError('unexpected method')
     return httpx.Response(200,json={'ok':True,'result':result})
@@ -52,12 +56,13 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==16
+    assert calls.count('sendMessage')==21
+    assert menus==[keyboard(),keyboard()]
     assert any('пока нет' in value for value in sent)
     assert any('не найдена' in value for value in sent)
     assert any('Запрос №1 сохранён' in value for value in sent)
     assert sum('Текст запроса (не команда):' in value and 'Synthetic container service request' in value
-               for value in sent)==5
+               for value in sent)==6
     assert any('Проект: LNAuto. Версия назначения: 1' in value for value in sent)
     assert any('LNAuto: 1\n/requests lnauto' in value for value in sent)
     assert any('Очередь: LNAuto. Ожидают планирования: 1.' in value for value in sent)
@@ -76,7 +81,8 @@ try:
     assert [r['checks']['passed'] for r in coding_task['coding']['test_runs']]==[False,True]
     assert coding_task['coding']['pr']['published'] is False and coding_task['coding']['pr']['url'] is None
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':12,'project_assignments':1,
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':17,'project_assignments':1,
+        'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'coding_task_id':task_id,'coding_repair_checks':[False,True],'mock_pr_published':False,
         'actual_telegram_contacted':False}))
 finally:
