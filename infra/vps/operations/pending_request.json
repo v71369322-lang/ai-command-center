@@ -1,0 +1,13 @@
+{
+  "receipt_public_key": "DRyCPa1vwsughFY9Tz433RKnLgL2k/Ns3N4jwTRG3S8=",
+  "request": {
+    "action": "status",
+    "expected_bundle": "0ee8a6023296fdacfe632c2f364c488b2564db399bfd15af357812e41004d64b",
+    "expires_at": 1793213249,
+    "issued_at": 1793212349,
+    "operation_id": "e89370ed-7afb-4b89-b326-451f75456e36",
+    "policy_digest": "fcab87067bc7486179b49d889e67bd3a0bcb3ee07a7c70e8abb26fdcd928e534",
+    "schema": 1,
+    "target_bundle": "0ee8a6023296fdacfe632c2f364c488b2564db399bfd15af357812e41004d64b"
+  }
+}
