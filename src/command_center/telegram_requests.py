@@ -29,27 +29,79 @@ def capture_receipt(inbox_id):
             'Ожидает планирования. AI-планирование ещё не подключено; бизнес-действия не выполнялись.')
 
 
-def request_reply(bridge, session, intent):
-    """Called under the existing admission/audit lock after audit validation."""
-    query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
-        TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
-    if intent['kind'] == 'request':
-        query = query.where(TelegramInbox.id == bridge.profile + ':' + intent['number'])
-    rows = session.execute(query.order_by(TelegramInbox.created_at.desc(), TelegramInbox.id.desc()).limit(5)).scalars().all()
-    if not rows:
-        return ('Сохранённых запросов в этом Telegram-подключении пока нет.' if intent['kind'] == 'requests'
-                else 'Запрос не найден среди сохранённых запросов этого Telegram-подключения.')
-    from .project_inbox import history, PROJECTS
+def project_queue(bridge, session, project='all'):
+    """Profile-scoped, validated queue under the caller's existing audit lock."""
+    from .project_inbox import IDS, PROJECTS, history
+    if project not in IDS | {'all', 'unassigned'}:
+        raise Denied('telegram_project_filter_invalid')
     assigned, _ = history(session)
-    parts = []
+    rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
+        TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
+        .order_by(TelegramInbox.created_at.desc(), TelegramInbox.id.desc()).limit(1001)).scalars().all()
+    if len(rows) > 1000:
+        raise Denied('telegram_inbox_capacity')
+    counts = dict.fromkeys(['unassigned', *[key for key, _ in PROJECTS]], 0)
+    selected = []
     for row in rows:
-        number = row.id.removeprefix(bridge.profile + ':')
         value = captured_text(session, row)
         bridge.check_text(value)
         selection = assigned.get(row.id)
         if selection and selection['request_fingerprint'] != row.fingerprint:
             raise Denied('project_request_binding_changed')
         pid, version = (selection['project_id'], selection['version']) if selection else (None, 0)
+        key = pid or 'unassigned'
+        counts[key] += 1
+        if (project == 'all' or project == key) and len(selected) < 5:
+            selected.append((row, value, pid, version))
+    return selected, counts
+
+
+def projects_reply(bridge, session):
+    from .project_inbox import PROJECTS
+    _, counts = project_queue(bridge, session)
+    parts = [f'{label}: {counts[key]}\n/requests {key}' for key, label in PROJECTS]
+    parts.append(f'Не распределены: {counts["unassigned"]}\n/requests unassigned')
+    return (f'Сохранённые запросы этого Telegram-подключения: {sum(counts.values())}.\n'
+            'Ожидают планирования; выполнение не запускалось.\n\n' + '\n\n'.join(parts))
+
+
+def request_reply(bridge, session, intent):
+    """Called under the existing admission/audit lock after audit validation."""
+    query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
+        TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
+    if intent['kind'] == 'request':
+        query = query.where(TelegramInbox.id == bridge.profile + ':' + intent['number'])
+    from .project_inbox import history, PROJECTS
+    if intent['kind'] == 'requests':
+        project = intent.get('project', 'all')
+        selected, counts = project_queue(bridge, session, project)
+        if project != 'all':
+            label = dict(PROJECTS).get(project, 'Не распределены')
+            header = f'Очередь: {label}. Ожидают планирования: {counts[project]}.\n\n'
+            if not selected:
+                return header + 'Сохранённых запросов этого проекта в этом Telegram-подключении пока нет.'
+            header += 'Последние запросы (до 5):\n\n'
+        else:
+            header = 'Последние сохранённые запросы (до 5):\n\n'
+    else:
+        rows = session.execute(query.limit(1)).scalars().all()
+        assigned, _ = history(session)
+        selected = []
+        for row in rows:
+            value = captured_text(session, row)
+            bridge.check_text(value)
+            selection = assigned.get(row.id)
+            if selection and selection['request_fingerprint'] != row.fingerprint:
+                raise Denied('project_request_binding_changed')
+            pid, version = (selection['project_id'], selection['version']) if selection else (None, 0)
+            selected.append((row, value, pid, version))
+        header = ''
+    if not selected:
+        return ('Сохранённых запросов в этом Telegram-подключении пока нет.' if intent['kind'] == 'requests'
+                else 'Запрос не найден среди сохранённых запросов этого Telegram-подключения.')
+    parts = []
+    for row, value, pid, version in selected:
+        number = row.id.removeprefix(bridge.profile + ':')
         project_label = dict(PROJECTS).get(pid, 'Не распределён')
         if intent['kind'] == 'requests':
             preview = ' '.join(value.split())
@@ -57,4 +109,4 @@ def request_reply(bridge, session, intent):
         parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
                      f'Проект: {project_label}. Версия назначения: {version}.\n'
                      f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')
-    return ('Последние сохранённые запросы (до 5):\n\n' if intent['kind'] == 'requests' else '') + '\n\n'.join(parts)
+    return header + '\n\n'.join(parts)

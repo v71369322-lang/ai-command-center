@@ -131,6 +131,12 @@ class TelegramBridge:
             return str(uid), {'kind': 'tasks'}
         if value == '/requests':
             return str(uid), {'kind': 'requests'}
+        if value.split()[:1] == ['/requests']:
+            from .project_inbox import IDS
+            parts = value.split()
+            if len(parts) != 2 or parts[1] not in IDS | {'all', 'unassigned'}:
+                raise Denied('telegram_project_filter_invalid')
+            return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
         if value.startswith('/assign '):
@@ -288,8 +294,8 @@ class TelegramBridge:
                 if row.state != 'RECEIVED':
                     raise Denied('telegram_query_not_pending')
                 if kind == 'projects':
-                    from .project_inbox import PROJECTS
-                    reply = 'Проекты:\n' + '\n'.join(key + ' — ' + label for key, label in PROJECTS)
+                    from .telegram_requests import projects_reply
+                    reply = projects_reply(self, session)
                     reply += '\n/assign номер project-id версия — выбрать проект; none — снять назначение. '
                     reply += 'Номер и текущая версия: /request номер. AI-разработка проектов не подключена.'
                 elif kind in {'requests', 'request'}:
@@ -334,7 +340,8 @@ class TelegramBridge:
                     self.enqueue(session, iid + ':reply', capture_receipt(iid))
                 else:
                     self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; '
-                        '/requests — сохранённые запросы; /request номер — открыть запрос; '
+                        '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
+                        '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
                         'Голос и реальные AI пока отключены.')
