@@ -32,7 +32,7 @@ done
 python3.12 /usr/local/libexec/acc-telegram-prepare-channel.py hydrate \
   /var/lib/acc-telegram-source-handoff/source.json "$base/source"
 cd "$base/source"
-test "$(git rev-parse HEAD)" = 59d12601ea28475264a18e44c6f1ead0ff5e548f
+test "$(git rev-parse HEAD)" = a994de96c2f9656f1d766a849e63a6836e21ef65
 test "$(git -C /home/acc-control/f31/source rev-parse HEAD)" = 4cc6ec46bf461d65958f013bb23ac2234b9a7fd3
 test -z "$(git -C /home/acc-control/f31/source status --porcelain)"
 cmp requirements.lock /home/acc-control/f31/source/requirements.lock

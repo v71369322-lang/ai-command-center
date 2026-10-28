@@ -19,7 +19,7 @@ jobs:
           path: operations
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 59d12601ea28475264a18e44c6f1ead0ff5e548f
+          ref: a994de96c2f9656f1d766a849e63a6836e21ef65
           persist-credentials: false
           path: approved-source
       - name: Stage non-secret source and wait for administrator handoff
@@ -40,7 +40,7 @@ jobs:
             sleep 2
           done
           test -f "$stage/operator.ready"
-          printf 'prepare-59d1260\n' > "$stage/request"
+          printf 'prepare-a994de9\n' > "$stage/request"
           for attempt in $(seq 1 2400); do
             receipt=/var/lib/acc-telegram-prepare-receipt/status
             if test -f "$receipt"; then
@@ -48,7 +48,7 @@ jobs:
                 cat "$receipt"
                 exit 1
               fi
-              if python3 -c 'import json,sys;p=json.load(open(sys.argv[1]));assert p["revision"]=="59d12601ea28475264a18e44c6f1ead0ff5e548f";assert p["go_live"] is False;print(p)' "$receipt" 2>/dev/null; then
+              if python3 -c 'import json,sys;p=json.load(open(sys.argv[1]));assert p["revision"]=="a994de96c2f9656f1d766a849e63a6836e21ef65";assert p["go_live"] is False;print(p)' "$receipt" 2>/dev/null; then
                 exit 0
               fi
             fi

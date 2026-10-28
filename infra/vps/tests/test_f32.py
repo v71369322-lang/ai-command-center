@@ -21,7 +21,7 @@ def test_telegram_update_exact_source(tmp_path):
     packet = tmp_path / 'packet.json'
     channel.pack(SOURCE, packet)
     channel.hydrate(packet, tmp_path / 'source')
-    assert channel.REVISION == '59d12601ea28475264a18e44c6f1ead0ff5e548f'
+    assert channel.REVISION == 'a994de96c2f9656f1d766a849e63a6836e21ef65'
     assert channel.git(tmp_path / 'source', 'rev-parse', 'HEAD').decode().strip() == channel.REVISION
     assert channel.git(tmp_path / 'source', 'status', '--porcelain') == b''
 
@@ -67,6 +67,6 @@ def test_telegram_preparation_is_bound_to_verified_password_receipt():
     p = (ROOT / 'f32/prepare_fixed_release.sh').read_text()
     assert '1e151b2953b6debb4bb05096fba20aa6c740665015f31479a50fd25c6ef80106' in p
     assert '4cc6ec46bf461d65958f013bb23ac2234b9a7fd3' in p
-    assert '59d12601ea28475264a18e44c6f1ead0ff5e548f' in p
+    assert 'a994de96c2f9656f1d766a849e63a6836e21ef65' in p
     assert '--telegram-connection-digest' not in p
     assert 'telegram_transition' not in p

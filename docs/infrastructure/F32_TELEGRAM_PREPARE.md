@@ -1,7 +1,7 @@
 # F32: prepare-only disabled Telegram release
 
-Application: PR #24, 59d12601ea28475264a18e44c6f1ead0ff5e548f.
-Successful CI: https://github.com/v71369322-lang/ai-command-center/actions/runs/40629843975.
+Application: PR #24, a994de96c2f9656f1d766a849e63a6836e21ef65.
+Successful CI: https://github.com/v71369322-lang/ai-command-center/actions/runs/40633584668.
 Operational base: F31 trigger 4ecbfa666324d630244df291cca3b976db13d1fe.
 
 This separate channel delivers only the reviewed source and builds/prepares a

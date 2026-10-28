@@ -1,5 +1,5 @@
 [Unit]
-Description=Prepare only the approved ACC 59d1260 disabled Telegram release
+Description=Prepare only the approved ACC a994de9 disabled Telegram release
 StartLimitIntervalSec=3600
 StartLimitBurst=2
 
