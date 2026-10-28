@@ -86,7 +86,7 @@ def inbox(store, role, project='all'):
                 'ai_planning_connected': False}
 
 
-def classify(store, role, request_id, project_id, expected_version, operation_id):
+def classify(store, role, request_id, project_id, expected_version, operation_id, *, _scope_installer=None):
     owner(role)
     if project_id is not None and (not isinstance(project_id, str) or project_id not in IDS):
         raise Denied('unknown_project')
@@ -104,6 +104,8 @@ def classify(store, role, request_id, project_id, expected_version, operation_id
         if previous:
             if previous['input_hash'] != fingerprint or previous['request_fingerprint'] != row.fingerprint:
                 raise Denied('project_assignment_idempotency_conflict')
+            if _scope_installer:
+                _scope_installer(session, previous)
             return receipt(previous)
         current = latest.get(row.id)
         if current and current['request_fingerprint'] != row.fingerprint:
@@ -115,6 +117,8 @@ def classify(store, role, request_id, project_id, expected_version, operation_id
         event = {'request_id': row.id, 'request_fingerprint': row.fingerprint, 'project_id': project_id,
                  'version': expected_version + 1, 'operation_id': operation_id, 'input_hash': fingerprint}
         store.audit(session, EVENT, 'owner', **event)
+        if _scope_installer:
+            _scope_installer(session, event)
         return receipt(event)
 
 

@@ -39,14 +39,22 @@ def request_reply(bridge, session, intent):
     if not rows:
         return ('Сохранённых запросов в этом Telegram-подключении пока нет.' if intent['kind'] == 'requests'
                 else 'Запрос не найден среди сохранённых запросов этого Telegram-подключения.')
+    from .project_inbox import history, PROJECTS
+    assigned, _ = history(session)
     parts = []
     for row in rows:
         number = row.id.removeprefix(bridge.profile + ':')
         value = captured_text(session, row)
         bridge.check_text(value)
+        selection = assigned.get(row.id)
+        if selection and selection['request_fingerprint'] != row.fingerprint:
+            raise Denied('project_request_binding_changed')
+        pid, version = (selection['project_id'], selection['version']) if selection else (None, 0)
+        project_label = dict(PROJECTS).get(pid, 'Не распределён')
         if intent['kind'] == 'requests':
             preview = ' '.join(value.split())
             value = preview[:160] + ('…' if len(preview) > 160 else '')
         parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
+                     f'Проект: {project_label}. Версия назначения: {version}.\n'
                      f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')
     return ('Последние сохранённые запросы (до 5):\n\n' if intent['kind'] == 'requests' else '') + '\n\n'.join(parts)

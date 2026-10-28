@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import secrets
-from uuid import UUID
+from uuid import UUID, uuid5, NAMESPACE_URL
 
 import httpx
 from sqlalchemy import select, func
@@ -131,6 +131,17 @@ class TelegramBridge:
             return str(uid), {'kind': 'tasks'}
         if value == '/requests':
             return str(uid), {'kind': 'requests'}
+        if value == '/projects':
+            return str(uid), {'kind': 'projects'}
+        if value.startswith('/assign '):
+            from .project_inbox import IDS
+            parts = value.split()
+            if (len(parts) != 4 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53 or parts[2] not in IDS | {'none'}
+                    or not re.fullmatch(r'0|[1-9][0-9]{0,3}', parts[3]) or int(parts[3]) > 1000):
+                raise Denied('telegram_project_assignment_invalid')
+            return str(uid), {'kind': 'assign', 'number': parts[1],
+                             'project_id': None if parts[2] == 'none' else parts[2], 'version': int(parts[3])}
         if value.startswith('/request '):
             number = value[9:]
             if not re.fullmatch(r'0|[1-9][0-9]{0,15}', number) or int(number) >= 2**53:
@@ -142,7 +153,7 @@ class TelegramBridge:
             except ValueError:
                 raise Denied('telegram_task_id_invalid') from None
             return str(uid), {'kind': 'status', 'task_id': task_id}
-        if value in {'/start', '/help', '/status', '/request'}:
+        if value in {'/start', '/help', '/status', '/request', '/assign'}:
             return str(uid), {'kind': 'help'}
         captured = value.removeprefix('/task ')
         if not captured.strip():
@@ -254,7 +265,21 @@ class TelegramBridge:
         elif kind == 'stop':
             self.store.halt('owner', _scope_installer=lambda session, control:
                             self.finish(session, iid, 'Новые запуски остановлены; активные исполнения требуют сверки.'))
-        elif kind in {'tasks', 'status', 'requests', 'request'}:
+        elif kind == 'assign':
+            from .project_inbox import classify, PROJECTS
+            def confirm(session, event):
+                self.guard()
+                row = session.get(TelegramInbox, iid)
+                if row.state == 'DONE':
+                    return
+                if row.state != 'RECEIVED':
+                    raise Denied('telegram_assignment_not_pending')
+                label = dict(PROJECTS).get(event['project_id'], 'Не распределён')
+                self.finish(session, iid, f'Запрос №{intent["number"]}: {label}. Версия назначения {event["version"]}. '
+                            'Выбор проекта сохранён; выполнение не запускалось.')
+            classify(self.store, 'owner', self.profile + ':' + intent['number'], intent['project_id'],
+                     intent['version'], str(uuid5(NAMESPACE_URL, 'acc:telegram-project:' + iid)), _scope_installer=confirm)
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -262,7 +287,12 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                 if row.state != 'RECEIVED':
                     raise Denied('telegram_query_not_pending')
-                if kind in {'requests', 'request'}:
+                if kind == 'projects':
+                    from .project_inbox import PROJECTS
+                    reply = 'Проекты:\n' + '\n'.join(key + ' — ' + label for key, label in PROJECTS)
+                    reply += '\n/assign номер project-id версия — выбрать проект; none — снять назначение. '
+                    reply += 'Номер и текущая версия: /request номер. AI-разработка проектов не подключена.'
+                elif kind in {'requests', 'request'}:
                     reply = request_reply(self, session, intent)
                 else:
                     # Scope is derived from the durable F1 request key, never from a
@@ -305,6 +335,7 @@ class TelegramBridge:
                 else:
                     self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /request номер — открыть запрос; '
+                        '/projects — проекты и назначение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
                         'Голос и реальные AI пока отключены.')
         with self.store.transaction() as session:
