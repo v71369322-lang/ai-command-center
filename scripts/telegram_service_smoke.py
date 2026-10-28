@@ -20,6 +20,7 @@ from command_center.telegram_transport import ConfiguredTelegramHTTP, connection
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
+sent=[]
 def handle(request):
     method=request.url.path.rsplit('/',1)[-1]
     body=json.loads(request.content)
@@ -29,12 +30,15 @@ def handle(request):
     elif method=='getWebhookInfo':
         result={'url':'','has_custom_certificate':False,'pending_update_count':0}
     elif method=='getUpdates':
-        result=[] if body['offset']>1 else [{'update_id':1,'message':{
-            'message_id':101,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
-            'chat':{'id':owner,'type':'private'},'text':'Synthetic container service request'}}]
+        values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001']
+        result=[{'update_id':i,'message':{
+            'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
+            'chat':{'id':owner,'type':'private'},'text':value}}
+            for i,value in enumerate(values,1) if i>=body['offset']]
     elif method=='sendMessage':
         assert body['chat_id']==owner
-        result={'message_id':1,'date':1700000000,'chat':{'id':owner,'type':'private'}}
+        sent.append(body['text'])
+        result={'message_id':len(sent),'date':1700000000,'chat':{'id':owner,'type':'private'}}
     else: raise AssertionError('unexpected method')
     return httpx.Response(200,json={'ok':True,'result':result})
 store=Store(service_settings())
@@ -44,8 +48,10 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
 try:
     result=TelegramService(store,client,poll_seconds=0).run(max_cycles=2)
     assert result['completed_cycles']==2 and result['live_verified'] is False
-    assert calls.count('sendMessage')==1
-    print(json.dumps({'mode':'http_mock','cycles':2,'actual_telegram_contacted':False}))
+    assert calls.count('sendMessage')==3
+    assert any('пока нет' in value for value in sent)
+    assert any('не найдена' in value for value in sent)
+    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':2,'actual_telegram_contacted':False}))
 finally:
     client.close();store.engine.dispose()
 '''
@@ -107,7 +113,7 @@ def main():
                   'runtime_mode': 'CLOUD_ROOTFUL_TEST_ONLY', 'rootless_host_verified': False,
                   'connection_digest': digest(config.model_dump()), 'vps_contacted': False}
         Path('.runtime/telegram-container.json').write_text(json.dumps(report, indent=2) + '\n')
-        print('Telegram service container → actual PG → mock HTTP → durable request/reply; no socket/ports: PASS')
+        print('Telegram service container → actual PG → mock HTTP → durable request/status replies; no socket/ports: PASS')
     finally:
         removed = docker('rm', '--force', name, timeout=15)
         absent = docker('inspect', name, timeout=5)

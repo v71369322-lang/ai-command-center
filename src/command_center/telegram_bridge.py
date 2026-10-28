@@ -10,7 +10,7 @@ import httpx
 from sqlalchemy import select, func
 
 from .api import Command
-from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit
+from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit, Task
 from .store import Denied, digest
 from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
 
@@ -133,7 +133,15 @@ class TelegramBridge:
             return str(uid), {'kind': 'cancel', 'task_id': task_id}
         if value == '/stop':
             return str(uid), {'kind': 'stop'}
-        if value in {'/start', '/help'}:
+        if value == '/tasks':
+            return str(uid), {'kind': 'tasks'}
+        if value.startswith('/status '):
+            try:
+                task_id = str(UUID(value[8:]))
+            except ValueError:
+                raise Denied('telegram_task_id_invalid') from None
+            return str(uid), {'kind': 'status', 'task_id': task_id}
+        if value in {'/start', '/help', '/status'}:
             return str(uid), {'kind': 'help'}
         return str(uid), {'kind': 'capture', 'text': value.removeprefix('/task ')}
 
@@ -231,6 +239,36 @@ class TelegramBridge:
         elif kind == 'stop':
             self.store.halt('owner', _scope_installer=lambda session, control:
                             self.finish(session, iid, 'Новые запуски остановлены; активные исполнения требуют сверки.'))
+        elif kind in {'tasks', 'status'}:
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                row = session.get(TelegramInbox, iid)
+                if row.state == 'DONE':
+                    return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+                if row.state != 'RECEIVED':
+                    raise Denied('telegram_query_not_pending')
+                # Scope is derived from the durable F1 request key, never from a
+                # supplied UUID alone or a mutable inbox task_id link alone.
+                query = select(Task).join(TelegramInbox,
+                    (TelegramInbox.task_id == Task.id)
+                    & (Task.request_key == 'owner:tg:' + TelegramInbox.id)).where(
+                        TelegramInbox.profile == self.profile, TelegramInbox.state == 'DONE',
+                        TelegramInbox.intent['kind'].as_string() == 'demo',
+                        Task.owner_role == 'owner', Task.payload['kind'].as_string() == 'approved_render')
+                if kind == 'status':
+                    query = query.where(Task.id == intent['task_id'])
+                tasks = session.execute(query.order_by(Task.created_at.desc(), Task.id.desc()).limit(5)).scalars().all()
+                if not tasks:
+                    reply = ('Синтетических тестов в этом Telegram-подключении пока нет.' if kind == 'tasks'
+                             else 'Задача не найдена среди синтетических тестов этого Telegram-подключения.')
+                else:
+                    reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
+                    reply += '\n\n'.join(self.task_summary(session, task) for task in tasks)
+                reply += '\n\nРабота по реальной бизнес-задаче не выполнялась.'
+                control = session.get(Control, 1)
+                if control.halted or control.recovery:
+                    reply += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
+                self.finish(session, iid, reply)
         else:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -238,10 +276,50 @@ class TelegramBridge:
                     session.get(TelegramInbox, iid).state = 'NEEDS_PLANNING'
                     self.enqueue(session, iid + ':reply', 'Запрос сохранён. AI-планирование ещё не подключено; бизнес-действия не выполнялись.')
                 else:
-                    self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; /cancel UUID; /stop. Голос и реальные AI пока отключены.')
+                    self.finish(session, iid, 'Текст — сохранить запрос; /demo текст — синтетический тест с подтверждением; '
+                        '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
+                        'Голос и реальные AI пока отключены.')
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
             return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+
+    def confirmed_result(self, session, task):
+        return bool(task.state == 'SUCCEEDED' and isinstance(task.artifact, str)
+            and hashlib.sha256(task.artifact.encode()).hexdigest() == task.artifact_hash
+            and session.execute(select(Audit).where(
+                Audit.event['kind'].as_string() == 'verified',
+                Audit.event['task_id'].as_string() == task.id,
+                Audit.event['actor'].as_string() == 'verifier',
+                Audit.event['artifact_hash'].as_string() == task.artifact_hash,
+                Audit.event['fence'].as_integer() == task.fence,
+                Audit.event['revision'].as_string() == self.store.settings.source_revision)).first())
+
+    def task_summary(self, session, task):
+        states = {
+            'WAITING_APPROVAL': 'Ожидает отдельного подтверждения синтетического теста.',
+            'READY': 'Ожидает исполнителя.',
+            'RUNNING': 'Выполняется.',
+            'VERIFYING': 'Результат проверяется.',
+            'CANCEL_REQUESTED': 'Намерение отмены сохранено; фактическая остановка ещё не подтверждена.',
+            'CANCELLED': 'В записи задачи: отменена.',
+            'RECONCILING': 'Результат неопределён; нужна сверка. Повторный запуск не разрешён этой командой.',
+            'SECURITY_BLOCKED': 'Выполнение заблокировано проверкой безопасности.',
+            'FAILED': 'Тест не завершился успешно.',
+        }
+        summary = states.get(task.state, 'Неизвестное состояние; нужна сверка.')
+        if task.state == 'SUCCEEDED':
+            summary = ('Результат независимо проверен; SHA-256 ' + task.artifact_hash if self.confirmed_result(session, task)
+                       else 'Успех не подтверждён; нужна сверка состояния.')
+        if task.state == 'RUNNING' and (task.lease_until is None or task.lease_until <= self.store.now(session)):
+            summary = 'Lease истёк или отсутствует; текущее выполнение не подтверждено, нужна сверка.'
+        # Only fixed explanations leave the control plane: no arbitrary reason,
+        # payload, artifact, provider output, credentials or repository content.
+        reasons = {'budget_limit': 'Исчерпан лимит бюджета.', 'attempt_limit': 'Исчерпан лимит попыток.',
+                   'expired_lease': 'Истёк срок полномочий исполнителя.',
+                   'isolation_policy_mismatch': 'Изоляция исполнителя не соответствует требованиям.'}
+        if task.reason in reasons:
+            summary += ' ' + reasons[task.reason]
+        return f'Синтетический тест {task.id}\n{summary}\nПодробнее: /status {task.id}'
 
     def collect_results(self):
         with self.store.transaction() as session:
@@ -252,15 +330,7 @@ class TelegramBridge:
                 task = self.store.task(session, row.task_id)
                 if task.state in {'SUCCEEDED', 'FAILED', 'CANCELLED', 'RECONCILING', 'SECURITY_BLOCKED'}:
                     text = f'Синтетический тест {task.id}: {task.state}. '
-                    verified = (task.state == 'SUCCEEDED' and isinstance(task.artifact, str)
-                        and hashlib.sha256(task.artifact.encode()).hexdigest() == task.artifact_hash
-                        and session.execute(select(Audit).where(
-                            Audit.event['kind'].as_string() == 'verified',
-                            Audit.event['task_id'].as_string() == task.id,
-                            Audit.event['actor'].as_string() == 'verifier',
-                            Audit.event['artifact_hash'].as_string() == task.artifact_hash,
-                            Audit.event['fence'].as_integer() == task.fence,
-                            Audit.event['revision'].as_string() == self.store.settings.source_revision)).first())
+                    verified = self.confirmed_result(session, task)
                     text += ('Результат независимо проверен; SHA-256 ' + str(task.artifact_hash)
                              if verified else 'Успех не подтверждён; нужна сверка состояния.')
                     text += ' Работа по реальной бизнес-задаче не выполнялась.'
