@@ -66,6 +66,11 @@ prompt injection, повреждение записи, смена известн
 Отдельные тесты используют ConfiguredTelegramHTTP в режиме http_mock с пятью
 длинными Unicode-запросами и проверяют успешную доставку через прежний validator.
 
+Полный CI также выявил гонку в существующем браузерном тесте logout: скрытие
+панели происходит до завершения серверного отзыва. Тест теперь ждёт ответ
+`/api/auth/logout` с 200, затем по-прежнему требует 401 при чтении `/api/state`.
+Production-код аутентификации и требования к отзыву сессии не менялись.
+
 Существующий container smoke расширен до capture → assign → project counts →
 filtered lists → durable replies через fake Bot API и настоящий PostgreSQL.
 Это облачный контейнерный тест, не проверка настоящего Telegram/Safari/VPS.

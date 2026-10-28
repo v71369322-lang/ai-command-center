@@ -55,7 +55,11 @@ def test_password_mobile_login_stop_logout(settings, store, tmp_path):
                 page.get_by_role('button', name='Аварийная остановка', exact=True).click()
                 page.get_by_text('Запуски остановлены', exact=True).wait_for()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-                page.get_by_role('button', name='Выйти', exact=True).click()
+                # Hiding the panel precedes async server-side revocation.
+                # Wait for that operation, not just its immediate UI effect.
+                with page.expect_response('**/api/auth/logout') as logged_out:
+                    page.get_by_role('button', name='Выйти', exact=True).click()
+                assert logged_out.value.status == 200
                 page.get_by_role('heading', name='Управление', exact=True).wait_for(state='detached')
                 assert context.request.get(origin + '/api/state').status == 401
                 context.close()
