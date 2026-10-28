@@ -15,6 +15,11 @@ IDs: command-center, vanilla-sugar, lnauto, capital-lab. Версия обяза
 устаревшее сообщение не должно отменить более новое назначение в панели.
 Это метаданные NEEDS_PLANNING, не разрешение на AI/CRM/execution.
 
+Следующая cloud-доработка добавляет [выбор проекта inline-кнопкой](PROJECT_PICKER.md)
+под capture receipt и `/request`: ручной ввод ID/версии больше не нужен для этого
+пути. Прежняя команда `/assign` и её проверки сохраняются; на VPS новая версия
+автоматически не устанавливается.
+
 Используется тот же project_inbox.classify, optimistic version и audit ledger,
 что и в API. Telegram request ID всегда выводится из текущего connection profile;
 произвольный чужой inbox ID не принимается. Проверки owner/private-chat,
