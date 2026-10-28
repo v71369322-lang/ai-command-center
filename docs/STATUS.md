@@ -9,6 +9,17 @@ LNAuto прошёл native Linux baseline (13 backend с PG / 28 frontend / 10 b
 без изменения исходников. Ваниль: свежий Prisma checksum GET снова дал HTTP 403;
 её полный C2 runtime остаётся BLOCKED. Ниже сохранён исходный metadata snapshot.
 
+Дополнение **28 октября, 16:43 UTC**:
+[Capital-Lab проверен в текущей cloud-сессии](projects/CAPITAL_LAB_CLOUD_CHECK_2026-10-28.md):
+1414 backend passed / 13 skipped / 1 warning, 138 frontend passed,
+настоящие HTTP/PG и build PASS, исходники не менялись.
+LNAuto затем получил отдельный [Draft UI PR #1](https://github.com/v71369322-lang/LNAuto/pull/1),
+`6eb27e105f976130b9a7975517fc90504bdb1f9f`, с успешным frontend CI;
+код этого UI-пилота уже отличается от первоначального read-only снимка ниже.
+LNAuto на VPS не развёртывался. Название CryptoLab пока не сопоставлено с
+отдельным доступным repo; Capital-Lab не переименован. Ни один из этих результатов
+не подтверждает действующий канал F33 или доставку новой версии Commander на VPS.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
