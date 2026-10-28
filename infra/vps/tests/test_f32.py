@@ -21,7 +21,7 @@ def test_telegram_update_exact_source(tmp_path):
     packet = tmp_path / 'packet.json'
     channel.pack(SOURCE, packet)
     channel.hydrate(packet, tmp_path / 'source')
-    assert channel.REVISION == 'a994de96c2f9656f1d766a849e63a6836e21ef65'
+    assert channel.REVISION == '316dc1615dea224bcf4bd595d87048d19820bd21'
     assert channel.git(tmp_path / 'source', 'rev-parse', 'HEAD').decode().strip() == channel.REVISION
     assert channel.git(tmp_path / 'source', 'status', '--porcelain') == b''
 
@@ -56,7 +56,10 @@ def test_telegram_update_keeps_state_and_cannot_install():
 
 def test_telegram_update_bootstrap_hashes_and_no_old_overwrite():
     p = (ROOT / 'f32/enable_prepare_channel.sh').read_text()
-    for digest, name in re.findall(r'^([a-f0-9]{64})  (.+)$', p, re.M):
+    entries = re.findall(r'^([a-f0-9]{64})  (.+)$', p, re.M)
+    assert len(entries) == 4 and {name for _, name in entries} == {
+        'prepare_channel.py', 'prepare_fixed_release.sh', 'acc-prepare-fixed.service', 'acc-prepare-fixed.path'}
+    for digest, name in entries:
         assert hashlib.sha256((ROOT / 'f32' / name).read_bytes()).hexdigest() == digest
     assert '/home/acc-control/f30' not in p
     assert 'acc-telegram-prepare-fixed.service' in p
@@ -67,6 +70,6 @@ def test_telegram_preparation_is_bound_to_verified_password_receipt():
     p = (ROOT / 'f32/prepare_fixed_release.sh').read_text()
     assert '1e151b2953b6debb4bb05096fba20aa6c740665015f31479a50fd25c6ef80106' in p
     assert '4cc6ec46bf461d65958f013bb23ac2234b9a7fd3' in p
-    assert 'a994de96c2f9656f1d766a849e63a6836e21ef65' in p
+    assert '316dc1615dea224bcf4bd595d87048d19820bd21' in p
     assert '--telegram-connection-digest' not in p
     assert 'telegram_transition' not in p

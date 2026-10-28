@@ -1,7 +1,10 @@
 # F32: prepare-only disabled Telegram release
 
-Application: PR #24, a994de96c2f9656f1d766a849e63a6836e21ef65.
-Successful CI: https://github.com/v71369322-lang/ai-command-center/actions/runs/40633584668.
+Application: PR #26, 316dc1615dea224bcf4bd595d87048d19820bd21.
+Successful application CI: https://github.com/v71369322-lang/ai-command-center/actions/runs/40639614754
+(479 Python tests, separately 32 infrastructure tests and cloud container drills).
+Includes PR #24 deployment/migration, #25 task status and #26 request receipts;
+these dependent PRs remain open and unmerged.
 Operational base: F31 trigger 4ecbfa666324d630244df291cca3b976db13d1fe.
 
 This separate channel delivers only the reviewed source and builds/prepares a
@@ -13,6 +16,9 @@ Existing F30/F31 source, helpers, units, state and bundles are preserved.
 Registration reuses the existing ephemeral acc-bootstrap-only runner without
 new permissions, dependency download, sudo or daemon socket grant. Only a
 reviewed push to ops/f32-telegram-prepare with [run-f32] starts the job.
+Ordinary preparation commits run only the new `verify` job on a GitHub-hosted
+Ubuntu 24.04 runner. The VPS `prepare` job needs successful source verification
+AND the explicit marker; it is skipped on this readiness-only commit.
 Owner separately snapshots/verifies the root bootstrap SHA-256 in trusted SSH.
 A root-owned fixed service runs as acc-control. It checks existing rootless
 daemons and free space, rehydrates the exact source from validated Git objects,
@@ -41,4 +47,18 @@ Offline tests: set F32_SOURCE_REPOSITORY to a local checkout containing the
 exact approved application Git objects, then run pytest infra/vps/tests/test_f32.py.
 They verify packet hydration, tamper rejection, bootstrap hashes, source/state
 pins and absence of install/update operations. They are not host execution proof.
+`verify_release.py --source CHECKOUT` additionally checks complete Git ancestry,
+unchanged locked dependencies against F31, exact old/new migration fingerprints,
+required application files and the deterministic packet digest. It needs local
+history; it is not run on the intentionally shallow VPS handoff checkout.
+
+Consolidated packet: 2,720,819 bytes, SHA-256
+`a694506a5d767c0cbab308bc43a820ecaa7dad832352841cedfee0a11f92be28`.
+Root bootstrap `infra/vps/f32/enable_prepare_channel.sh` SHA-256:
+`f2da4ce4738b5c05a087e90c820fdf4e7b286b2ba89ed983952bb57137bab909`.
+Previous a994de9/9d2544... bootstrap instructions are obsolete for this new packet.
+No image IDs or target bundle digest are invented: they are produced on the VPS
+only after a separately authorized rootless build/inspect.
+
+Operator sequence and gates: [F32_OPERATOR_HANDOFF.md](F32_OPERATOR_HANDOFF.md).
 No server has been changed by preparing this branch. No merge or live bot call.

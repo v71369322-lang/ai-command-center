@@ -26,9 +26,9 @@ for name in ['prepare_channel.py','prepare_fixed_release.sh','acc-prepare-fixed.
     Path(sys.argv[1],name).write_bytes(raw)
 PY
 ( cd "$tmp"; sha256sum -c <<'SUMS'
-93dc53e9fc0066f6633bcb58e9c4fdeb2975f5cf90d749ae5a7fed00ec321094  prepare_channel.py
-95b58c7c6144448c320f063535aebbd5074b2d89e546b596af599bb1d965c449  prepare_fixed_release.sh
-3f43fdafbb391e3e0072951879285d7d86940a3b46bb50cdd7ffa827ed9a7051  acc-prepare-fixed.service
+d82c0b9eef9e78b41fa3e61ee4eb83a9461a20b56daaf66f2b78ddaba92f875a  prepare_channel.py
+4e5ce0dfba5b9e6a196c878a159f7b5ffc3a74f01095c6dbad62194eb617ebb8  prepare_fixed_release.sh
+41c79c82f109164a4ab143243961d82c7917c436beff519ca6c05fd322964565  acc-prepare-fixed.service
 8d78f53970273bb158cf8b22c0ecca2037e843485f50cbafdcc2697dcd2218c3  acc-prepare-fixed.path
 SUMS
 )

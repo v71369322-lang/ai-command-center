@@ -8,7 +8,37 @@ concurrency:
   group: f32-password-prepare
   cancel-in-progress: false
 jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          path: operations
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 316dc1615dea224bcf4bd595d87048d19820bd21
+          fetch-depth: 0
+          persist-credentials: false
+          path: approved-source
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify consolidated source and preparation helpers without VPS access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install uv==0.12.23
+          cd approved-source
+          uv sync --frozen
+          export F32_SOURCE_REPOSITORY="$PWD"
+          .venv/bin/ruff check ../operations/infra/vps/f32 ../operations/infra/vps/tests/test_f32*.py
+          .venv/bin/pytest ../operations/infra/vps/tests/test_f32*.py -q
+          python ../operations/infra/vps/f32/verify_release.py --source "$PWD"
+          for file in ../operations/infra/vps/f32/*.sh; do bash -n "$file"; done
   prepare:
+    needs: verify
     if: contains(github.event.head_commit.message, '[run-f32]')
     runs-on: [acc-bootstrap-only]
     timeout-minutes: 115
@@ -19,7 +49,7 @@ jobs:
           path: operations
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: a994de96c2f9656f1d766a849e63a6836e21ef65
+          ref: 316dc1615dea224bcf4bd595d87048d19820bd21
           persist-credentials: false
           path: approved-source
       - name: Stage non-secret source and wait for administrator handoff
@@ -40,7 +70,7 @@ jobs:
             sleep 2
           done
           test -f "$stage/operator.ready"
-          printf 'prepare-a994de9\n' > "$stage/request"
+          printf 'prepare-316dc16\n' > "$stage/request"
           for attempt in $(seq 1 2400); do
             receipt=/var/lib/acc-telegram-prepare-receipt/status
             if test -f "$receipt"; then
@@ -48,7 +78,7 @@ jobs:
                 cat "$receipt"
                 exit 1
               fi
-              if python3 -c 'import json,sys;p=json.load(open(sys.argv[1]));assert p["revision"]=="a994de96c2f9656f1d766a849e63a6836e21ef65";assert p["go_live"] is False;print(p)' "$receipt" 2>/dev/null; then
+              if python3 -c 'import json,sys;p=json.load(open(sys.argv[1]));assert p["revision"]=="316dc1615dea224bcf4bd595d87048d19820bd21";assert p["go_live"] is False;print(p)' "$receipt" 2>/dev/null; then
                 exit 0
               fi
             fi

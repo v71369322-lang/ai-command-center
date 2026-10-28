@@ -9,7 +9,7 @@ import stat
 import subprocess
 import tempfile
 
-REVISION = 'a994de96c2f9656f1d766a849e63a6836e21ef65'
+REVISION = '316dc1615dea224bcf4bd595d87048d19820bd21'
 MAX_PACKET = 8 * 1024 * 1024
 
 
