@@ -28,7 +28,8 @@ def main():
          '--format', 'json', '--output', str(target / 'all-pip-audit.json')])
     npm = run(['npm', 'audit', '--prefix', 'web', '--cache', str(target / 'npm-cache'), '--json'])
     (target / 'npm-audit.json').write_bytes(npm.stdout)
-    run([sys.executable, '-m', 'bandit', '-r', 'src', 'scripts', 'infra/vps/operations', '-f', 'json',
+    run([sys.executable, '-m', 'bandit', '-r', 'src', 'scripts', 'infra/vps/operations',
+         'infra/vps/stage_telegram_update.py', '-f', 'json',
          '-o', str(target / 'bandit.json')], expected=(0, 1))
     static = json.loads((target / 'bandit.json').read_text())
     # Keep every finding. These LOW rules were manually reviewed in

@@ -68,6 +68,15 @@ SQL interlock строится через psycopg.sql.SQL/Literal, не чере
 неэкранированных данных. Полный набор LOW наблюдений не удаляется из отчёта.
 Это triage текущего кода, а не независимое security certification.
 
+## F34 operator helper
+
+В scan добавлен infra/vps/stage_telegram_update.py. Его две LOW B105 относятся
+к сравнению token_file с фиксированным in-container путём /run/telegram/token.
+Это ссылка на защищённый binding, не значение credential. Staging вообще не
+открывает token; approved apply делегирует прежний credential preflight trusted
+Deployment. Оба наблюдения сохраняются в Bandit JSON. LOW allowlist не изменён,
+новые MEDIUM/HIGH или неизвестные rules по-прежнему блокируют CI.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,
