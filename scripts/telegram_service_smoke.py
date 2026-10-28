@@ -31,7 +31,7 @@ def handle(request):
         result={'url':'','has_custom_certificate':False,'pending_update_count':0}
     elif method=='getUpdates':
         values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
-                '/requests','/request 1']
+                '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -49,14 +49,15 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
 try:
     result=TelegramService(store,client,poll_seconds=0).run(max_cycles=2)
     assert result['completed_cycles']==2 and result['live_verified'] is False
-    assert calls.count('sendMessage')==5
+    assert calls.count('sendMessage')==8
     assert any('пока нет' in value for value in sent)
     assert any('не найдена' in value for value in sent)
     assert any('Запрос №1 сохранён' in value for value in sent)
     assert sum('Текст запроса (не команда):' in value and 'Synthetic container service request' in value
-               for value in sent)==2
+               for value in sent)==3
+    assert any('Проект: LNAuto. Версия назначения: 1' in value for value in sent)
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':4,'actual_telegram_contacted':False}))
+    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':6,'project_assignments':1,'actual_telegram_contacted':False}))
 finally:
     client.close();store.engine.dispose()
 '''
