@@ -4,6 +4,11 @@
 разрешение доступа, расходов, merge или deployment. Перед работой сверять
 актуальные HEAD/PR/CI; ниже указаны проверенные точки, не вечные значения.
 
+Последующее дополнение 28 октября: [фактическая cloud-проверка проектов](projects/CLOUD_VALIDATION_2026-10-28.md).
+LNAuto прошёл native Linux baseline (13 backend с PG / 28 frontend / 10 browser),
+без изменения исходников. Ваниль: свежий Prisma checksum GET снова дал HTTP 403;
+её полный C2 runtime остаётся BLOCKED. Ниже сохранён исходный metadata snapshot.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
@@ -62,10 +67,12 @@ rootless Docker. После попытки установить новый ка�
 
 ## Три бизнес-проекта: проверен только GitHub-контекст
 
-Проверены метаданные GitHub: доступность, private visibility, branches/refs,
+В исходном снимке проверены метаданные GitHub: доступность, private visibility, branches/refs,
 открытые PR и Actions runs по известным точным SHA. Исходники, клиентские
-данные, локальные Windows-копии и полнота переноса в этой задаче не читались,
-не сравнивались и не изменялись. GitHub-доступ Codex не означает подключение
+данные, локальные Windows-копии и полнота переноса в первоначальном metadata-снимке не читались,
+не сравнивались и не изменялись. Последующая отдельная read-only проверка
+LNAuto и C2-блокера Ванили описана по ссылке выше; бизнес-данные и Windows-копии
+по-прежнему не читались. GitHub-доступ Codex не означает подключение
 этих репозиториев к runtime coding-agent Command Center.
 
 | Проект | Private repository / ID | Снимок main | Отдельная работа в GitHub |
