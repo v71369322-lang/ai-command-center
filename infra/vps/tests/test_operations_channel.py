@@ -537,7 +537,8 @@ def source_repository(tmp_path):
     source = tmp_path / 'source'
     source.mkdir()
     paths = ['src/command_center/__init__.py', 'src/command_center/deployment.py',
-             'src/command_center/operations_channel.py', 'infra/vps/operations/submit.py',
+             'src/command_center/operations_channel.py', 'src/command_center/coding/__init__.py',
+             'src/command_center/coding/spec.py', 'infra/vps/operations/submit.py',
              'infra/vps/operations/inbox.mount.template', 'requirements.lock']
     paths += ['infra/vps/operations/' + name for name in module('enroll').UNITS]
     for name in paths:
@@ -560,7 +561,20 @@ def test_enrollment_packages_git_objects_not_mutable_worktree(source_repository)
     target.write_text('raise RuntimeError("unreviewed worktree")\n')
     files = module('enroll').package(source, revision)
     assert files['src/command_center/operations_channel.py'] == b'# synthetic package data\n'
-    assert len(files) == 9
+    assert files['src/command_center/coding/spec.py'] == b'# synthetic package data\n'
+    assert len(files) == 11
+
+
+def test_enrollment_bounds_git_output_before_copying_or_execution(source_repository):
+    source, _ = source_repository
+    (source / 'src/command_center/operations_channel.py').write_bytes(b'x' * (9 * 1024 * 1024))
+    git = ['git', '-C', str(source)]
+    subprocess.run([*git, 'add', '.'], check=True, capture_output=True)
+    subprocess.run([*git, '-c', 'user.name=Synthetic Test', '-c', 'user.email=synthetic@example.invalid',
+                    'commit', '-qm', 'oversized synthetic source'], check=True, capture_output=True)
+    revision = subprocess.check_output([*git, 'rev-parse', 'HEAD']).decode().strip()
+    with pytest.raises(ValueError, match='git_output_limit'):
+        module('enroll').package(source, revision)
 
 
 def test_enrollment_rejects_tampered_tree_before_install(source_repository, monkeypatch):

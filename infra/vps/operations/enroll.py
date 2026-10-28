@@ -13,6 +13,9 @@ import os
 from pathlib import Path
 import pwd
 import re
+import resource
+import selectors
+import signal
 import socket
 import stat
 import subprocess
@@ -81,10 +84,39 @@ def git(source, *args):
     command = ['git', '--no-replace-objects', '-c', 'safe.directory=*', '-C', str(source), *args]
     if os.getuid() == 0:
         command = ['runuser', '-u', 'acc-gh-runner', '--', *command]
-    return subprocess.check_output(command, env={
+    env = {
         'PATH': '/usr/bin:/bin', 'HOME': '/var/lib/acc-gh-runner', 'LANG': 'C.UTF-8',
         'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_NO_REPLACE_OBJECTS': '1',
-        'GIT_PAGER': 'cat'}, stderr=subprocess.DEVNULL, timeout=30)
+        'GIT_PAGER': 'cat', 'GIT_ALLOW_PROTOCOL': '', 'GIT_NO_LAZY_FETCH': '1', 'GIT_TERMINAL_PROMPT': '0'}
+    def limits():
+        resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
+        resource.setrlimit(resource.RLIMIT_CPU, (30, 30))
+        resource.setrlimit(resource.RLIMIT_FSIZE, (8 * 1024 * 1024, 8 * 1024 * 1024))
+    process = subprocess.Popen(command, env=env, stdin=subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               start_new_session=True, preexec_fn=limits)
+    output = bytearray()
+    deadline = time.monotonic() + 30
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ)
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not selector.select(remaining):
+                    raise ValueError('git_read_timeout')
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
+                    if process.wait(timeout=max(.1, deadline - time.monotonic())):
+                        raise ValueError('git_read_failed')
+                    return bytes(output)
+                output.extend(chunk)
+                if len(output) > 8 * 1024 * 1024:
+                    raise ValueError('git_output_limit')
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=5)
+        process.stdout.close()
 
 
 def package(source, revision):
@@ -112,7 +144,7 @@ def package(source, revision):
     for row in rows:
         header, name = row.split('\t', 1)
         mode, kind, oid = header.split()
-        wanted = (bool(re.fullmatch(r'src/command_center/[a-z_][a-z0-9_]*\.py', name))
+        wanted = (bool(re.fullmatch(r'src/command_center/(?:[a-z_][a-z0-9_]*/)*[a-z_][a-z0-9_]*\.py', name))
                   or name in {'infra/vps/operations/' + unit for unit in UNITS}
                   or name in {'infra/vps/operations/submit.py', 'infra/vps/operations/inbox.mount.template',
                               'requirements.lock'})
