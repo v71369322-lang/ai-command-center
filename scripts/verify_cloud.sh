@@ -42,6 +42,7 @@ else
 fi
 scripts/cloud_test.sh
 .venv/bin/python scripts/isolated_restore_drill.py
+.venv/bin/python scripts/telegram_transition_smoke.py
 dkr compose --profile worker up -d --no-build api runtime-broker watchdog worker
 .venv/bin/python scripts/container_smoke.py
 dkr compose --profile worker restart api worker runtime-broker

@@ -110,6 +110,19 @@ React обновляет раздел каждые 15 секунд, поддер
 
 ## Проверки и ограничения
 
+Дополнительный `scripts/telegram_transition_smoke.py` выполняет сквозной переход
+в настоящих старых/новых контейнерах, включая CLI maintenance job. Исходники
+baseline восстанавливаются из Git objects точного 4cc6ec4 без remote credentials
+и без дополнительного Git worktree. CI получает полную Git history для baseline.
+Сценарий создаёт отдельный синтетический state, проверяет пароль и задачу старой
+версии, stage/apply, потерю ответа после реального commit, reconcile без второго
+DDL, новую задачу, serialized boot и сохранность данных. Runtime translation и
+rootful backend находятся только в тестовом скрипте; production rootless gates
+и logical bundle validation сохраняются. HTTP Telegram/AI/GitHub не вызывается.
+Для двух наборов image layers нужно минимум 8 GiB свободного диска. Недостаток
+ресурсов — отказ теста, не снижение production reserve или признание успеха.
+Проверка не является настоящим reboot/systemd/rootless VPS trial.
+
 Тесты используют настоящую отдельную legacy PostgreSQL и networkless restore,
 но явную fake host orchestration в transition tests. Проверяются exact scope,
 plan expiry, preserved data, повреждение backup, ambiguous commit, reconciliation
