@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .store import Denied, canonical, digest
 from .telegram_menu import keyboard
+from .telegram_project_picker import allowed_markup
 
 
 class TelegramConnection(BaseModel):
@@ -136,7 +137,7 @@ class ConfiguredTelegramHTTP:
             markup = body.get('reply_markup')
             # Only this exact read-only menu is added; arbitrary reply keyboards,
             # contact/location requests, Web Apps and URLs remain forbidden.
-            if markup is not None and canonical(markup) != canonical(keyboard()):
+            if markup is not None and canonical(markup) != canonical(keyboard()) and not allowed_markup(markup):
                 valid = valid and (isinstance(markup, dict) and set(markup) == {'inline_keyboard'})
                 rows = markup.get('inline_keyboard') if isinstance(markup, dict) else None
                 valid = valid and isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], list) and len(rows[0]) == 1

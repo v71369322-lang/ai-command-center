@@ -11,7 +11,7 @@ from sqlalchemy import select, func, and_, or_
 
 from .api import Command
 from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit, Task
-from .store import Denied, digest
+from .store import Denied, canonical, digest
 from .telegram_requests import capture_receipt, request_reply
 from .telegram_menu import BUTTONS, keyboard
 from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
@@ -100,11 +100,17 @@ class TelegramBridge:
             raise Denied('telegram_owner_private_chat_required')
         if callback is not None:
             token = callback.get('data', '')
-            if (not isinstance(token, str) or not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token)
-                    or type(message.get('message_id')) is not int or message['message_id'] <= 0):
+            if (not isinstance(token, str) or type(message.get('message_id')) is not int
+                    or message['message_id'] <= 0):
                 raise Denied('telegram_callback_invalid')
-            intent = {'kind': 'approve', 'card': hashlib.sha256(token[3:].encode()).hexdigest(),
-                      'message_id': message.get('message_id')}
+            if token.startswith('pj:'):
+                from .telegram_project_picker import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
+            else:
+                if not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token):
+                    raise Denied('telegram_callback_invalid')
+                intent = {'kind': 'approve', 'card': hashlib.sha256(token[3:].encode()).hexdigest(),
+                          'message_id': message['message_id']}
             if isinstance(self.client, ConfiguredTelegramHTTP):
                 query_id = callback.get('id')
                 if (not isinstance(query_id, str) or not 1 <= len(query_id) <= 128
@@ -190,7 +196,7 @@ class TelegramBridge:
         if row.state == 'DONE':
             raise Denied('telegram_update_already_committed')
         row.state = 'DONE'
-        self.enqueue(session, iid + ':reply', text, markup)
+        return self.enqueue(session, iid + ':reply', text, markup)
 
     def receive(self, update):
         self.guard()
@@ -290,6 +296,11 @@ class TelegramBridge:
                             self.finish(session, iid, 'Новые запуски остановлены; активные исполнения требуют сверки.'))
         elif kind == 'assign':
             from .project_inbox import classify, PROJECTS
+            from .telegram_project_picker import verify
+            if 'picker_callback' in intent:
+                with self.store.transaction() as session:
+                    self.store.check_audit(session)
+                    verify(self, session, intent)
             def confirm(session, event):
                 self.guard()
                 row = session.get(TelegramInbox, iid)
@@ -297,11 +308,27 @@ class TelegramBridge:
                     return
                 if row.state != 'RECEIVED':
                     raise Denied('telegram_assignment_not_pending')
+                if 'picker_callback' in intent:
+                    verify(self, session, intent)
                 label = dict(PROJECTS).get(event['project_id'], 'Не распределён')
                 self.finish(session, iid, f'Запрос №{intent["number"]}: {label}. Версия назначения {event["version"]}. '
                             'Выбор проекта сохранён; выполнение не запускалось.')
-            classify(self.store, 'owner', self.profile + ':' + intent['number'], intent['project_id'],
-                     intent['version'], str(uuid5(NAMESPACE_URL, 'acc:telegram-project:' + iid)), _scope_installer=confirm)
+            try:
+                classify(self.store, 'owner', self.profile + ':' + intent['number'], intent['project_id'],
+                         intent['version'], str(uuid5(NAMESPACE_URL, 'acc:telegram-project:' + iid)), _scope_installer=confirm)
+            except Denied as error:
+                if 'picker_callback' not in intent or str(error) != 'project_assignment_stale_version':
+                    raise
+                with self.store.transaction() as session:
+                    self.guard()
+                    self.store.check_audit(session)
+                    verify(self, session, intent)
+                    row = session.get(TelegramInbox, iid)
+                    if row.state != 'DONE':
+                        if row.state != 'RECEIVED':
+                            raise Denied('telegram_assignment_not_pending')
+                        self.finish(session, iid, 'Проект не изменён: карточка устарела. '
+                                    f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -338,7 +365,19 @@ class TelegramBridge:
                         reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
                         reply += '\n\n'.join(self.task_summary(session, task, compact=True) if kind == 'tasks'
                                              else self.task_summary(session, task) for task in tasks)
-                self.finish(session, iid, reply + suffix)
+                from .telegram_project_picker import saved_version, keyboard as picker_keyboard, issue
+                version = saved_version(self, session, intent['number']) if kind == 'request' else None
+                markup = picker_keyboard(intent['number'], version) if version is not None else None
+                if markup and len(canonical({'chat_id': self.owner, 'text': reply + suffix,
+                                             'reply_markup': markup}).encode()) > 8192:
+                    # Preserve the full readback and the existing transport limit.
+                    self.finish(session, iid, reply + suffix)
+                    delivery = self.enqueue(session, iid + ':picker',
+                        f'Выберите проект запроса №{intent["number"]}. Выполнение не запускалось.', markup)
+                else:
+                    delivery = self.finish(session, iid, reply + suffix, markup)
+                if markup:
+                    issue(self, session, delivery, intent['number'], version)
         else:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -353,7 +392,10 @@ class TelegramBridge:
                         raise Denied('telegram_empty_request')
                     self.guard()
                     row.state = 'NEEDS_PLANNING'
-                    self.enqueue(session, iid + ':reply', capture_receipt(iid))
+                    from .telegram_project_picker import keyboard as picker_keyboard, issue
+                    number = iid.rsplit(':', 1)[1]
+                    delivery = self.enqueue(session, iid + ':reply', capture_receipt(iid), picker_keyboard(number, 0))
+                    issue(self, session, delivery, number, 0)
                 else:
                     row = session.get(TelegramInbox, iid)
                     if row.state == 'DONE':
