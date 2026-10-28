@@ -1,0 +1,35 @@
+{
+  "workflow_run": 40747402356,
+  "mailbox_job": 123024814623,
+  "workflow_conclusion": "failure",
+  "expected_producer_exit": 1,
+  "expected_state": "REJECTED",
+  "expected_code": "bundle_not_approved",
+  "submission": {
+    "receipt_public_key": "DRyCPa1vwsughFY9Tz433RKnLgL2k/Ns3N4jwTRG3S8=",
+    "request": {
+      "action": "status",
+      "expected_bundle": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expires_at": 1793213717,
+      "issued_at": 1793212817,
+      "operation_id": "def8806d-1b88-48f3-9ca3-7768a9feab52",
+      "policy_digest": "fcab87067bc7486179b49d889e67bd3a0bcb3ee07a7c70e8abb26fdcd928e534",
+      "schema": 1,
+      "target_bundle": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  },
+  "envelope": {
+    "receipt": {
+      "action": "status",
+      "code": "bundle_not_approved",
+      "expected_bundle": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "operation_id": "def8806d-1b88-48f3-9ca3-7768a9feab52",
+      "policy_digest": "fcab87067bc7486179b49d889e67bd3a0bcb3ee07a7c70e8abb26fdcd928e534",
+      "request_hash": "782321c305e2467c357fdae8bea8b4f71440248bde36b04e9057308278563a0f",
+      "state": "REJECTED",
+      "target_bundle": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "updated_at": 1793212882
+    },
+    "signature": "HV+djjjUmCjphRsFlqvHZEg3U8wIZWoMweQ0dAVnmsygNOdtOTM3GFngmq0loVv0kr3cLB0aI/qL99X+jn/AAw=="
+  }
+}
