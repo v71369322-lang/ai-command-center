@@ -20,10 +20,17 @@ LNAuto на VPS не развёртывался. Название CryptoLab по
 отдельным доступным repo; Capital-Lab не переименован. Ни один из этих результатов
 не подтверждает действующий канал F33 или доставку новой версии Commander на VPS.
 
+Следующая cloud-доработка: [главное меню Telegram](telegram/OWNER_MENU.md),
+source/test checkpoint `974430a260cde68d4e75f50cfd73e2cee886bede`.
+Четыре кнопки вызывают прежние readonly-команды; AI/расходы/CRM не включаются.
+Локально 140 targeted / 105 infrastructure, Ruff/OpenAPI/TypeScript/Vite PASS.
+Итоговые HEAD/полный CI этой отдельной ветки сверять в её Draft PR.
+На VPS меню пока не доставлено; F33 по-прежнему требует reconciliation.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
-- Последняя проверенная реализация: [Draft PR #31](https://github.com/v71369322-lang/ai-command-center/pull/31),
+- Предшествующая реализация до этапа меню: [Draft PR #31](https://github.com/v71369322-lang/ai-command-center/pull/31),
   `feat/telegram-coding-demo`, `b2b57ba8ae52d8ae7629c13647f250d0d92cfae7`.
 - [CI этого SHA](https://github.com/v71369322-lang/ai-command-center/actions/runs/40698783681):
   593 Python passed / 1 Starlette-httpx warning, отдельно 105 infrastructure passed.
