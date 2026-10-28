@@ -174,6 +174,81 @@ def mark_current(deployment, *, phase='VERIFIED', previous='old'):
     return value
 
 
+@pytest.mark.parametrize('change', ['bundle', 'pending', 'missing', 'malformed'])
+def test_remote_update_predecessor_is_checked_before_any_effect(operator, change):
+    previous = mark_current(operator)
+    previous['bundle'] = 'c' * 64
+    expected = 'c' * 64
+    if change == 'bundle':
+        previous['bundle'] = 'd' * 64
+    elif change == 'pending':
+        previous['phase'] = 'INTENT'
+    elif change == 'malformed':
+        expected = 'main'
+    atomic_json(operator.root / 'deployment.json', previous)
+    if change == 'missing':
+        (operator.root / 'deployment.json').unlink()
+    with pytest.raises(ValueError, match='expected_previous_release_changed'):
+        operator.apply('update', checksum(operator.bundle), expected_previous=expected)
+    assert operator.engine.calls == []
+
+
+def test_remote_update_exact_predecessor_uses_existing_backup_and_interlock(operator):
+    previous = mark_current(operator)
+    previous['bundle'] = 'c' * 64
+    atomic_json(operator.root / 'deployment.json', previous)
+    operator.apply('update', checksum(operator.bundle), expected_previous='c' * 64)
+    calls = operator.engine.calls
+    assert calls[0] == ('quiesce',) and calls[1] == ('encrypted_backup',)
+    receipt = json.loads((operator.root / 'deployment.json').read_text())
+    assert receipt['phase'] == 'VERIFIED' and receipt['previous_bundle'] == 'c' * 64
+
+
+@pytest.mark.parametrize('change', ['none', 'predecessor', 'pending', 'owner_login', 'migration',
+                                   'data_root', 'control_uid', 'catalog_revision', 'telegram_owner'])
+def test_host_channel_enforces_owner_scope_and_ready_prepared_release(release, monkeypatch, change):
+    import command_center.deployment as deployment_module
+    import command_center.operations_channel as operations
+    before = copy.deepcopy(release[0])
+    target = copy.deepcopy(before)
+    for value in (before, target):
+        value['manifest']['data_root'] = '/home/acc-control/f30/state'
+    target['manifest']['revision'] = 'd' * 40
+    if change == 'owner_login':
+        target['manifest']['owner_login'] = {'origin': 'http://127.0.0.1:18000', 'loopback_http': True}
+    elif change == 'migration':
+        target['manifest']['migration_hash'] = 'f' * 64
+    elif change == 'data_root':
+        target['manifest']['data_root'] = '/home/acc-control/other-state'
+    elif change == 'control_uid':
+        target['manifest']['control_uid'] = 0
+    elif change == 'telegram_owner':
+        before['manifest']['telegram'] = {'mode': 'live', 'owner_id': 12, 'bot_id': 34}
+        target['manifest']['telegram'] = {'mode': 'live', 'owner_id': 56, 'bot_id': 34}
+    active = dict(phase='INTENT' if change == 'pending' else 'VERIFIED',
+                  bundle=checksum(before), directory='/home/acc-control/old/bundle')
+    request = dict(action='update', target_bundle=checksum(target), expected_bundle=active['bundle'])
+    if change == 'predecessor':
+        request['expected_bundle'] = 'e' * 64
+    policy = {'releases': {request['target_bundle']: dict(directory='/home/acc-control/new/bundle',
+                         revision='f' * 40 if change == 'catalog_revision' else target['manifest']['revision'])}}
+    monkeypatch.setattr(operations, 'protected_read', lambda *args, **kwargs: operations.canonical(active))
+    monkeypatch.setattr(deployment_module, 'load_bundle', lambda p:
+                        before if p == active['directory'] else target)
+    monkeypatch.setattr(Deployment, 'preflight', lambda self: None)
+    backend = operations.HostBackend(policy)
+    if change == 'none':
+        prepared = backend.prepare(request)
+        assert prepared.bundle == target
+        invoked = []
+        monkeypatch.setattr(prepared, 'apply', lambda *args, **kwargs: invoked.append((args, kwargs)))
+        backend.execute(request, prepared)
+        assert invoked == [(('update', request['target_bundle']), {'expected_previous': request['expected_bundle']})]
+    else:
+        with pytest.raises(operations.Blocked):
+            backend.prepare(request)
+
+
 def test_profile_closed_and_normalizes_with_real_compose(release):
     bundle, directory = release
     result = subprocess.run(['docker', 'compose', '-f', str(directory / 'compose.json'), 'config', '--format', 'json'],

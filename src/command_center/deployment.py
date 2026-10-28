@@ -379,7 +379,7 @@ class Deployment:
         return {'state': 'CLOSED_SYNTHETIC_SERVICES_RUNNING', 'owner_mfa_verified': False,
                 'rootless_execution_smoke_verified': False, 'offsite_verified': False, 'go_live': False}
 
-    def apply(self, action, approval):
+    def apply(self, action, approval, *, expected_previous=None):
         if action not in {'install', 'update', 'rollback'} or approval != checksum(self.bundle):
             raise ValueError('exact_release_authorization_required')
         self.preflight(fresh=action == 'install')
@@ -388,6 +388,14 @@ class Deployment:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             state_file = self.root / 'deployment.json'
             previous = json.loads(state_file.read_text()) if state_file.exists() else None
+            # A remote operator must compare the predecessor under this lock,
+            # not before acquiring it: a manual update may have won the race.
+            if expected_previous is not None and (
+                    not isinstance(expected_previous, str) or len(expected_previous) != 64
+                    or any(c not in '0123456789abcdef' for c in expected_previous)
+                    or previous is None or previous.get('phase') != 'VERIFIED'
+                    or previous.get('bundle') != expected_previous):
+                raise ValueError('expected_previous_release_changed')
             if previous and previous.get('phase') != 'VERIFIED' and not (
                     action == 'rollback' and previous.get('phase') == 'INTENT'):
                 raise ValueError('incomplete_deployment_requires_investigation')

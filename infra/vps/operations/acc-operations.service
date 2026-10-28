@@ -1,0 +1,41 @@
+[Unit]
+Description=ACC bounded owner-approved maintenance mailbox
+After=network-online.target
+RequiresMountsFor=/var/lib/acc-operations/inbox
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+User=acc-control
+Group=acc-control
+WorkingDirectory=/home/acc-control
+Environment=HOME=/home/acc-control
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+Environment=PYTHONPATH=/usr/local/lib/acc-operations/source/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONNOUSERSITE=1
+ExecStart=/home/acc-control/f30/tools/bin/python -m command_center.operations_channel drain
+UMask=0027
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/acc-operations/inbox /var/lib/acc-operations/receipts /var/lib/acc-operations/private /home/acc-control/f30/state
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=128
+TimeoutStartSec=15min
+TimeoutStopSec=30s
+KillMode=control-group
+
+# Trusted host operator, not a coding executor. Existing rootless Docker daemons
+# have their own cgroups. Limits here constrain this process, not those daemons.

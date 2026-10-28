@@ -1,0 +1,12 @@
+[Unit]
+Description=Bounded volatile inbox for ACC maintenance intents
+Before=acc-operations.service acc-operations-runner.service
+
+[Mount]
+What=tmpfs
+Where=/var/lib/acc-operations/inbox
+Type=tmpfs
+Options=size=1m,mode=2770,uid=1000,gid=__RUNNER_GID__,nodev,nosuid,noexec
+
+[Install]
+WantedBy=multi-user.target

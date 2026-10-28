@@ -1,0 +1,53 @@
+[Unit]
+Description=ACC persistent unprivileged GitHub mailbox runner
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/var/lib/acc-operations/inbox
+StartLimitIntervalSec=300
+StartLimitBurst=3
+Conflicts=acc-gh-runner.service
+
+[Service]
+User=acc-gh-runner
+Group=acc-gh-runner
+WorkingDirectory=/var/lib/acc-gh-runner/runner
+Environment=HOME=/var/lib/acc-gh-runner
+ExecStart=/var/lib/acc-gh-runner/runner/run.sh
+Restart=on-failure
+RestartSec=15s
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/acc-operations/inbox
+ReadOnlyPaths=/var/lib/acc-gh-runner
+ReadOnlyPaths=/var/lib/acc-operations/receipts
+InaccessiblePaths=-/run/user -/var/run/docker.sock -/run/docker.sock /var/lib/acc-operations/private /etc/acc-operations
+TemporaryFileSystem=/var/lib/acc-gh-runner/runner/_work:size=512M,mode=1777,nodev,nosuid
+TemporaryFileSystem=/var/lib/acc-gh-runner/runner/_diag:size=16M,mode=1777,nodev,nosuid,noexec
+TemporaryFileSystem=/tmp:size=64M,mode=1777,nodev,nosuid
+TemporaryFileSystem=/var/tmp:size=16M,mode=1777,nodev,nosuid,noexec
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+MemoryMax=512M
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+TimeoutStopSec=30s
+KillMode=control-group
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+
+# Persistent registration: no --ephemeral, but --disableupdate because package
+# files are read-only in this service. Owner-approved runner maintenance remains
+# necessary; GitHub's normal version/update enforcement is never bypassed.
+# Labels route jobs; they are not a workflow authorization boundary. No sudo.
