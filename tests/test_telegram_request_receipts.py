@@ -214,6 +214,24 @@ def test_lost_receipt_response_is_not_resent_after_restart(bridge, store):
     assert store.snapshot()['tasks'] == []
 
 
+@pytest.mark.parametrize('value', ['', '   '])
+def test_legacy_pending_blank_is_rejected_during_recovery(bridge, store, value):
+    service, fake = bridge
+    # Earlier code accepted blank captures. This source-approved RECEIVED
+    # fixture tests apply-time validation, not bypass of the source-change gate.
+    intent = {'kind': 'capture', 'text': value}
+    with store.transaction() as session:
+        session.add(TelegramInbox(id=service.profile + ':1', profile=service.profile,
+            fingerprint=digest(intent), intent=intent, state='RECEIVED', created_at=store.now(session)))
+        store.audit(session, 'telegram_update_received', 'owner', update_id='1', profile=service.profile,
+                    intent_hash=digest(intent))
+    service.resume_pending()
+    with store.transaction() as session:
+        assert session.get(TelegramInbox, service.profile + ':1').state == 'REJECTED'
+        assert session.execute(select(TelegramDelivery)).first() is None
+    assert fake.sent == [] and store.snapshot()['tasks'] == []
+
+
 def test_database_audit_and_revocation_fail_before_reply(bridge, admin, monkeypatch):
     service, fake = bridge
     service.receive(message(1, 'Public synthetic request'))

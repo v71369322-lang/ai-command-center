@@ -296,6 +296,9 @@ class TelegramBridge:
                         return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                     if row.state != 'RECEIVED':
                         raise Denied('telegram_capture_not_pending')
+                    self.check_text(intent.get('text'))
+                    if not intent['text'].strip():
+                        raise Denied('telegram_empty_request')
                     self.guard()
                     row.state = 'NEEDS_PLANNING'
                     self.enqueue(session, iid + ':reply', capture_receipt(iid))
