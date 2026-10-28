@@ -84,7 +84,7 @@ class Store:
         if not created or created.event.get('revision') != self.settings.source_revision:
             raise Denied('stale_task_revision')
 
-    def create(self, actor, key, payload):
+    def create(self, actor, key, payload, *, _scope_installer=None):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
         if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic'}:
@@ -110,6 +110,8 @@ class Store:
             if previous:
                 if previous.payload_hash != fingerprint:
                     raise Denied("idempotency_conflict")
+                if _scope_installer:
+                    _scope_installer(s, previous)
                 return self.view(previous)
             if control.halted or control.recovery:
                 raise Denied("control_blocked")
@@ -135,6 +137,8 @@ class Store:
             self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint)
             if task.state == "READY":
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
+            if _scope_installer:
+                _scope_installer(s, task)
             return self.view(task)
 
     def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None, _deadline=None):

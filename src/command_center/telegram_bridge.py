@@ -7,7 +7,7 @@ import secrets
 from uuid import UUID, uuid5, NAMESPACE_URL
 
 import httpx
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, or_
 
 from .api import Command
 from .models import TelegramInbox, TelegramDelivery, TelegramCard, Control, Audit, Task
@@ -129,6 +129,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'stop'}
         if value == '/tasks':
             return str(uid), {'kind': 'tasks'}
+        if value in {'/coding_demo', '/coding_plan'}:
+            return str(uid), {'kind': value[1:]}
+        if value.split()[:1] in [['/coding_demo'], ['/coding_plan']]:
+            raise Denied('telegram_coding_fixed_scope_required')
         if value == '/requests':
             return str(uid), {'kind': 'requests'}
         if value.split()[:1] == ['/requests']:
@@ -199,18 +203,29 @@ class TelegramBridge:
                 if row.state in {'DONE', 'NEEDS_PLANNING'}:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
             else:
+                admission = {}
+                if intent['kind'] == 'coding_demo':
+                    control = session.get(Control, 1)
+                    if control.halted or control.recovery:
+                        raise Denied('control_blocked')
+                    admission = {'admission_epoch': control.epoch,
+                                 'expires_at': (self.store.now(session) + timedelta(seconds=120)).isoformat()}
                 if session.scalar(select(func.count()).select_from(TelegramInbox)) >= 1000:
                     raise Denied('telegram_inbox_capacity')
                 session.add(TelegramInbox(id=iid, profile=self.profile, fingerprint=digest(intent), intent=intent,
                                          state='RECEIVED', created_at=self.store.now(session)))
                 self.store.audit(session, 'telegram_update_received', 'owner', update_id=update_id, profile=self.profile,
-                                 intent_hash=digest(intent))
+                                 intent_hash=digest(intent), **admission)
         return self._apply_pending(iid, intent)
 
     def _apply_pending(self, iid, intent):
         self.guard()
         kind = intent['kind']
-        if kind == 'demo':
+        if kind == 'coding_demo':
+            from .telegram_coding import accepted, exercise
+            self.store.create('owner', 'tg:' + iid, exercise(),
+                              _scope_installer=lambda session, task: accepted(self, session, iid, task))
+        elif kind == 'demo':
             # Crash-safe stable F1 idempotency key. A duplicate never creates another task.
             task = self.store.create('owner', 'tg:' + iid, intent['payload'])
             with self.store.transaction() as session:
@@ -285,7 +300,7 @@ class TelegramBridge:
                             'Выбор проекта сохранён; выполнение не запускалось.')
             classify(self.store, 'owner', self.profile + ':' + intent['number'], intent['project_id'],
                      intent['version'], str(uuid5(NAMESPACE_URL, 'acc:telegram-project:' + iid)), _scope_installer=confirm)
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects'}:
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -297,7 +312,10 @@ class TelegramBridge:
                 control = session.get(Control, 1)
                 if control.halted or control.recovery:
                     suffix += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
-                if kind == 'projects':
+                if kind == 'coding_plan':
+                    from .telegram_coding import plan
+                    reply = plan()
+                elif kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
                     reply += '\n/assign номер project-id версия — выбрать проект; none — снять назначение. '
@@ -307,12 +325,7 @@ class TelegramBridge:
                 else:
                     # Scope is derived from the durable F1 request key, never from a
                     # supplied UUID alone or a mutable inbox task_id link alone.
-                    query = select(Task).join(TelegramInbox,
-                        (TelegramInbox.task_id == Task.id)
-                        & (Task.request_key == 'owner:tg:' + TelegramInbox.id)).where(
-                            TelegramInbox.profile == self.profile, TelegramInbox.state == 'DONE',
-                            TelegramInbox.intent['kind'].as_string() == 'demo',
-                            Task.owner_role == 'owner', Task.payload['kind'].as_string() == 'approved_render')
+                    query = self.scoped_tasks()
                     if kind == 'status':
                         query = query.where(Task.id == intent['task_id'])
                     tasks = session.execute(query.order_by(Task.created_at.desc(), Task.id.desc()).limit(5)).scalars().all()
@@ -321,7 +334,8 @@ class TelegramBridge:
                                  else 'Задача не найдена среди синтетических тестов этого Telegram-подключения.')
                     else:
                         reply = ('Последние синтетические тесты (до 5):\n\n' if kind == 'tasks' else '')
-                        reply += '\n\n'.join(self.task_summary(session, task) for task in tasks)
+                        reply += '\n\n'.join(self.task_summary(session, task, compact=True) if kind == 'tasks'
+                                             else self.task_summary(session, task) for task in tasks)
                 self.finish(session, iid, reply + suffix)
         else:
             with self.store.transaction() as session:
@@ -343,11 +357,32 @@ class TelegramBridge:
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
+                        '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
                         'Голос и реальные AI пока отключены.')
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
             return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+
+    def scoped_tasks(self):
+        from .telegram_coding import exercise
+        fixed = exercise()
+        accepted = select(Audit).where(
+            Audit.event['kind'].as_string() == 'telegram_coding_accepted',
+            Audit.event['actor'].as_string() == 'owner',
+            Audit.event['task_id'].as_string() == Task.id,
+            Audit.event['profile'].as_string() == self.profile,
+            Audit.event['inbox_id'].as_string() == TelegramInbox.id,
+            Audit.event['request_fingerprint'].as_string() == TelegramInbox.fingerprint,
+            Audit.event['payload_hash'].as_string() == digest(fixed)).exists()
+        return select(Task).join(TelegramInbox,
+            (TelegramInbox.task_id == Task.id) & (Task.request_key == 'owner:tg:' + TelegramInbox.id)).where(
+                TelegramInbox.profile == self.profile, TelegramInbox.state == 'DONE', Task.owner_role == 'owner',
+                or_(and_(TelegramInbox.intent['kind'].as_string() == 'demo',
+                         Task.payload['kind'].as_string() == 'approved_render'),
+                    and_(TelegramInbox.intent == {'kind': 'coding_demo'},
+                         TelegramInbox.fingerprint == digest({'kind': 'coding_demo'}),
+                         Task.payload == fixed, Task.payload_hash == digest(fixed), accepted)))
 
     def confirmed_result(self, session, task):
         return bool(task.state == 'SUCCEEDED' and isinstance(task.artifact, str)
@@ -360,7 +395,7 @@ class TelegramBridge:
                 Audit.event['fence'].as_integer() == task.fence,
                 Audit.event['revision'].as_string() == self.store.settings.source_revision)).first())
 
-    def task_summary(self, session, task):
+    def task_summary(self, session, task, *, compact=False):
         states = {
             'WAITING_APPROVAL': 'Ожидает отдельного подтверждения синтетического теста.',
             'READY': 'Ожидает исполнителя.',
@@ -376,6 +411,9 @@ class TelegramBridge:
         if task.state == 'SUCCEEDED':
             summary = ('Результат независимо проверен; SHA-256 ' + task.artifact_hash if self.confirmed_result(session, task)
                        else 'Успех не подтверждён; нужна сверка состояния.')
+            if task.payload['kind'] == 'coding_synthetic':
+                from .telegram_coding import summary as coding_summary
+                summary = coding_summary(self, session, task, compact=compact)
         if task.state == 'RUNNING' and (task.lease_until is None or task.lease_until <= self.store.now(session)):
             summary = 'Lease истёк или отсутствует; текущее выполнение не подтверждено, нужна сверка.'
         # Only fixed explanations leave the control plane: no arbitrary reason,
@@ -385,20 +423,21 @@ class TelegramBridge:
                    'isolation_policy_mismatch': 'Изоляция исполнителя не соответствует требованиям.'}
         if task.reason in reasons:
             summary += ' ' + reasons[task.reason]
-        return f'Синтетический тест {task.id}\n{summary}\nПодробнее: /status {task.id}'
+        label = 'Тестовый разработчик (mock)' if task.payload['kind'] == 'coding_synthetic' else 'Синтетический тест'
+        return f'{label} {task.id}\n{summary}\nПодробнее: /status {task.id}'
 
     def collect_results(self):
         with self.store.transaction() as session:
             self.store.check_audit(session)
-            rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == self.profile,
-                                    TelegramInbox.task_id.is_not(None))).scalars()
-            for row in rows:
-                task = self.store.task(session, row.task_id)
+            for task in session.execute(self.scoped_tasks()).scalars():
                 if task.state in {'SUCCEEDED', 'FAILED', 'CANCELLED', 'RECONCILING', 'SECURITY_BLOCKED'}:
-                    text = f'Синтетический тест {task.id}: {task.state}. '
-                    verified = self.confirmed_result(session, task)
-                    text += ('Результат независимо проверен; SHA-256 ' + str(task.artifact_hash)
-                             if verified else 'Успех не подтверждён; нужна сверка состояния.')
+                    if task.payload['kind'] == 'coding_synthetic':
+                        text = task.state + '\n' + self.task_summary(session, task)
+                    else:
+                        text = f'Синтетический тест {task.id}: {task.state}. '
+                        verified = self.confirmed_result(session, task)
+                        text += ('Результат независимо проверен; SHA-256 ' + str(task.artifact_hash)
+                                 if verified else 'Успех не подтверждён; нужна сверка состояния.')
                     text += ' Работа по реальной бизнес-задаче не выполнялась.'
                     self.enqueue(session, f'task:{task.id}:{task.version}:{task.state}', text)
 

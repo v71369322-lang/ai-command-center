@@ -32,7 +32,8 @@ def handle(request):
     elif method=='getUpdates':
         values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
                 '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1',
-                '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all']
+                '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all',
+                '/coding_plan','/coding_demo']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -48,9 +49,10 @@ from command_center.store import digest
 client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.model_dump()),
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
-    result=TelegramService(store,client,poll_seconds=0).run(max_cycles=2)
-    assert result['completed_cycles']==2 and result['live_verified'] is False
-    assert calls.count('sendMessage')==13
+    service=TelegramService(store,client,poll_seconds=0)
+    result=service.run(max_cycles=40)
+    assert result['completed_cycles']==40 and result['live_verified'] is False
+    assert calls.count('sendMessage')==16
     assert any('пока нет' in value for value in sent)
     assert any('не найдена' in value for value in sent)
     assert any('Запрос №1 сохранён' in value for value in sent)
@@ -61,8 +63,22 @@ try:
     assert any('Очередь: LNAuto. Ожидают планирования: 1.' in value for value in sent)
     assert any('Очередь: Ваниль и Сахар. Ожидают планирования: 0.' in value for value in sent)
     assert any('Очередь: Не распределены. Ожидают планирования: 0.' in value for value in sent)
+    assert any('Тестовый разработчик (mock) принят:' in value for value in sent)
+    assert any('Проверка 1: найдена ошибка. Проверка 2: пройдена после исправления.' in value
+               and 'Результат независимо проверен' in value
+               and 'PR подготовлен в mock-режиме, не опубликован' in value for value in sent)
+    from command_center.models import TelegramInbox
+    row_id=service.bridge.profile+':15'
+    with store.transaction() as session:
+        task_id=session.get(TelegramInbox,row_id).task_id
+    coding_task=store.get(task_id)
+    assert coding_task['state']=='SUCCEEDED'
+    assert [r['checks']['passed'] for r in coding_task['coding']['test_runs']]==[False,True]
+    assert coding_task['coding']['pr']['published'] is False and coding_task['coding']['pr']['url'] is None
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':2,'read_only_queries':11,'project_assignments':1,'actual_telegram_contacted':False}))
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':12,'project_assignments':1,
+        'coding_task_id':task_id,'coding_repair_checks':[False,True],'mock_pr_published':False,
+        'actual_telegram_contacted':False}))
 finally:
     client.close();store.engine.dispose()
 '''
@@ -124,7 +140,7 @@ def main():
                   'runtime_mode': 'CLOUD_ROOTFUL_TEST_ONLY', 'rootless_host_verified': False,
                   'connection_digest': digest(config.model_dump()), 'vps_contacted': False}
         Path('.runtime/telegram-container.json').write_text(json.dumps(report, indent=2) + '\n')
-        print('Telegram service container → actual PG → mock HTTP → durable numbered requests/status replies; no socket/ports: PASS')
+        print('Telegram service container → fake Bot API → actual PG/Redis/worker/broker → coding repair/replay → mock PR → Telegram report; no socket/ports: PASS')
     finally:
         removed = docker('rm', '--force', name, timeout=15)
         absent = docker('inspect', name, timeout=5)
