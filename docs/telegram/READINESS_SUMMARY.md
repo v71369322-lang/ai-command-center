@@ -69,10 +69,18 @@ OpenAI, GitHub, worker/watchdog, состояние баланса или око
 
 Mobile opt-in: локально **183 passed / 1 Starlette-httpx warning** — deployment,
 config byte pin и readiness через actual PostgreSQL + strict Bot API mock.
-Включены прежние regressions и 22 новых cases; пересекающиеся прогоны не суммируются.
+Включены прежние regressions и 24 новых cases; пересекающиеся прогоны не суммируются.
 Container smoke расширен API/Telegram config-only и отказом при изменённом pin;
 его выполненный результат и полный финальный CI фиксируются в новом Draft PR.
 На VPS и к платным provider API эти проверки не обращаются.
+
+Operator profile `--release first-experiment-readiness` закрепляет application
+`d932baafce53c0748396abfc019cf81b931ebfec` →
+`5a70a48e57d75eceac0526fe8abcf70d57489b8b`. Prepare выбирает новый flag;
+stage/apply требуют его для нового имени и отвергают добавление под прежним
+`first-experiment` (target0d44f31). Operator checkout закрепляется отдельно.
+Один кандидат включает и прежнее подключение Gateway, и readonly AI-сводку
+Telegram; новые owner prepare/apply approvals остаются обязательными.
 
 Локально **126 passed / 1 прежний Starlette-httpx warning**: новая сводка,
 прежние menu/control/task-status regression tests, настоящая PostgreSQL и строгий

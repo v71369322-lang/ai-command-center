@@ -24,7 +24,7 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment"])
+@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness"])
 def prepared(tmp_path, monkeypatch, request):
     base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
@@ -84,7 +84,7 @@ def prepared(tmp_path, monkeypatch, request):
     target.pop("telegram")
     target["revision"] = target_revision
     target["source_root"] = str(tmp_path / "new-source")
-    if request.param == "first-experiment":
+    if request.param in {"first-experiment", "first-experiment-readiness"}:
         from command_center.coding.first_experiment import CAP, FirstExperiment, MODEL
         from command_center.coding.integration_config import IntegrationConfig, Tariff
         from command_center.deployment_integrations import prepare_binding
@@ -104,7 +104,8 @@ def prepared(tmp_path, monkeypatch, request):
             path.write_text("PUBLIC_SYNTHETIC_FIXTURE_" + name)
             path.chmod(0o600)
             key_files.append(path)
-        target["first_experiment"] = prepare_binding(target, config_file, *key_files)
+        target["first_experiment"] = prepare_binding(target, config_file, *key_files,
+            telegram_readiness=request.param == "first-experiment-readiness")
     disabled = {"manifest": target, "compose": render(base, target)}
     old_dir, new_dir = tmp_path / "active", tmp_path / "disabled"
     for folder, bundle in [(old_dir, previous), (new_dir, disabled)]:
@@ -145,14 +146,26 @@ def closed_source(previous):
     return base
 
 
-@pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
+@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness"], indirect=True)
 def test_first_experiment_requires_explicit_new_binding(prepared):
     previous, disabled, config, *_ = prepared
     unbound = copy.deepcopy(disabled)
     unbound["manifest"].pop("first_experiment")
     unbound["compose"] = render(closed_source(previous), unbound["manifest"])
     with pytest.raises(ValueError, match="explicit_first_experiment_binding_required"):
-        staging.candidate(previous, unbound, config, checksum(previous), release="first-experiment")
+        staging.candidate(previous, unbound, config, checksum(previous), release=release_for(prepared))
+
+
+@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness"], indirect=True)
+def test_readiness_flag_cannot_be_added_or_removed_under_another_release(prepared):
+    previous, disabled, config, *_ = prepared
+    changed = copy.deepcopy(disabled)
+    binding = changed["manifest"]["first_experiment"]
+    if binding.pop("telegram_readiness", None) is None:
+        binding["telegram_readiness"] = True
+    changed["compose"] = render(changed["compose"], changed["manifest"])
+    with pytest.raises(ValueError, match="exact_readiness_profile_required"):
+        staging.candidate(previous, changed, config, checksum(previous), release=release_for(prepared))
 
 
 @pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
@@ -528,7 +541,7 @@ def test_unknown_profile_is_rejected_before_loading_any_path(value):
         staging.stage("/not-loaded", "/not-loaded", "/not-created", "a" * 64, release=value)
 
 
-@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile", "first-experiment"])
+@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness"])
 @pytest.mark.parametrize("action", ["stage", "apply"])
 def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, action, capsys):
     argv = ["tool", action, "--active-bundle", "/active", "--disabled-bundle", "/disabled",

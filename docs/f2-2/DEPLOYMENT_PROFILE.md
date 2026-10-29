@@ -122,6 +122,9 @@ checkout и application checkout закрепляются отдельно. Ст
 через старое имя подключение integration отвергается. Stage и apply под lock
 перепроверяют config pin и custody до записи candidate/остановки Telegram.
 Нельзя вручную подменить connection.json или использовать compose override/up.
+Для mobile opt-in добавлен отдельный `--release first-experiment-readiness` с
+target `5a70a48e57d75eceac0526fe8abcf70d57489b8b` от того же d932baa.
+Он требует readiness flag; прежний first-experiment этот flag отвергает.
 Согласование source/build/stage отдельно от exact candidate apply сохраняется.
 Нового готового host bundle digest, source checkout или image IDs в облаке нет.
 
@@ -164,6 +167,8 @@ public fake credentials во временном private directory вне build c
 и отказ при изменённом credential reference с прежним byte pin. Script не
 использует реальные keys, DB, provider API или публикацию PR. Результат будет
 доказательством только после выполненного финального CI, не по наличию script.
+Mobile-продолжение добавляет реальный Telegram image probe с config-only mounts
+и pin rejection. Полный итог этого продолжения, с новым image revision, — в его PR.
 
 Временный cloud workspace имеет ограниченный диск; локальная пересборка старых
 образов без нужды не выполняется. Полный Python/HTTP-mock/container/security CI
