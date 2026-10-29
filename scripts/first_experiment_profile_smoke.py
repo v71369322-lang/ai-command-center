@@ -12,6 +12,8 @@ from command_center.deployment import migration_hash
 from command_center.deployment_integrations import mounts, prepare_binding
 from command_center.deployment_profile import atomic_json, render
 from command_center.local_docker import environment, run as docker
+from command_center.store import digest
+from command_center.telegram_transport import TelegramConnection
 
 
 def main():
@@ -51,7 +53,11 @@ def main():
         manifest = dict(schema=1, revision=revision, images=images, migration_hash=migration_hash(source),
             database_image=base['services']['db']['image'], redis_image=base['services']['redis']['image'],
             control_uid=os.getuid(), execution_uid=os.getuid() + 1, source_root=str(source), data_root=str(private / 'state'))
-        manifest['first_experiment'] = prepare_binding(manifest, **paths)
+        manifest['first_experiment'] = prepare_binding(manifest, **paths, telegram_readiness=True)
+        telegram = TelegramConnection(mode='live', owner_id=1234567, bot_id=123456789,
+                                      source_revision=revision, token_file='/run/telegram/token')  # nosec B106 -- fixed container path, no token value
+        manifest['telegram'] = dict(mode='live', owner_id=telegram.owner_id, bot_id=telegram.bot_id,
+                                    connection_digest=digest(telegram.model_dump()))
         profile = render(base, manifest)
         names = []
 
@@ -66,7 +72,7 @@ def main():
                     args += ['--env', key + '=' + value]
             for mount in mounts(manifest, role):
                 args += ['--mount', f'type=bind,src={mount["source"]},dst={mount["target"]},readonly']
-            image = images['broker' if role == 'runtime-broker' else role]
+            image = images[{'runtime-broker': 'broker', 'telegram': 'api'}.get(role, role)]
             result = docker(*args, image, 'python', '-B', '-c', code, timeout=45)
             if result.returncode:
                 raise ValueError('first_experiment_container_probe_failed:' + role)
@@ -75,10 +81,11 @@ def main():
             common = ('import os,errno;from command_center.coding.integration_config import IntegrationConfig,FileCredentials;'
                       'c=IntegrationConfig.load();assert c.mode=="live" and not c.connected();'
                       'assert not c.first_experiment.report()["ready_for_final_confirmation"];')
-            probe('api', common + '\nfor ref in (c.openai_secret_ref,c.github_secret_ref):\n'
-                  ' try: FileCredentials(c).get(ref)\n'
-                  ' except FileNotFoundError: pass\n'
-                  ' else: raise ValueError("credential_visible_to_api")\n')
+            for role in ('api', 'telegram'):
+                probe(role, common + '\nfor ref in (c.openai_secret_ref,c.github_secret_ref):\n'
+                      ' try: FileCredentials(c).get(ref)\n'
+                      ' except FileNotFoundError: pass\n'
+                      ' else: raise ValueError("credential_visible_to_observer")\n')
             broker = common + ('assert FileCredentials(c).get(c.openai_secret_ref)=="PUBLIC_SYNTHETIC_FIXTURE_openai_key_file";'
                                'assert FileCredentials(c).get(c.github_secret_ref)=="PUBLIC_SYNTHETIC_FIXTURE_github_token_file";')
             broker += '\nfor path in c.credential_files.values():\n'
@@ -100,15 +107,19 @@ def main():
                   'try: IntegrationConfig.load()\n'
                   'except ValueError as error: assert str(error)=="integration_config_pin_changed"\n'
                   'else: raise ValueError("changed_reference_accepted")\n')
+            probe('telegram', 'from command_center.coding.integration_config import IntegrationConfig\n'
+                  'try: IntegrationConfig.load()\n'
+                  'except ValueError as error: assert str(error)=="integration_config_pin_changed"\n'
+                  'else: raise ValueError("changed_reference_accepted")\n')
         finally:
             for name in names:
                 docker('rm', '-f', name)  # Exact fresh probe names only, including a timed-out CLI.
     report = dict(revision=revision, mode='CLOUD_ROOTFUL_NETWORKLESS_PUBLIC_FIXTURES',
-        api_config_only=True, broker_only_credentials=True, credential_mounts_readonly=True,
+        api_config_only=True, telegram_config_only=True, broker_only_credentials=True, credential_mounts_readonly=True,
         worker_unconfigured=True, changed_reference_rejected=True, exact_image_revision=True,
         real_credentials_used=False, external_api_calls=0, vps_contacted=False, rootless_host_verified=False)
     atomic_json(source / '.runtime/first-experiment-profile-smoke.json', report)
-    print('First-experiment profile: API config only, broker readonly credentials, worker isolated, byte pin: PASS')
+    print('First-experiment profile: API/Telegram config only, broker readonly credentials, worker isolated, byte pin: PASS')
 
 
 if __name__ == '__main__':

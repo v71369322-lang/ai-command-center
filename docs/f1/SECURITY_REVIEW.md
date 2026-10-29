@@ -95,6 +95,13 @@ networkless cloud smoke — argv-only Git/local Unix Docker для exact source
 MEDIUM/HIGH отсутствуют в локальном scan. Allowlist rules не расширялись,
 findings не подавлялись. Полный dependency/static scan final SHA — в CI.
 
+Следующий mobile opt-in добавляет readonly config Telegram без credentials,
+новых сетей или grants; legacy binding без флага остаётся прежним. Postcheck
+проверяет actual mount/pin. В public-fixture smoke точечно отмечен B106:
+`token_file='/run/telegram/token'` — fixed container selector, не значение токена.
+Только этот false positive имеет локальный nosec с объяснением; список разрешённых
+Bandit rules не расширяется. Остальные retained findings продолжают проверяться.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

@@ -17,7 +17,8 @@ BINDING_KEYS = {'config_file', 'config_sha256', 'profile_hash', *CREDENTIAL_TARG
 
 def validate_binding(manifest):
     binding = manifest.get('first_experiment')
-    if not isinstance(binding, dict) or set(binding) != BINDING_KEYS:
+    if (not isinstance(binding, dict) or set(binding) not in (BINDING_KEYS, BINDING_KEYS | {'telegram_readiness'})
+            or 'telegram_readiness' in binding and binding['telegram_readiness'] is not True):
         raise ValueError('first_experiment_binding_invalid')
     if any(not isinstance(binding[k], str) or not re.fullmatch('[a-f0-9]{64}', binding[k])
            for k in ('config_sha256', 'profile_hash')):
@@ -100,9 +101,11 @@ def check_binding(manifest):
     return config
 
 
-def prepare_binding(manifest, config_file, openai_key_file, github_token_file):
+def prepare_binding(manifest, config_file, openai_key_file, github_token_file, *, telegram_readiness=False):
     binding = dict(config_file=str(config_file), config_sha256='0' * 64, profile_hash='0' * 64,
                    openai_key_file=str(openai_key_file), github_token_file=str(github_token_file))
+    if telegram_readiness:
+        binding['telegram_readiness'] = True
     candidate = {**manifest, 'first_experiment': binding}
     validate_binding(candidate)
     raw, config = _configuration(config_file, manifest['control_uid'])
@@ -112,7 +115,9 @@ def prepare_binding(manifest, config_file, openai_key_file, github_token_file):
 
 
 def mounts(manifest, service):
-    if 'first_experiment' not in manifest or service not in {'api', 'runtime-broker'}:
+    if ('first_experiment' not in manifest or service not in {'api', 'runtime-broker', 'telegram'}
+            or service == 'telegram' and ('telegram' not in manifest
+                or not manifest['first_experiment'].get('telegram_readiness'))):
         return []
     binding = manifest['first_experiment']
     result = [{'type': 'bind', 'source': binding['config_file'], 'target': CONFIG_TARGET, 'read_only': True}]

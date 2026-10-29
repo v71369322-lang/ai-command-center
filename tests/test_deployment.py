@@ -71,6 +71,62 @@ def test_external_profile_is_opt_in_pinned_and_secrets_only_reach_broker(externa
     assert load_bundle(release[1]) == release[0]
 
 
+@pytest.mark.parametrize('attack', [None, 'key', 'writable', 'missing_pin', 'wrong_pin', 'gateway_network'])
+def test_mobile_profile_shares_only_pinned_readonly_config(external_release, attack):
+    from command_center.deployment_integrations import CONFIG_TARGET, mounts
+    manifest, profile, _ = external_release
+    manifest['first_experiment']['telegram_readiness'] = True
+    manifest['telegram'] = {'mode': 'live', 'owner_id': 1234567, 'bot_id': 123456789,
+                            'connection_digest': 'c' * 64}
+    profile = render(profile, manifest)
+    telegram = profile['services']['telegram']
+    if attack == 'key':
+        telegram['volumes'].append(mounts(manifest, 'runtime-broker')[-1])
+    elif attack == 'writable':
+        telegram['volumes'][-1]['read_only'] = False
+    elif attack == 'missing_pin':
+        telegram['environment'].pop('F2_INTEGRATION_CONFIG_SHA256')
+    elif attack == 'wrong_pin':
+        telegram['environment']['F2_INTEGRATION_CONFIG_SHA256'] = '0' * 64
+    elif attack == 'gateway_network':
+        telegram['networks']['gateway-access'] = None
+    if attack:
+        with pytest.raises(ValueError, match='telegram_service_boundary_changed'):
+            validate_profile(profile, manifest)
+    else:
+        validate_profile(profile, manifest)
+        assert mounts(manifest, 'telegram') == mounts(manifest, 'api')
+        assert telegram['volumes'][-1]['target'] == CONFIG_TARGET
+        assert telegram['secrets'] == ['db_password']
+        assert set(telegram['networks']) == {'control', 'telegram-access'}
+        assert not mounts({k: v for k, v in manifest.items() if k != 'telegram'}, 'telegram')
+
+
+def test_legacy_external_telegram_bundle_remains_without_ai_config(external_release):
+    from command_center.deployment_integrations import mounts
+    manifest, profile, _ = external_release
+    manifest['telegram'] = {'mode': 'live', 'owner_id': 1234567, 'bot_id': 123456789,
+                            'connection_digest': 'c' * 64}
+    profile = render(profile, manifest)
+    validate_profile(profile, manifest)
+    assert mounts(manifest, 'telegram') == []
+    assert not any(k.startswith('F2_') for k in profile['services']['telegram']['environment'])
+
+
+@pytest.mark.parametrize('flag', [False, 'true', 1, None])
+def test_mobile_profile_flag_must_be_explicit_true(external_release, flag):
+    manifest, profile, _ = external_release
+    manifest['first_experiment']['telegram_readiness'] = flag
+    with pytest.raises(ValueError, match='first_experiment_binding_invalid'):
+        render(profile, manifest)
+
+
+def test_mobile_prepare_requires_config_before_docker():
+    from command_center.deployment import prepare
+    with pytest.raises(ValueError, match='first_experiment_config_required'):
+        prepare('/unused', '/unused/new', 1000, 1001, '/unused/state', first_experiment_telegram_readiness=True)
+
+
 @pytest.mark.parametrize('attack', ['worker_key', 'api_key', 'watchdog_config', 'wrong_target', 'writable_key',
                                    'extra_mount', 'worker_egress', 'api_gateway_network', 'extra_network',
                                    'internal_egress', 'missing_pin', 'wrong_pin', 'worker_pin', 'extra_selector'])
@@ -233,11 +289,18 @@ def test_external_preflight_rechecks_pin_before_images_database_or_start(externa
     assert engine.calls == []
 
 
-@pytest.mark.parametrize('attack', [None, 'worker_key', 'broker_writable', 'api_missing_config', 'wrong_pin'])
-def test_external_postcheck_validates_actual_mounts_and_running_config(external_release, monkeypatch, attack):
+@pytest.mark.parametrize('telegram,attack', [(t, a) for t in (False, True)
+    for a in (None, 'worker_key', 'broker_writable', 'api_missing_config', 'wrong_pin')]
+    + [(True, a) for a in ('telegram_missing_config', 'telegram_writable_config', 'telegram_key')])
+def test_external_postcheck_validates_actual_mounts_and_running_config(external_release, monkeypatch, telegram, attack):
     from command_center.coding.integration_config import IntegrationConfig
     from command_center.deployment_integrations import CONFIG_TARGET, check_binding, mounts
     manifest, profile, paths = external_release
+    if telegram:
+        manifest['first_experiment']['telegram_readiness'] = True
+        manifest['telegram'] = {'mode': 'live', 'owner_id': 1234567, 'bot_id': 123456789,
+                                'connection_digest': 'c' * 64}
+        profile = render(profile, manifest)
     config = check_binding(manifest)
     class InspectedEngine(FakeEngine):
         def json(self, *args):
@@ -252,9 +315,17 @@ def test_external_postcheck_validates_actual_mounts_and_running_config(external_
                 actual[-1]['RW'] = True
             if attack == 'api_missing_config' and name == 'api':
                 actual = []
+            if name == 'telegram':
+                if attack == 'telegram_missing_config':
+                    actual = []
+                elif attack == 'telegram_writable_config':
+                    actual[0]['RW'] = True
+                elif attack == 'telegram_key':
+                    v = mounts(manifest, 'runtime-broker')[-1]
+                    actual.append({'Source': v['source'], 'Destination': v['target'], 'RW': False})
             return [{'State': {'Running': True}, 'Mounts': actual}]
         def run(self, *args, **kwargs):
-            if args[:1] == ('exec',) and args[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1'}:
+            if args[:1] == ('exec',) and args[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1', 'acc-f23-telegram-1'}:
                 with monkeypatch.context() as scope:
                     scope.setenv('F2_INTEGRATION_CONFIG_FILE', CONFIG_TARGET)
                     scope.setenv('F2_INTEGRATION_CONFIG_SHA256',
@@ -270,11 +341,12 @@ def test_external_postcheck_validates_actual_mounts_and_running_config(external_
             controller.postcheck()
     else:
         assert controller.postcheck()['state'] == 'CLOSED_SYNTHETIC_SERVICES_RUNNING'
-        assert sum(c[:1] == ('exec',) and c[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1'}
-                   for c in engine.calls) == 2
+        assert sum(c[:1] == ('exec',) and c[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1', 'acc-f23-telegram-1'}
+                   for c in engine.calls) == (3 if telegram else 2)
 
 
-def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys):
+@pytest.mark.parametrize('telegram', [False, True])
+def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys, telegram):
     import sys
     import command_center.deployment as module
     calls = []
@@ -282,19 +354,21 @@ def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys)
     monkeypatch.setattr(sys, 'argv', ['deployment', 'prepare', '--source', '/source', '--bundle', '/new',
         '--control-uid', '1000', '--execution-uid', '1001', '--data-root', '/state',
         '--first-experiment-config', '/private/config', '--openai-key-file', '/private/openai',
-        '--github-token-file', '/private/github'])
+        '--github-token-file', '/private/github'] + (['--first-experiment-telegram-readiness'] if telegram else []))
     module.main()
     assert json.loads(capsys.readouterr().out)['bundle_digest'] == 'a' * 64
     assert calls[0][1] == dict(owner_password_origin=None, password_loopback_http=False,
         telegram_connection_digest=None, first_experiment_config='/private/config',
-        openai_key_file='/private/openai', github_token_file='/private/github')
+        openai_key_file='/private/openai', github_token_file='/private/github',
+        first_experiment_telegram_readiness=telegram)
 
 
-def test_non_prepare_cli_cannot_silently_ignore_integration_binding(monkeypatch):
+@pytest.mark.parametrize('arguments', [['--first-experiment-config', '/private/config'],
+                                    ['--first-experiment-telegram-readiness']])
+def test_non_prepare_cli_cannot_silently_ignore_integration_binding(monkeypatch, arguments):
     import sys
     import command_center.deployment as module
-    monkeypatch.setattr(sys, 'argv', ['deployment', 'update', '--bundle', '/unused',
-                                     '--first-experiment-config', '/private/config'])
+    monkeypatch.setattr(sys, 'argv', ['deployment', 'update', '--bundle', '/unused'] + arguments)
     with pytest.raises(SystemExit) as error:
         module.main()
     assert error.value.code == 2

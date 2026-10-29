@@ -35,10 +35,15 @@ F2 integration env/mounts и оставляет broker в internal network. Эт
 
 ## Что именно добавляется
 
-Необязательный manifest `first_experiment` содержит только пять полей:
+Исходный manifest `first_experiment` содержит пять обязательных полей:
 `config_file`, `config_sha256`, `profile_hash`, `openai_key_file`,
 `github_token_file`. Последнее — короткоживущий installation token, **не**
 App private key. Значений credentials в manifest/образах/Git нет.
+
+Следующее cloud-продолжение добавляет единственное optional поле
+`telegram_readiness: true`, выбираемое только отдельным prepare flag
+`--first-experiment-telegram-readiness`. Отсутствие поля сохраняет прежний bundle;
+false/строки не принимаются. Flag без config отклоняется до Docker access.
 
 Все три host files должны быть разными canonical absolute paths вне build
 context, в private0700 parents, regular/0600, UID control, без symlinks/hardlinks.
@@ -72,7 +77,9 @@ tariff и budgets не выше100₽. `http_mock`, произвольная м�
 API и broker получают readonly `/run/f2/config.json` и его обязательный byte
 SHA-256 через `F2_INTEGRATION_CONFIG_FILE`/`F2_INTEGRATION_CONFIG_SHA256`.
 Только broker получает два readonly credential mounts и `gateway-access` network.
-Worker, watchdog, Telegram и coding/verifier sandboxes не получают ни этих
+С opt-in `telegram_readiness` Telegram также получает только pinned readonly config;
+его прежние сети/DB-only secret scope сохраняются. Worker, watchdog и
+coding/verifier sandboxes не получают ни этих
 credentials, ни integration config, ни gateway network. Loopback API, отдельный
 execution daemon, image/source pinning, read-only root/cap drops/resource limits
 и прежний boot/halt/recovery порядок сохраняются.
@@ -101,7 +108,7 @@ IntegrationConfig.load проверяет byte pin до возврата config 
 Без всех трёх нет нового профиля; неполный набор отклоняется до Docker access.
 На других actions эти аргументы не игнорируются, а отвергаются. Config/file
 custody и оба hashes проверяются при prepare и каждом deployment preflight.
-Postcheck проверяет hashes внутри API/broker и actual readonly mount metadata
+Postcheck проверяет hashes внутри API/broker и opt-in Telegram, actual readonly mount metadata
 всех служб; ключ в API/worker/watchdog/Telegram или writable bind отвергается.
 
 Оператор использует прежний build_release.sh на двух rootless daemons,
@@ -115,6 +122,9 @@ checkout и application checkout закрепляются отдельно. Ст
 через старое имя подключение integration отвергается. Stage и apply под lock
 перепроверяют config pin и custody до записи candidate/остановки Telegram.
 Нельзя вручную подменить connection.json или использовать compose override/up.
+Для mobile opt-in добавлен отдельный `--release first-experiment-readiness` с
+target `5a70a48e57d75eceac0526fe8abcf70d57489b8b` от того же d932baa.
+Он требует readiness flag; прежний first-experiment этот flag отвергает.
 Согласование source/build/stage отдельно от exact candidate apply сохраняется.
 Нового готового host bundle digest, source checkout или image IDs в облаке нет.
 
@@ -157,6 +167,8 @@ public fake credentials во временном private directory вне build c
 и отказ при изменённом credential reference с прежним byte pin. Script не
 использует реальные keys, DB, provider API или публикацию PR. Результат будет
 доказательством только после выполненного финального CI, не по наличию script.
+Mobile-продолжение добавляет реальный Telegram image probe с config-only mounts
+и pin rejection. Полный итог этого продолжения, с новым image revision, — в его PR.
 
 Временный cloud workspace имеет ограниченный диск; локальная пересборка старых
 образов без нужды не выполняется. Полный Python/HTTP-mock/container/security CI

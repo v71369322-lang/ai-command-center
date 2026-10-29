@@ -30,10 +30,21 @@
 
 ## Что именно означает AI-статус
 
-В deployment-профиле Telegram не смонтирован конфигурационный файл шлюза и его
+В прежнем deployment-профиле Telegram не смонтирован конфигурационный файл шлюза и его
 credentials. Поэтому по умолчанию сообщение говорит **«Состояние gateway
 неизвестно»**. Отсутствие файла в этом процессе не доказывает отключение другого
-сервиса. Отдельный профиль/ключи ради этой сводки не монтируются.
+сервиса. Старые bundles сохраняют это поведение.
+
+Cloud-продолжение поверх [PR #42](https://github.com/v71369322-lang/ai-command-center/pull/42)
+добавляет явный opt-in `deployment prepare --first-experiment-telegram-readiness`
+вместе с тремя existing first-experiment file arguments. В manifest binding
+появляется только `telegram_readiness: true`; false/строки/другие значения
+отвергаются, отсутствие поля сохраняет прежний профиль. При наличии Telegram
+его служба получает readonly config и обязательный SHA-256 pin. Mounts OpenAI key
+и installation token остаются только у broker; сетевые права Telegram прежние.
+Postcheck проверяет pin в работающем Telegram и actual readonly mount metadata.
+Эта функция ещё не доставлена на VPS; прежний application target PR #42 её
+не содержит и не переименовывается в новую версию.
 
 Если оператор ранее предоставил `F2_INTEGRATION_CONFIG_FILE`, используется
 существующий `IntegrationConfig.load()` и `FirstExperiment.report()` с текущим
@@ -55,6 +66,21 @@ OpenAI, GitHub, worker/watchdog, состояние баланса или око
 со всеми прежними блокировками; paid consent через эту команду получить нельзя.
 
 ## Доказательства
+
+Mobile opt-in: локально **183 passed / 1 Starlette-httpx warning** — deployment,
+config byte pin и readiness через actual PostgreSQL + strict Bot API mock.
+Включены прежние regressions и 24 новых cases; пересекающиеся прогоны не суммируются.
+Container smoke расширен API/Telegram config-only и отказом при изменённом pin;
+его выполненный результат и полный финальный CI фиксируются в новом Draft PR.
+На VPS и к платным provider API эти проверки не обращаются.
+
+Operator profile `--release first-experiment-readiness` закрепляет application
+`d932baafce53c0748396abfc019cf81b931ebfec` →
+`5a70a48e57d75eceac0526fe8abcf70d57489b8b`. Prepare выбирает новый flag;
+stage/apply требуют его для нового имени и отвергают добавление под прежним
+`first-experiment` (target0d44f31). Operator checkout закрепляется отдельно.
+Один кандидат включает и прежнее подключение Gateway, и readonly AI-сводку
+Telegram; новые owner prepare/apply approvals остаются обязательными.
 
 Локально **126 passed / 1 прежний Starlette-httpx warning**: новая сводка,
 прежние menu/control/task-status regression tests, настоящая PostgreSQL и строгий

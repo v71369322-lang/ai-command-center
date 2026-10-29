@@ -70,7 +70,7 @@ def services(m):
 
 def telegram_service(m):
     """One fixed client process, not an arbitrary service or HTTP proxy."""
-    return {
+    service = {
         'image': m['images']['api'], 'user': '0:0', 'restart': 'no',
         'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
         'command': ['python', '-m', 'command_center.telegram_service', 'run',
@@ -88,6 +88,12 @@ def telegram_service(m):
         'depends_on': {'db': {'condition': 'service_healthy'}},
         'logging': {'driver': 'local', 'options': {'max-size': '1m', 'max-file': '2'}},
     }
+    if m.get('first_experiment', {}).get('telegram_readiness'):
+        from .deployment_integrations import CONFIG_TARGET, mounts
+        service['environment'].update(F2_INTEGRATION_CONFIG_FILE=CONFIG_TARGET,
+            F2_INTEGRATION_CONFIG_SHA256=m['first_experiment']['config_sha256'])
+        service['volumes'] += mounts(m, 'telegram')
+    return service
 
 
 def render(base, m):

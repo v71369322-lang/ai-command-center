@@ -107,6 +107,12 @@ identity/permissions/target binding; selected count, installation token, payment
 upper bound и новый actual runtime profile остаются отдельными проверками.
 Итоговые commit/PR/CI этого изменения сверять в его отдельной ветке.
 
+Продолжение без owner SSH: [закреплённый AI-профиль в Telegram readiness](telegram/READINESS_SUMMARY.md).
+Явный prepare flag добавляет readonly config в Telegram без ключей и новых сетей;
+прежние bundles сохраняются. `/readiness` использует существующие локальные gates,
+не выполняет удалённые проверки и не выдаёт grants. Новый application SHA требует
+своего закреплённого пакета; target PR #42 не изменяется автоматически.
+
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
 - Предшествующая реализация до этапа меню: [Draft PR #31](https://github.com/v71369322-lang/ai-command-center/pull/31),
   `feat/telegram-coding-demo`, `b2b57ba8ae52d8ae7629c13647f250d0d92cfae7`.
