@@ -33,6 +33,8 @@ RELEASES = {
                               '185e6e32a60f8b5d62ed7046648560844a6eb19d'),
     'first-experiment-notifications': ('d932baafce53c0748396abfc019cf81b931ebfec',
                                      '8bab523f6f6e50a8a63e13a094f7fccf59ca889f'),
+    'first-experiment-cancel': ('d932baafce53c0748396abfc019cf81b931ebfec',
+                                'a5d867cb734a4954926a4e77c71e6f5be217057c'),
 }
 
 
@@ -44,7 +46,7 @@ def release_pair(release):
 
 def integration_transition(old, new, release):
     if release in {'first-experiment', 'first-experiment-readiness', 'first-experiment-status',
-                   'first-experiment-notifications'}:
+                   'first-experiment-notifications', 'first-experiment-cancel'}:
         if 'first_experiment' in old or 'first_experiment' not in new:
             raise ValueError('explicit_first_experiment_binding_required')
         if bool(new['first_experiment'].get('telegram_readiness')) != (release != 'first-experiment'):
