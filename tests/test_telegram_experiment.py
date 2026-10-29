@@ -7,7 +7,7 @@ import hashlib
 
 import httpx
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from command_center.coding.first_experiment import CAP, REQUEST_KEY, task_payload
 from command_center.coding.gateway import Gateway
@@ -197,13 +197,18 @@ def test_cached_completion_needs_matching_proof_and_publication_mode(bridge, sto
     assert (authority(store), ledger(store)) == before
 
 
-@pytest.mark.parametrize('field', ['payload', 'payload_hash', 'owner_role', 'request_key'])
+@pytest.mark.parametrize('field', ['payload', 'payload_number', 'payload_hash', 'owner_role', 'request_key'])
 def test_task_identity_cannot_be_inferred_from_experiment_tag_alone(bridge, store, field):
     task = create(store)
     with store.transaction() as session:
         row = session.get(Task, task['id'])
         if field == 'payload':
             row.payload = {**row.payload, 'cost': 1}
+        elif field == 'payload_number':
+            # ORM equality suppresses a dict assignment for 2 == 2.0. Write the
+            # changed JSON representation directly to exercise the actual threat.
+            session.execute(text("UPDATE tasks SET payload=jsonb_set(payload,'{cost}','2.0'::jsonb) WHERE id=:id"),
+                            {'id': task['id']})
         else:
             setattr(row, field, {'payload_hash': 'a' * 64, 'owner_role': 'operator', 'request_key': 'owner:other'}[field])
     if field == 'request_key':

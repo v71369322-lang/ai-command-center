@@ -38,6 +38,7 @@ def reply(bridge, session):
     created = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'task_created',
         Audit.event['task_id'].as_string() == task.id).order_by(Audit.sequence).limit(1))
     if (task.owner_role != 'owner' or task.payload != fixed or task.payload_hash != digest(fixed)
+            or task.payload_hash != digest(task.payload)
             or not created or created.event.get('actor') != 'owner'
             or created.event.get('payload_hash') != task.payload_hash):
         raise Denied('first_experiment_task_integrity')
