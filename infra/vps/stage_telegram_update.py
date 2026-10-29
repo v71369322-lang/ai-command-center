@@ -21,10 +21,21 @@ from command_center.telegram_transport import TelegramConnection, connection, pr
 
 BASE_REVISION = '316dc1615dea224bcf4bd595d87048d19820bd21'
 TARGET_REVISION = 'b2e71fe073f3109e639dac43496884905ce86d9f'
+RELEASES = {
+    'f34': (BASE_REVISION, TARGET_REVISION),
+    'telegram-resume': (TARGET_REVISION, 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
+}
 
 
-def candidate(previous, disabled, config, approved_previous):
+def release_pair(release):
+    if type(release) is not str or release not in RELEASES:
+        raise ValueError('exact_release_profile_required')
+    return RELEASES[release]
+
+
+def candidate(previous, disabled, config, approved_previous, *, release='f34'):
     """Pure transformation: no daemon, credential, file or permission changes."""
+    base_revision, target_revision = release_pair(release)
     if checksum(previous) != approved_previous:
         raise ValueError('previous_bundle_not_approved')
     old, new = previous['manifest'], disabled['manifest']
@@ -32,7 +43,7 @@ def candidate(previous, disabled, config, approved_previous):
     validate_manifest(new)
     validate_profile(previous['compose'], old)
     validate_profile(disabled['compose'], new)
-    if old['revision'] != BASE_REVISION or new['revision'] != TARGET_REVISION:
+    if old['revision'] != base_revision or new['revision'] != target_revision:
         raise ValueError('exact_source_revisions_required')
     fields = ('migration_hash', 'database_image', 'redis_image', 'data_root',
               'control_uid', 'execution_uid', 'owner_login')
@@ -41,12 +52,12 @@ def candidate(previous, disabled, config, approved_previous):
     if 'telegram' not in old or 'telegram' in new:
         raise ValueError('live_to_disabled_preparation_required')
     scope = old['telegram']
-    if (config.mode != 'live' or config.source_revision != BASE_REVISION
+    if (config.mode != 'live' or config.source_revision != base_revision
             or config.token_file != '/run/telegram/token'
             or digest(config.model_dump()) != scope['connection_digest']
             or config.bot_id != scope['bot_id'] or config.owner_id != scope['owner_id']):
         raise ValueError('active_telegram_binding_changed')
-    staged = TelegramConnection.model_validate({**config.model_dump(), 'source_revision': TARGET_REVISION})
+    staged = TelegramConnection.model_validate({**config.model_dump(), 'source_revision': target_revision})
     bundle = copy.deepcopy(disabled)
     bundle['manifest']['telegram'] = {**scope, 'connection_digest': digest(staged.model_dump())}
     bundle['compose'] = render(disabled['compose'], bundle['manifest'])
@@ -54,19 +65,20 @@ def candidate(previous, disabled, config, approved_previous):
     return bundle, staged
 
 
-def stage(active_directory, disabled_directory, output, approved_previous):
+def stage(active_directory, disabled_directory, output, approved_previous, *, release='f34'):
+    base_revision, target_revision = release_pair(release)
     previous, disabled = load_bundle(active_directory), load_bundle(disabled_directory)
     root = Path(previous['manifest']['data_root'])
     if os.getuid() != previous['manifest']['control_uid']:
         raise ValueError('dedicated_control_user_required')
     state = json.loads(private_read(root / 'deployment.json', 32768))
     if (state.get('phase') != 'VERIFIED' or state.get('bundle') != approved_previous
-            or state.get('revision') != BASE_REVISION
+            or state.get('revision') != base_revision
             or Path(state.get('directory', '')).resolve() != Path(active_directory).resolve()):
         raise ValueError('verified_predecessor_changed')
     live_config = root / 'telegram/connection.json'
     config = connection(live_config)
-    bundle, staged = candidate(previous, disabled, config, approved_previous)
+    bundle, staged = candidate(previous, disabled, config, approved_previous, release=release)
     source_check(disabled['manifest'])
     for uid, images in (
         (bundle['manifest']['control_uid'], {k: v for k, v in bundle['manifest']['images'].items()
@@ -76,7 +88,7 @@ def stage(active_directory, disabled_directory, output, approved_previous):
     ):
         engine = Engine(uid)
         engine.preflight()
-        image_check(engine, images, TARGET_REVISION)
+        image_check(engine, images, target_revision)
     output = Path(output)
     parent = output.parent.lstat()
     if (not output.is_absolute() or output.exists() or output.is_symlink()
@@ -88,7 +100,7 @@ def stage(active_directory, disabled_directory, output, approved_previous):
     if connection(live_config) != config or json.loads(private_read(root / 'deployment.json', 32768)) != state:
         raise ValueError('predecessor_changed_during_preparation')
     output.mkdir(mode=0o700)
-    plan = {'schema': 1, 'state': 'STAGED_NOT_ACTIVATED', 'revision': TARGET_REVISION,
+    plan = {'schema': 1, 'state': 'STAGED_NOT_ACTIVATED', 'release': release, 'revision': target_revision,
             'expected_previous': approved_previous, 'candidate_bundle': checksum(bundle),
             'previous_connection': digest(config.model_dump()),
             'candidate_connection': digest(staged.model_dump()), 'prepared_at': int(time.time()),
@@ -100,12 +112,14 @@ def stage(active_directory, disabled_directory, output, approved_previous):
     return plan
 
 
-def apply_candidate(active_directory, candidate_directory, approved_previous, approved_candidate, approved_until):
+def apply_candidate(active_directory, candidate_directory, approved_previous, approved_candidate, approved_until, *, release='f34'):
     """Explicit local operator action; never invoked by staging or the mailbox.
 
     Unknown results preserve activation.json and prohibit retry. Existing
     Deployment owns task quiescing, encrypted backup, update and postcheck.
     """
+    base_revision, target_revision = release_pair(release)
+
     def deadline():
         now = int(time.time())
         if type(approved_until) is not int or not now < approved_until <= now + 3600:
@@ -117,7 +131,7 @@ def apply_candidate(active_directory, candidate_directory, approved_previous, ap
     old, new = previous['manifest'], target['manifest']
     if checksum(previous) != approved_previous or checksum(target) != approved_candidate:
         raise ValueError('exact_bundle_approvals_required')
-    if old['revision'] != BASE_REVISION or new['revision'] != TARGET_REVISION:
+    if old['revision'] != base_revision or new['revision'] != target_revision:
         raise ValueError('exact_source_revisions_required')
     if any(old.get(k) != new.get(k) for k in ('migration_hash', 'database_image', 'redis_image',
                                              'data_root', 'control_uid', 'execution_uid', 'owner_login')):
@@ -133,10 +147,10 @@ def apply_candidate(active_directory, candidate_directory, approved_previous, ap
     live_config = root / 'telegram/connection.json'
     original = connection(live_config)
     staged = connection(directory / 'connection.candidate.json')
-    if (original.source_revision != BASE_REVISION or original.mode != 'live'
+    if (original.source_revision != base_revision or original.mode != 'live'
             or original.token_file != '/run/telegram/token'
             or digest(original.model_dump()) != old.get('telegram', {}).get('connection_digest')
-            or staged.model_dump() != {**original.model_dump(), 'source_revision': TARGET_REVISION}
+            or staged.model_dump() != {**original.model_dump(), 'source_revision': target_revision}
             or new.get('telegram') != {**old['telegram'], 'connection_digest': digest(staged.model_dump())}):
         raise ValueError('exact_candidate_binding_required')
     controller = Deployment(previous, active_directory)
@@ -154,13 +168,13 @@ def apply_candidate(active_directory, candidate_directory, approved_previous, ap
                            (new['execution_uid'], {'executor', 'coding'})):
             engine = Engine(uid)
             engine.preflight()
-            image_check(engine, {k: new['images'][k] for k in names}, TARGET_REVISION)
+            image_check(engine, {k: new['images'][k] for k in names}, target_revision)
         deadline()
         # Recheck after the potentially slow image/source preflight, under the lock.
         if connection(live_config) != original or json.loads(private_read(root / 'deployment.json', 32768)) != state:
             raise ValueError('predecessor_changed_during_preparation')
         atomic_json(directory / 'connection.previous.json', original.model_dump())
-        record = {'expected_previous': approved_previous, 'target': approved_candidate,
+        record = {'expected_previous': approved_previous, 'target': approved_candidate, 'release': release,
                   'phase': 'PAUSING_TELEGRAM', 'approved_until': approved_until, 'go_live': False}
         atomic_json(journal, record)
         controller.pause_telegram()
@@ -183,6 +197,7 @@ def main():
             self.exit(2, 'invalid preparation arguments; values not displayed\n')
     parser = SafeParser(description=__doc__)
     parser.add_argument('action', choices=['stage', 'apply'])
+    parser.add_argument('--release', choices=tuple(RELEASES), default='f34')
     parser.add_argument('--active-bundle', required=True)
     parser.add_argument('--disabled-bundle')
     parser.add_argument('--output', required=True)
@@ -194,10 +209,10 @@ def main():
         if args.action == 'stage':
             if not args.disabled_bundle:
                 parser.error('disabled bundle required for stage')
-            result = stage(args.active_bundle, args.disabled_bundle, args.output, args.approved_previous)
+            result = stage(args.active_bundle, args.disabled_bundle, args.output, args.approved_previous, release=args.release)
         else:
             result = apply_candidate(args.active_bundle, args.output, args.approved_previous,
-                                     args.approved_candidate, args.approved_until)
+                                     args.approved_candidate, args.approved_until, release=args.release)
         print(json.dumps(result))
     except Exception:
         parser.exit(1, 'telegram_candidate_unconfirmed; inspect output; do not overwrite or retry blindly\n')
