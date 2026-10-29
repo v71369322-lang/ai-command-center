@@ -24,7 +24,7 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile"])
+@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment"])
 def prepared(tmp_path, monkeypatch, request):
     base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
@@ -84,6 +84,27 @@ def prepared(tmp_path, monkeypatch, request):
     target.pop("telegram")
     target["revision"] = target_revision
     target["source_root"] = str(tmp_path / "new-source")
+    if request.param == "first-experiment":
+        from command_center.coding.first_experiment import CAP, FirstExperiment, MODEL
+        from command_center.coding.integration_config import IntegrationConfig, Tariff
+        from command_center.deployment_integrations import prepare_binding
+        private = tmp_path / "external-private"
+        private.mkdir(mode=0o700)
+        external = IntegrationConfig(mode="live", live_authorized=False,
+            synthetic_repository="fixture/acc-f2-synthetic-stage", budget_evidence="PUBLIC_FIXTURE_ONLY",
+            daily_nano_rub=CAP, monthly_nano_rub=CAP, first_experiment=FirstExperiment(repository_id=725000001),
+            tariff=Tariff(model=MODEL, input_nano_rub=67500, output_nano_rub=405000, context_tokens=400000,
+                          max_output_tokens=2048, confirmed=True, evidence="PUBLIC_FIXTURE_ONLY"),
+            credential_files={"openai": "/run/f2/openai.key", "github-installation-token": "/run/f2/github.token"})
+        config_file = private / "config.json"
+        atomic_json(config_file, {**external.model_dump(), "credential_files": external.credential_files})
+        key_files = []
+        for name in ("openai", "github"):
+            path = private / name
+            path.write_text("PUBLIC_SYNTHETIC_FIXTURE_" + name)
+            path.chmod(0o600)
+            key_files.append(path)
+        target["first_experiment"] = prepare_binding(target, config_file, *key_files)
     disabled = {"manifest": target, "compose": render(base, target)}
     old_dir, new_dir = tmp_path / "active", tmp_path / "disabled"
     for folder, bundle in [(old_dir, previous), (new_dir, disabled)]:
@@ -114,6 +135,51 @@ def prepared(tmp_path, monkeypatch, request):
 def release_for(prepared):
     pair = (prepared[0]["manifest"]["revision"], prepared[1]["manifest"]["revision"])
     return next(name for name, allowed in staging.RELEASES.items() if pair == allowed)
+
+
+def closed_source(previous):
+    """Restore this fixture's closed input before rendering a different manifest."""
+    base = copy.deepcopy(previous["compose"])
+    base["services"].pop("telegram", None)
+    base["services"]["api"]["environment"].pop("F1_TELEGRAM_SCOPE", None)
+    return base
+
+
+@pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
+def test_first_experiment_requires_explicit_new_binding(prepared):
+    previous, disabled, config, *_ = prepared
+    unbound = copy.deepcopy(disabled)
+    unbound["manifest"].pop("first_experiment")
+    unbound["compose"] = render(closed_source(previous), unbound["manifest"])
+    with pytest.raises(ValueError, match="explicit_first_experiment_binding_required"):
+        staging.candidate(previous, unbound, config, checksum(previous), release="first-experiment")
+
+
+@pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
+@pytest.mark.parametrize("release", ["f34", "telegram-resume", "telegram-mobile"])
+def test_legacy_release_cannot_inherit_integration_binding(prepared, release):
+    previous, disabled, config, *_ = prepared
+    old, new = copy.deepcopy(previous), copy.deepcopy(disabled)
+    old_revision, new_revision = staging.release_pair(release)
+    old["manifest"]["revision"], new["manifest"]["revision"] = old_revision, new_revision
+    # Rendering profiles does not require real files or credentials.
+    for bundle in (old, new):
+        bundle["compose"] = render(closed_source(previous), bundle["manifest"])
+    with pytest.raises(ValueError, match="first_experiment_release_required"):
+        staging.candidate(old, new, config, checksum(old), release=release)
+
+
+@pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
+def test_stage_rejects_changed_config_before_creating_candidate(prepared, tmp_path):
+    previous, disabled, _, old_dir, new_dir, root, _ = prepared
+    path = Path(disabled["manifest"]["first_experiment"]["config_file"])
+    path.write_bytes(path.read_bytes() + b"\n")
+    before = (root / "telegram/connection.json").read_bytes()
+    output = tmp_path / "candidate"
+    with pytest.raises(ValueError, match="first_experiment_config_pin_changed"):
+        staging.stage(old_dir, new_dir, output, checksum(previous), release="first-experiment")
+    assert not output.exists()
+    assert (root / "telegram/connection.json").read_bytes() == before
 
 
 def test_stage_keeps_live_binding_and_state_and_never_reads_token(prepared, tmp_path):
@@ -191,7 +257,7 @@ def test_candidate_rejects_unapproved_source_or_binding(prepared, change):
         approved = "a" * 64
     elif change == "old_source":
         previous["manifest"]["revision"] = "a" * 40
-        previous["compose"] = render(disabled["compose"], previous["manifest"])
+        previous["compose"] = render(closed_source(previous), previous["manifest"])
         approved = checksum(previous)
     elif change == "new_source":
         disabled["manifest"]["revision"] = "a" * 40
@@ -345,6 +411,20 @@ def invoke_activation(activation, **overrides):
     return staging.apply_candidate(**arguments)
 
 
+@pytest.mark.parametrize("prepared", ["first-experiment"], indirect=True)
+def test_activation_rechecks_config_pin_before_pause_or_journal(activation):
+    prepared, output, _, events, _ = activation
+    binding = prepared[1]["manifest"]["first_experiment"]
+    path = Path(binding["config_file"])
+    path.write_bytes(path.read_bytes() + b"\n")
+    before = (prepared[5] / "telegram/connection.json").read_bytes()
+    with pytest.raises(ValueError, match="first_experiment_config_pin_changed"):
+        invoke_activation(activation)
+    assert events == ["preflight-old"]
+    assert not (output / "activation.json").exists()
+    assert (prepared[5] / "telegram/connection.json").read_bytes() == before
+
+
 def test_activation_pauses_before_binding_and_delegates_existing_interlocks(activation):
     prepared, output, _, events, _ = activation
     original = prepared[2]
@@ -448,7 +528,7 @@ def test_unknown_profile_is_rejected_before_loading_any_path(value):
         staging.stage("/not-loaded", "/not-loaded", "/not-created", "a" * 64, release=value)
 
 
-@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile"])
+@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile", "first-experiment"])
 @pytest.mark.parametrize("action", ["stage", "apply"])
 def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, action, capsys):
     argv = ["tool", action, "--active-bundle", "/active", "--disabled-bundle", "/disabled",

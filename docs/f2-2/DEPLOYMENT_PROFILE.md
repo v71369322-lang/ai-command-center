@@ -105,9 +105,16 @@ Postcheck проверяет hashes внутри API/broker и actual readonly m
 всех служб; ключ в API/worker/watchdog/Telegram или writable bind отвергается.
 
 Оператор использует прежний build_release.sh на двух rootless daemons,
-prepare/inspect/exact approval/update/postcheck. Если Telegram source binding
-старой версии, нужен именованный stage/apply переход с точными revisions; нельзя
-вручную подменить connection.json или использовать compose override/up.
+prepare/inspect/exact approval/update/postcheck. Operator helper
+`infra/vps/stage_telegram_update.py` получает отдельный `--release first-experiment`:
+приложение `d932baafce53c0748396abfc019cf81b931ebfec` →
+`0d44f31fe9e37045ed410751cbac7020c59b669a`. Этот полный application SHA
+предшествует operator-only commit, содержащему именованный переход; operator
+checkout и application checkout закрепляются отдельно. Старые три release profiles
+и default f34 не меняются. Новый profile требует явный binding только в candidate;
+через старое имя подключение integration отвергается. Stage и apply под lock
+перепроверяют config pin и custody до записи candidate/остановки Telegram.
+Нельзя вручную подменить connection.json или использовать compose override/up.
 Согласование source/build/stage отдельно от exact candidate apply сохраняется.
 Нового готового host bundle digest, source checkout или image IDs в облаке нет.
 
@@ -137,6 +144,11 @@ warning** —129 deployment/pin tests и338 infrastructure. Новые61 вхо�
 Ruff/OpenAPI/TypeScript/Vite PASS. Полный локальный dependency/static audit:
 64 Python dependencies,0 Python/npm advisories,0 Bandit MED/HIGH,92 reviewed LOW.
 Эти результаты получены на рабочем tree до commit; final SHA проверяется CI.
+
+После добавления именованного operator transition: **353 passed /1 тот же warning**
+(224 staging tests, включая четвёртый release profile и отказы до pause/journal,
+плюс те же129 deployment/pin tests). Это пересекающийся targeted run, не353
+дополнительных теста. Ruff/OpenAPI/current-runtime-secret guard/diff check PASS.
 
 `scripts/first_experiment_profile_smoke.py` добавлен в полный verify_cloud.sh:
 fresh exact-revision images, настоящие network=none контейнеры API/broker/worker,

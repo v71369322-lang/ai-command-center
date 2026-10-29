@@ -25,6 +25,8 @@ RELEASES = {
     'f34': (BASE_REVISION, TARGET_REVISION),
     'telegram-resume': (TARGET_REVISION, 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
     'telegram-mobile': (TARGET_REVISION, 'd932baafce53c0748396abfc019cf81b931ebfec'),
+    'first-experiment': ('d932baafce53c0748396abfc019cf81b931ebfec',
+                         '0d44f31fe9e37045ed410751cbac7020c59b669a'),
 }
 
 
@@ -32,6 +34,14 @@ def release_pair(release):
     if type(release) is not str or release not in RELEASES:
         raise ValueError('exact_release_profile_required')
     return RELEASES[release]
+
+
+def integration_transition(old, new, release):
+    if release == 'first-experiment':
+        if 'first_experiment' in old or 'first_experiment' not in new:
+            raise ValueError('explicit_first_experiment_binding_required')
+    elif 'first_experiment' in old or 'first_experiment' in new:
+        raise ValueError('first_experiment_release_required')
 
 
 def candidate(previous, disabled, config, approved_previous, *, release='f34'):
@@ -46,6 +56,7 @@ def candidate(previous, disabled, config, approved_previous, *, release='f34'):
     validate_profile(disabled['compose'], new)
     if old['revision'] != base_revision or new['revision'] != target_revision:
         raise ValueError('exact_source_revisions_required')
+    integration_transition(old, new, release)
     fields = ('migration_hash', 'database_image', 'redis_image', 'data_root',
               'control_uid', 'execution_uid', 'owner_login')
     if any(old.get(k) != new.get(k) for k in fields):
@@ -90,6 +101,9 @@ def stage(active_directory, disabled_directory, output, approved_previous, *, re
         engine = Engine(uid)
         engine.preflight()
         image_check(engine, images, target_revision)
+    if 'first_experiment' in bundle['manifest']:
+        from command_center.deployment_integrations import check_binding
+        check_binding(bundle['manifest'])
     output = Path(output)
     parent = output.parent.lstat()
     if (not output.is_absolute() or output.exists() or output.is_symlink()
@@ -134,6 +148,7 @@ def apply_candidate(active_directory, candidate_directory, approved_previous, ap
         raise ValueError('exact_bundle_approvals_required')
     if old['revision'] != base_revision or new['revision'] != target_revision:
         raise ValueError('exact_source_revisions_required')
+    integration_transition(old, new, release)
     if any(old.get(k) != new.get(k) for k in ('migration_hash', 'database_image', 'redis_image',
                                              'data_root', 'control_uid', 'execution_uid', 'owner_login')):
         raise ValueError('separate_scope_or_migration_required')
@@ -165,6 +180,9 @@ def apply_candidate(active_directory, candidate_directory, approved_previous, ap
             raise ValueError('verified_predecessor_changed')
         controller.preflight()
         source_check(new)
+        if 'first_experiment' in new:
+            from command_center.deployment_integrations import check_binding
+            check_binding(new)
         for uid, names in ((new['control_uid'], {'api', 'worker', 'broker'}),
                            (new['execution_uid'], {'executor', 'coding'})):
             engine = Engine(uid)
