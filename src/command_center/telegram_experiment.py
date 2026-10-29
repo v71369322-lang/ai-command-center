@@ -29,11 +29,11 @@ def rub(value):
     return format(Decimal(value) / NANO_RUB, '.9f').rstrip('0').rstrip('.') + ' ₽'
 
 
-def snapshot(bridge, session, *, include_time=True):
+def task_record(bridge, session):
+    """Immutable task identity, deliberately independent of external accounting."""
     task = session.scalar(select(Task).where(Task.request_key == 'owner:' + REQUEST_KEY))
     if task is None:
-        return None, ('Первый AI-эксперимент ещё не создан. Условия: /readiness.\n'
-                      'Просмотр не создаёт задачу и не разрешает расходы.')
+        return None, None
     fixed = task_payload()
     created = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'task_created',
         Audit.event['task_id'].as_string() == task.id).order_by(Audit.sequence).limit(1))
@@ -42,6 +42,14 @@ def snapshot(bridge, session, *, include_time=True):
             or not created or created.event.get('actor') != 'owner'
             or created.event.get('payload_hash') != task.payload_hash):
         raise Denied('first_experiment_task_integrity')
+    return task, created
+
+
+def snapshot(bridge, session, *, include_time=True):
+    task, created = task_record(bridge, session)
+    if task is None:
+        return None, ('Первый AI-эксперимент ещё не создан. Условия: /readiness.\n'
+                      'Просмотр не создаёт задачу и не разрешает расходы.')
     if created.event.get('revision') != bridge.store.settings.source_revision:
         return task, 'Первый AI-эксперимент создан другой версией приложения. Нужна сверка; повтор не выполняется.'
     actions = session.scalars(select(ExternalAction).where(ExternalAction.task_id == task.id)).all()
@@ -111,4 +119,5 @@ def snapshot(bridge, session, *, include_time=True):
 
 
 def reply(bridge, session):
-    return snapshot(bridge, session)[1] + '\n\nУведомления: /watch_experiment; отключить: /unwatch_experiment.'
+    return (snapshot(bridge, session)[1] + '\n\nОтмена задачи: /cancel_experiment. '
+            'Уведомления: /watch_experiment; отключить: /unwatch_experiment.')

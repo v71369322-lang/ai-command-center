@@ -119,6 +119,14 @@ delivery не переиспользуются как NEW. Unsubscribe меня�
 notices и сохраняет начатые/неопределённые sends. Схема и финансовые/F1 grants не
 меняются; rootful mocked results не означают внешние live evidence.
 
+Отмена первого эксперимента связывает private-owner receipt с UUID/payload при
+приёме команды, source и сроком 120 секунд. Перепривязка request key не меняет
+цель. Cancel и inbox/reply commit атомарны под прежним Control lock; DONE receipt
+не применяется повторно. Внутренний locked F1 cancel сохраняет прежние roles,
+operator ownership и переходы; новый путь не создаёт Gateway/HTTP/credentials.
+Accounting/grants/reserves не изменяются даже при отмене во время HTTP. Неизвестный
+исход сохраняет no-repeat; подтверждение намерения не обещает фактической остановки.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

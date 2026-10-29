@@ -176,19 +176,25 @@ class Store:
         if actor not in {"owner", "operator"} or (revoke and actor != "owner"):
             raise Denied("role_forbidden")
         with self.transaction() as s:
-            task = self.task(s, task_id)
-            if actor == "operator" and task.owner_role != actor:
-                raise Denied("not_task_owner")
-            if _scope_installer:
-                _scope_installer(s, task)
-            approval = s.get(Approval, task_id)
-            if approval:
-                approval.revoked = True
-            if task.state not in TERMINAL:
-                task.state = "CANCEL_REQUESTED" if task.state in {"RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED"} else "CANCELLED"
-                task.version += 1
-            self.audit(s, "approval_revoked" if revoke else "cancel_requested", actor, task.id)
-            return self.view(task)
+            return self._cancel_locked(s, actor, task_id, revoke, _scope_installer=_scope_installer)
+
+    def _cancel_locked(self, s, actor, task_id, revoke=False, *, _scope_installer=None):
+        """Internal composition of the same F1 action; caller holds transaction()."""
+        if actor not in {"owner", "operator"} or (revoke and actor != "owner"):
+            raise Denied("role_forbidden")
+        task = self.task(s, task_id)
+        if actor == "operator" and task.owner_role != actor:
+            raise Denied("not_task_owner")
+        if _scope_installer:
+            _scope_installer(s, task)
+        approval = s.get(Approval, task_id)
+        if approval:
+            approval.revoked = True
+        if task.state not in TERMINAL:
+            task.state = "CANCEL_REQUESTED" if task.state in {"RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED"} else "CANCELLED"
+            task.version += 1
+        self.audit(s, "approval_revoked" if revoke else "cancel_requested", actor, task.id)
+        return self.view(task)
 
     def dispatch(self, broker):
         with self.transaction() as s:

@@ -148,6 +148,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'readiness'}
         if value == '/experiment':
             return str(uid), {'kind': 'experiment'}
+        if value == '/cancel_experiment':
+            return str(uid), {'kind': 'cancel_experiment'}
+        if value.split()[:1] == ['/cancel_experiment']:
+            raise Denied('telegram_experiment_cancel_arguments_forbidden')
         if value in {'/watch_experiment', '/unwatch_experiment'}:
             return str(uid), {'kind': value[1:]}
         if value.split()[:1] in [['/watch_experiment'], ['/unwatch_experiment']]:
@@ -237,6 +241,9 @@ class TelegramBridge:
                         raise Denied('control_blocked')
                     admission = {'admission_epoch': control.epoch,
                                  'expires_at': (self.store.now(session) + timedelta(seconds=120)).isoformat()}
+                if intent['kind'] == 'cancel_experiment':
+                    from .telegram_experiment_cancel import bind
+                    admission['experiment_cancel_binding'] = bind(self, session)
                 if session.scalar(select(func.count()).select_from(TelegramInbox)) >= 1000:
                     raise Denied('telegram_inbox_capacity')
                 session.add(TelegramInbox(id=iid, profile=self.profile, fingerprint=digest(intent), intent=intent,
@@ -307,6 +314,9 @@ class TelegramBridge:
                 self.finish(session, iid, 'Синтетический тест подтверждён. Ожидаем проверяемый результат.')
                 self.store.audit(session, 'telegram_card_consumed', 'owner', task.id, version=task.version)
             self.store.approve('owner', task_id, version, _scope_installer=consume, _deadline=expires)
+        elif kind == 'cancel_experiment':
+            from .telegram_experiment_cancel import apply
+            apply(self, iid)
         elif kind == 'cancel':
             self.store.cancel('owner', intent['task_id'], _scope_installer=lambda session, task:
                               self.finish(session, iid, 'Намерение отмены сохранено; фактическая остановка проверяется.'))
@@ -459,6 +469,7 @@ class TelegramBridge:
                         '/projects — проекты и назначение; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
+                        '/cancel_experiment — запросить отмену этой задачи; '
                         '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '

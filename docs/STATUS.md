@@ -95,6 +95,13 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение поверх PR #45 — [отмена первого эксперимента](telegram/EXPERIMENT_CANCELLATION.md):
+`/cancel_experiment` вызывает прежний F1 cancel для UUID, закреплённого при
+получении команды. Повтор/перезапуск не отменяют будущую или заменённую задачу.
+Расходы, спорные резервы и запрет повторного provider вызова сохраняются;
+CANCEL_REQUESTED не выдаётся за подтверждённую остановку. VPS не менялся.
+Итоговые source/operator pins и clean-source CI — в отдельном Draft PR.
+
 Следующее cloud-продолжение поверх PR #44 — [явные уведомления эксперимента](telegram/EXPERIMENT_NOTIFICATIONS.md):
 owner `/watch_experiment` / `/unwatch_experiment`, consent в прежнем audit и
 delivery через существующий collector/outbox, без новой task authority. По
