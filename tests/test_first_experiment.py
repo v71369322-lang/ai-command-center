@@ -237,6 +237,16 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
                 elif scenario == 'lost_response':
                     assert 'Внешняя операция не сверена' in body
                 assert len(fake.calls) == calls_before and 'Зафиксирован Draft PR:' not in body
+                # Explicit subscription then automatic polling reuses this same
+                # terminal pipeline evidence without another provider request.
+                bridge.receive(message(902, '/watch_experiment'))
+                assert bridge.deliver_one()['state'] == 'SENT'
+                delivered = bridge.poll_once(timeout=0)
+                assert len(delivered) == 1 and delivered[0]['state'] == 'SENT'
+                notice = bot.sent[-1]['text']
+                assert notice.startswith('Уведомление первого AI-эксперимента') and task['id'] in notice
+                assert ('Результат независимо проверен в HTTP-моках' in notice) == (scenario == 'normal')
+                assert bridge.poll_once(timeout=0) == [] and len(fake.calls) == calls_before
             finally:
                 telegram_client.close()
             g.close()

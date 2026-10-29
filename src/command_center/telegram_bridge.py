@@ -148,6 +148,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'readiness'}
         if value == '/experiment':
             return str(uid), {'kind': 'experiment'}
+        if value in {'/watch_experiment', '/unwatch_experiment'}:
+            return str(uid), {'kind': value[1:]}
+        if value.split()[:1] in [['/watch_experiment'], ['/unwatch_experiment']]:
+            raise Denied('telegram_experiment_watch_arguments_forbidden')
         if value.split()[:1] == ['/experiment']:
             raise Denied('telegram_experiment_arguments_forbidden')
         if value.split()[:1] == ['/readiness']:
@@ -364,7 +368,8 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness', 'experiment'}:
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness', 'experiment',
+                      'watch_experiment', 'unwatch_experiment'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -382,6 +387,9 @@ class TelegramBridge:
                 elif kind == 'experiment':
                     from .telegram_experiment import reply as experiment_reply
                     reply = experiment_reply(self, session)
+                elif kind in {'watch_experiment', 'unwatch_experiment'}:
+                    from .telegram_experiment_watch import change
+                    reply = change(self, session, iid, kind == 'watch_experiment')
                 elif kind == 'coding_plan':
                     from .telegram_coding import plan
                     reply = plan()
@@ -451,6 +459,7 @@ class TelegramBridge:
                         '/projects — проекты и назначение; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
+                        '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
@@ -536,6 +545,8 @@ class TelegramBridge:
                                  if verified else 'Успех не подтверждён; нужна сверка состояния.')
                     text += ' Работа по реальной бизнес-задаче не выполнялась.'
                     self.enqueue(session, f'task:{task.id}:{task.version}:{task.state}', text)
+            from .telegram_experiment_watch import collect
+            collect(self, session)
 
     def deliver_one(self):
         self.guard()
