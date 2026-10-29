@@ -84,6 +84,15 @@ operator profile `telegram-mobile` явно выбирается; прежние
 ignored cloud evidence; host candidate/image IDs пока отсутствуют. VPS не менялся,
 старые approvals не продлевались. Финальный operator HEAD/CI — в отдельном Draft PR.
 
+Следующий cloud-шаг: [офлайн preflight первого AI-эксперимента](f2-2/OFFLINE_PREFLIGHT.md)
+проверяет локальный профиль без HTTP clients, Gateway/Store и чтения credential
+files. Даже LOCAL_CHECKS_PASSED не подтверждает remote state или paid consent.
+Закоммичен только disabled template; реальный запуск CLI дал ожидаемый BLOCKED,
+0 external calls. Локально58 новых /338 infrastructure, отдельно16 существующих
+pure F2.2 tests; поднаборы не складываются. Src/runtime/пакет PR #40 остаются
+неизменными. Account/model/funding/GitHub App/repo/credential/ledger проверки и
+окончательное разрешение живого эксперимента остаются отдельными gates.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
