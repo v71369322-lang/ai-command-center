@@ -4,6 +4,13 @@ Cloud-продолжение [PR #45](https://github.com/v71369322-lang/ai-comma
 На действующем VPS этой команды пока нет. Предыдущие pinned targets не включают
 эту доработку; доставка требует нового именованного пакета и exact approval.
 
+Operator profile `--release first-experiment-cancel` закрепляет переход d932baaf →
+`a5d867cb734a4954926a4e77c71e6f5be217057c`. Один кандидат содержит предшествующие
+gateway/readiness/snapshot/notification функции и cancel. Private file bindings
+и readiness opt-in обязательны; прежние семь source targets сохранены.
+Operator checkout закрепляется отдельно от application SHA. Host prepare и exact
+candidate apply остаются отдельными разрешёнными владельцем этапами.
+
 ## Использование после доставки
 
 `/cancel_experiment` без аргументов в личном чате владельца запрашивает отмену
@@ -61,6 +68,8 @@ private-owner checks, остановку/recovery и неизвестную до
 Ruff/OpenAPI/current-runtime-secret guard/diff check PASS; locked audit:64 Python
 dependencies,0 Python/npm advisories,0 Bandit MED/HIGH,92 retained reviewed LOW.
 Локальные source checks выполнены до source commit, итоговый SHA проверяется в CI.
+Named staging suite:405 passed для всех восьми profiles; это отдельный
+infrastructure scope, пересекающиеся наборы не суммируются.
 Контейнерные tests требуют свежих exact-source images; старые local images не
 переименовываются. Cloud rootful tests не подтверждают rootless VPS/systemd,
 физический iPhone, баланс провайдера или разрешение платного запуска.
