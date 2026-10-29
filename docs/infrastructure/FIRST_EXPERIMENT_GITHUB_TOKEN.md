@@ -129,7 +129,8 @@ scope, baseline, lifetime, exact source/plan, custody, concurrency, response los
 local commit loss и отсутствие runtime/DB/AI side effects. Это не живой auth probe.
 Итоговые counts и final-source CI фиксируются в Draft PR.
 
-Локально61 targeted tests passed. Ruff/OpenAPI/current-runtime-secret guard/diff
+Локально64 targeted tests passed, включая redaction ошибок самого argument parser.
+Ruff/OpenAPI/current-runtime-secret guard/diff
 check PASS; locked security audit:64 Python dependencies,0 Python/npm advisories,
 0 Bandit MED/HIGH,98 retained reviewed LOW. Эти результаты получены до commit;
 полный infrastructure suite и прежние runtime/container checks проверяются

@@ -42,6 +42,12 @@ class Blocked(Exception):
     """Only fixed codes may cross the CLI boundary; never provider text/credentials."""
 
 
+class Arguments(argparse.ArgumentParser):
+    def error(self, message):
+        # argparse's default error repeats untrusted argument values.
+        raise Blocked('operator_arguments_invalid')
+
+
 def check_source(revision):
     if not isinstance(revision, str) or not re.fullmatch('[a-f0-9]{40}', revision):
         raise Blocked('exact_operator_revision_required')
@@ -222,15 +228,15 @@ def prepare(key_file, output_directory, revision, approved_plan, approved_until,
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = Arguments(description=__doc__)
     parser.add_argument('action', choices=('plan', 'prepare'), nargs='?', default='plan')
     parser.add_argument('--key-file', required=True)
     parser.add_argument('--output-directory', required=True)
     parser.add_argument('--operator-revision', required=True)
     parser.add_argument('--approved-plan')
     parser.add_argument('--approved-until', type=int)
-    args = parser.parse_args()
     try:
+        args = parser.parse_args()
         if args.action == 'plan':
             if args.approved_plan is not None or args.approved_until is not None:
                 raise Blocked('plan_does_not_consume_approval')

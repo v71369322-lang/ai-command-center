@@ -427,3 +427,23 @@ def test_cli_never_echoes_provider_or_credential_errors(fixture, rsa_key, monkey
     assert error.value.code == 2 and json.loads(result.out)['status'] == 'BLOCKED'
     assert TOKEN not in result.out + result.err and str(key) not in result.out + result.err
     assert 'PRIVATE KEY' not in result.out + result.err and 'Traceback' not in result.err
+
+
+@pytest.mark.parametrize('invalid', ['action', 'deadline', 'unknown_argument'])
+def test_argument_parser_never_repeats_mistakenly_pasted_values(fixture, monkeypatch, capsys, invalid):
+    key, output = fixture
+    argv = ['tool', '--key-file', str(key), '--output-directory', str(output), '--operator-revision', REVISION]
+    if invalid == 'action':
+        argv.insert(1, TOKEN)
+    elif invalid == 'deadline':
+        argv += ['--approved-until', TOKEN]
+    else:
+        argv += ['--unknown', TOKEN]
+    monkeypatch.setattr(sys, 'argv', argv)
+    monkeypatch.setattr(httpx, 'Client', lambda **k: pytest.fail('invalid arguments cannot construct a client'))
+    with pytest.raises(SystemExit) as error:
+        operator.main()
+    result = capsys.readouterr()
+    assert error.value.code == 2 and json.loads(result.out)['status'] == 'BLOCKED'
+    assert TOKEN not in result.out + result.err and str(key) not in result.out + result.err
+    assert result.err == '' and not output.exists()
