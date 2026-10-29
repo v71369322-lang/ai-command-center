@@ -111,6 +111,14 @@ anchors и exact synthetic-repository URL validation. SETTLED трактуетс
 settled money не означает полученный результат. Cached live fixtures не являются
 внешним live evidence. Новый reader не добавляет network/file execution sinks.
 
+Experiment notices требуют явный owner/private receipt с immutable intent и
+fingerprint, audit ordering и профиль/source/task binding. Collector повторно
+использует верифицирующий snapshot без Gateway/client construction. UTC timestamp
+исключён из semantic delivery key; уже существующие SENT/UNCERTAIN/CANCELLED
+delivery не переиспользуются как NEW. Unsubscribe меняет только известные NEW
+notices и сохраняет начатые/неопределённые sends. Схема и финансовые/F1 grants не
+меняются; rootful mocked results не означают внешние live evidence.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

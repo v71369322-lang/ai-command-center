@@ -29,11 +29,11 @@ def rub(value):
     return format(Decimal(value) / NANO_RUB, '.9f').rstrip('0').rstrip('.') + ' ₽'
 
 
-def reply(bridge, session):
+def snapshot(bridge, session, *, include_time=True):
     task = session.scalar(select(Task).where(Task.request_key == 'owner:' + REQUEST_KEY))
     if task is None:
-        return ('Первый AI-эксперимент ещё не создан. Условия: /readiness.\n'
-                'Просмотр не создаёт задачу и не разрешает расходы.')
+        return None, ('Первый AI-эксперимент ещё не создан. Условия: /readiness.\n'
+                      'Просмотр не создаёт задачу и не разрешает расходы.')
     fixed = task_payload()
     created = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'task_created',
         Audit.event['task_id'].as_string() == task.id).order_by(Audit.sequence).limit(1))
@@ -43,7 +43,7 @@ def reply(bridge, session):
             or created.event.get('payload_hash') != task.payload_hash):
         raise Denied('first_experiment_task_integrity')
     if created.event.get('revision') != bridge.store.settings.source_revision:
-        return 'Первый AI-эксперимент создан другой версией приложения. Нужна сверка; повтор не выполняется.'
+        return task, 'Первый AI-эксперимент создан другой версией приложения. Нужна сверка; повтор не выполняется.'
     actions = session.scalars(select(ExternalAction).where(ExternalAction.task_id == task.id)).all()
     Gateway.check_ledger(session, actions)
     grant = session.get(ExternalGrant, task.id)
@@ -105,4 +105,10 @@ def reply(bridge, session):
                 lines += ['Публикация не подтверждена; нужна сверка.']
     lines += ['Это локальный журнал, не проверка баланса или текущего состояния OpenAI/GitHub.\n'
               'Просмотр не запускает задачу, не выдаёт разрешение и не меняет расходы или резервы.']
-    return '\n\n'.join(lines)
+    if not include_time:
+        lines.pop(1)
+    return task, '\n\n'.join(lines)
+
+
+def reply(bridge, session):
+    return snapshot(bridge, session)[1] + '\n\nУведомления: /watch_experiment; отключить: /unwatch_experiment.'

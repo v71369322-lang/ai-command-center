@@ -95,6 +95,13 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение поверх PR #44 — [явные уведомления эксперимента](telegram/EXPERIMENT_NOTIFICATIONS.md):
+owner `/watch_experiment` / `/unwatch_experiment`, consent в прежнем audit и
+delivery через существующий collector/outbox, без новой task authority. По
+умолчанию выключено; source/profile/task binding, semantic dedupe и no-resend
+для неизвестных отправок сохраняются. Source/image/deployment требуют нового
+закреплённого пакета, paid calls этим не разрешаются.
+
 Следующее cloud-продолжение поверх PR #43 — [просмотр первого AI-эксперимента](telegram/FIRST_EXPERIMENT_STATUS.md).
 `/experiment` читает одну фиксированную API-задачу и проверенные локальные
 result/financial anchors без Gateway/HTTP client construction и ключей.
