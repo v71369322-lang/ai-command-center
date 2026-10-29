@@ -206,6 +206,14 @@ def test_only_selected_json_configuration_is_read_and_references_never_leak(tmp_
         opened.append(self)
         return original(self, *args, **kwargs)
     monkeypatch.setattr(Path, 'open', guarded_open)
+    original_fd_open = os.open
+    def guarded_fd_open(selected, *args, **kwargs):
+        # The pinned loader uses O_NOFOLLOW descriptors; retain the no-key-read
+        # assertion for both pathlib and descriptor-based access paths.
+        assert str(selected) not in config.credential_files.values(), 'credential path opened'
+        opened.append(Path(selected))
+        return original_fd_open(selected, *args, **kwargs)
+    monkeypatch.setattr(os, 'open', guarded_fd_open)
     monkeypatch.setenv('F2_INTEGRATION_CONFIG_FILE', str(path))
     monkeypatch.setattr(sys, 'argv', ['preflight'])
     monkeypatch.setattr(preflight, 'datetime', SimpleNamespace(now=lambda zone: NOW))

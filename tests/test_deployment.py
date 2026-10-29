@@ -16,6 +16,305 @@ from command_center.recovery import seal
 
 
 @pytest.fixture
+def external_release(release, tmp_path):
+    from command_center.coding.first_experiment import CAP, FirstExperiment, MODEL
+    from command_center.coding.integration_config import IntegrationConfig, Tariff
+    from command_center.deployment_integrations import CREDENTIAL_TARGETS, prepare_binding
+    original, _ = release
+    manifest = copy.deepcopy(original['manifest'])
+    manifest.update(control_uid=os.getuid(), execution_uid=os.getuid() + 1)
+    private = tmp_path / 'external-private'
+    private.mkdir(mode=0o700)
+    config = IntegrationConfig(mode='live', live_authorized=False,
+        synthetic_repository='fixture/acc-f2-synthetic-deployment', budget_evidence='PUBLIC_FIXTURE_ONLY',
+        daily_nano_rub=CAP, monthly_nano_rub=CAP, first_experiment=FirstExperiment(repository_id=725000001),
+        tariff=Tariff(model=MODEL, input_nano_rub=67500, output_nano_rub=405000,
+                      context_tokens=400000, max_output_tokens=2048, confirmed=True, evidence='PUBLIC_FIXTURE_ONLY'),
+        credential_files={'openai': CREDENTIAL_TARGETS['openai_key_file'],
+                          'github-installation-token': CREDENTIAL_TARGETS['github_token_file']})
+    config_file = private / 'config.json'
+    config_file.write_text(json.dumps({**config.model_dump(), 'credential_files': config.credential_files}))
+    config_file.chmod(0o600)
+    paths = {'config_file': config_file}
+    for name in CREDENTIAL_TARGETS:
+        path = private / name
+        path.write_text('PUBLIC_SYNTHETIC_FIXTURE_' + name)
+        path.chmod(0o600)
+        paths[name] = path
+    manifest['first_experiment'] = prepare_binding(manifest, **paths)
+    profile = render(original['compose'], manifest)
+    return manifest, profile, paths
+
+
+def test_external_profile_is_opt_in_pinned_and_secrets_only_reach_broker(external_release, release):
+    from command_center.deployment_integrations import CONFIG_TARGET, CREDENTIAL_TARGETS, check_binding
+    from command_center.coding.contract import CodingRequest
+    from command_center.store import Denied
+    from datetime import datetime, timezone
+    manifest, profile, _ = external_release
+    config = check_binding(manifest)
+    assert not config.live_authorized
+    assert not config.first_experiment.report()['ready_for_final_confirmation']
+    with pytest.raises(Denied, match='first_experiment_preconditions_missing'):
+        config.first_experiment.validate_scope(config,
+            CodingRequest(provider='openai', experiment_id=config.first_experiment.id).model_dump(),
+            config.tariff.maximum() * 2, datetime.now(timezone.utc), final_confirmation=True)
+    for name, service in profile['services'].items():
+        destinations = {v['target'] for v in service.get('volumes', [])}
+        assert (CONFIG_TARGET in destinations) == (name in {'api', 'runtime-broker'})
+        assert bool(destinations & set(CREDENTIAL_TARGETS.values())) == (name == 'runtime-broker')
+        assert ('gateway-access' in service['networks']) == (name == 'runtime-broker')
+        if name in {'api', 'runtime-broker'}:
+            assert service['environment']['F2_INTEGRATION_CONFIG_SHA256'] == manifest['first_experiment']['config_sha256']
+    assert 'first_experiment' not in release[0]['manifest']
+    assert 'gateway-access' not in release[0]['compose']['networks']
+    assert load_bundle(release[1]) == release[0]
+
+
+@pytest.mark.parametrize('attack', ['worker_key', 'api_key', 'watchdog_config', 'wrong_target', 'writable_key',
+                                   'extra_mount', 'worker_egress', 'api_gateway_network', 'extra_network',
+                                   'internal_egress', 'missing_pin', 'wrong_pin', 'worker_pin', 'extra_selector'])
+def test_external_profile_cannot_expand_mount_network_or_environment_scope(external_release, attack):
+    from command_center.deployment_integrations import mounts
+    manifest, original, _ = external_release
+    profile = copy.deepcopy(original)
+    if attack in {'worker_key', 'api_key'}:
+        name = 'worker' if attack == 'worker_key' else 'api'
+        profile['services'][name]['volumes'].append(mounts(manifest, 'runtime-broker')[-1])
+    elif attack == 'watchdog_config':
+        profile['services']['watchdog']['volumes'].append(mounts(manifest, 'api')[0])
+    elif attack in {'wrong_target', 'writable_key', 'extra_mount'}:
+        service = profile['services']['runtime-broker']
+        if attack == 'wrong_target':
+            service['volumes'][-1]['target'] = '/run/other-token'
+        elif attack == 'writable_key':
+            service['volumes'][-1]['read_only'] = False
+        else:
+            service['volumes'].append({'type': 'bind', 'source': '/etc', 'target': '/host', 'read_only': True})
+    elif attack in {'worker_egress', 'api_gateway_network'}:
+        profile['services']['worker' if attack == 'worker_egress' else 'api']['networks']['gateway-access'] = None
+    elif attack == 'extra_network':
+        profile['networks']['extra-access'] = {'internal': False}
+    elif attack == 'internal_egress':
+        profile['networks']['gateway-access']['internal'] = True
+    else:
+        env = profile['services']['api']['environment']
+        if attack == 'missing_pin':
+            env.pop('F2_INTEGRATION_CONFIG_SHA256')
+        elif attack == 'wrong_pin':
+            env['F2_INTEGRATION_CONFIG_SHA256'] = '0' * 64
+        elif attack == 'worker_pin':
+            profile['services']['worker']['environment']['F2_INTEGRATION_CONFIG_SHA256'] = '0' * 64
+        else:
+            env['F21_OPERATOR_OVERRIDE'] = '1'
+    with pytest.raises(ValueError):
+        validate_profile(profile, manifest)
+
+
+@pytest.mark.parametrize('attack', ['config_changed', 'config_mode', 'key_mode', 'key_missing', 'key_symlink',
+                                   'key_hardlink', 'empty_key', 'app_private_key_size', 'parent_public',
+                                   'same_path', 'wrong_hash', 'wrong_profile_hash'])
+def test_external_binding_rechecks_private_custody_and_full_config_pin(external_release, attack):
+    from command_center.deployment_integrations import check_binding
+    manifest, _, paths = external_release
+    if attack == 'config_changed':
+        paths['config_file'].write_text(paths['config_file'].read_text() + '\n')
+    elif attack in {'config_mode', 'key_mode'}:
+        paths['config_file' if attack == 'config_mode' else 'openai_key_file'].chmod(0o644)
+    elif attack == 'key_missing':
+        paths['github_token_file'].unlink()
+    elif attack == 'key_symlink':
+        paths['github_token_file'].unlink()
+        paths['github_token_file'].symlink_to(paths['openai_key_file'])
+    elif attack == 'key_hardlink':
+        paths['github_token_file'].unlink()
+        os.link(paths['openai_key_file'], paths['github_token_file'])
+    elif attack in {'empty_key', 'app_private_key_size'}:
+        paths['github_token_file'].write_text('' if attack == 'empty_key' else 'X' * 1675)
+    elif attack == 'parent_public':
+        paths['config_file'].parent.chmod(0o755)
+    elif attack == 'same_path':
+        manifest['first_experiment']['github_token_file'] = str(paths['openai_key_file'])
+    else:
+        manifest['first_experiment']['config_sha256' if attack == 'wrong_hash' else 'profile_hash'] = '0' * 64
+    with pytest.raises((ValueError, OSError)):
+        check_binding(manifest)
+
+
+@pytest.mark.parametrize('attack', ['mock', 'missing_experiment', 'missing_repo_id', 'missing_tariff',
+                                   'unconfirmed_tariff', 'wrong_model', 'wrong_context', 'wrong_output',
+                                   'zero_rate', 'over_budget', 'under_capacity', 'wrong_reference', 'same_alias'])
+def test_external_prepare_does_not_admit_other_modes_or_unbounded_profiles(external_release, attack):
+    from command_center.deployment_integrations import prepare_binding
+    manifest, _, paths = external_release
+    config = json.loads(paths['config_file'].read_text())
+    if attack == 'mock':
+        config['mode'] = 'http_mock'
+    elif attack == 'missing_experiment':
+        config['first_experiment'] = None
+    elif attack == 'missing_repo_id':
+        config['first_experiment']['repository_id'] = None
+    elif attack == 'missing_tariff':
+        config['tariff'] = None
+    elif attack == 'unconfirmed_tariff':
+        config['tariff']['confirmed'] = False
+    elif attack in {'wrong_model', 'wrong_context', 'wrong_output', 'zero_rate'}:
+        key, value = {'wrong_model': ('model', 'other'), 'wrong_context': ('context_tokens', 8192),
+                      'wrong_output': ('max_output_tokens', 4096), 'zero_rate': ('input_nano_rub', 0)}[attack]
+        config['tariff'][key] = value
+    elif attack == 'over_budget':
+        config['daily_nano_rub'] *= 2
+    elif attack == 'under_capacity':
+        config['daily_nano_rub'] = 1
+    elif attack == 'wrong_reference':
+        config['credential_files']['openai'] = '/run/secrets/db_runtime_password'
+    else:
+        config['openai_secret_ref'] = config['github_secret_ref']
+    paths['config_file'].write_text(json.dumps(config))
+    with pytest.raises(ValueError):
+        prepare_binding(manifest, **paths)
+
+
+def test_external_prepare_never_reads_key_values_or_creates_authority(external_release, monkeypatch):
+    import httpx
+    from command_center import deployment_integrations as integration
+    from command_center.coding.integration_config import FileCredentials
+    from command_center.coding.gateway import Gateway
+    from command_center.store import Store
+    manifest, _, paths = external_release
+    def forbidden(*args, **kwargs):
+        pytest.fail('prepare attempted credentials/network/authority action')
+    for owner, method in ((httpx, 'Client'), (Gateway, '__init__'), (Store, '__init__'),
+                          (Store, 'approve'), (Gateway, 'authorize'), (FileCredentials, 'get')):
+        monkeypatch.setattr(owner, method, forbidden)
+    original = integration._open_private
+    checked = []
+    class MetadataOnly:
+        def __init__(self, stream):
+            self.stream = stream
+        def read(self, *args):
+            forbidden()
+        def close(self):
+            self.stream.close()
+    def guarded(path, *args, **kwargs):
+        stream, metadata = original(path, *args, **kwargs)
+        if Path(path) != paths['config_file']:
+            checked.append(Path(path))
+            stream = MetadataOnly(stream)
+        return stream, metadata
+    monkeypatch.setattr(integration, '_open_private', guarded)
+    binding = integration.prepare_binding(manifest, **paths)
+    assert binding == manifest['first_experiment']
+    assert set(checked) == {paths['openai_key_file'], paths['github_token_file']}
+
+
+def test_partial_external_prepare_flags_fail_before_daemon_access(monkeypatch):
+    from command_center.deployment import prepare
+    def forbidden(*args, **kwargs):
+        pytest.fail('partial bindings reached Docker')
+    monkeypatch.setattr(subprocess, 'run', forbidden)
+    with pytest.raises(ValueError, match='first_experiment_all_bindings_required'):
+        prepare('/unused', '/unused/new', 1000, 1001, '/unused/state', first_experiment_config='/unused/config')
+
+
+def test_external_preflight_rechecks_pin_before_images_database_or_start(external_release, monkeypatch):
+    import command_center.deployment as module
+    manifest, profile, paths = external_release
+    paths['config_file'].write_text(paths['config_file'].read_text() + '\n')
+    engine = FakeEngine()
+    engine.preflight = lambda: None
+    controller = Deployment({'manifest': manifest, 'compose': profile}, paths['config_file'].parent, engine, engine)
+    monkeypatch.setattr(module, 'source_check', lambda manifest: None)
+    def forbidden(*args, **kwargs):
+        pytest.fail('changed config reached later runtime checks')
+    monkeypatch.setattr(module, 'image_check', forbidden)
+    with pytest.raises(ValueError, match='first_experiment_config_pin_changed'):
+        controller.preflight()
+    assert engine.calls == []
+
+
+@pytest.mark.parametrize('attack', [None, 'worker_key', 'broker_writable', 'api_missing_config', 'wrong_pin'])
+def test_external_postcheck_validates_actual_mounts_and_running_config(external_release, monkeypatch, attack):
+    from command_center.coding.integration_config import IntegrationConfig
+    from command_center.deployment_integrations import CONFIG_TARGET, check_binding, mounts
+    manifest, profile, paths = external_release
+    config = check_binding(manifest)
+    class InspectedEngine(FakeEngine):
+        def json(self, *args):
+            assert args[0] == 'inspect'
+            name = args[1].removeprefix('acc-f23-').removesuffix('-1')
+            actual = [{'Source': v['source'], 'Destination': v['target'], 'RW': False}
+                      for v in mounts(manifest, name)]
+            if attack == 'worker_key' and name == 'worker':
+                v = mounts(manifest, 'runtime-broker')[-1]
+                actual.append({'Source': v['source'], 'Destination': v['target'], 'RW': False})
+            if attack == 'broker_writable' and name == 'runtime-broker':
+                actual[-1]['RW'] = True
+            if attack == 'api_missing_config' and name == 'api':
+                actual = []
+            return [{'State': {'Running': True}, 'Mounts': actual}]
+        def run(self, *args, **kwargs):
+            if args[:1] == ('exec',) and args[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1'}:
+                with monkeypatch.context() as scope:
+                    scope.setenv('F2_INTEGRATION_CONFIG_FILE', CONFIG_TARGET)
+                    scope.setenv('F2_INTEGRATION_CONFIG_SHA256',
+                                 '0' * 64 if attack == 'wrong_pin' else manifest['first_experiment']['config_sha256'])
+                    scope.setattr(IntegrationConfig, 'load', lambda: config)
+                    exec(compile(args[-1], 'fake_container_config_check.py', 'exec'), {})
+            return super().run(*args, **kwargs)
+    engine = InspectedEngine()
+    controller = Deployment({'manifest': manifest, 'compose': profile}, paths['config_file'].parent, engine, engine)
+    monkeypatch.setattr(controller, 'tool', lambda code: b'')  # Explicitly fake DB for this policy test.
+    if attack:
+        with pytest.raises((ValueError, AssertionError)):
+            controller.postcheck()
+    else:
+        assert controller.postcheck()['state'] == 'CLOSED_SYNTHETIC_SERVICES_RUNNING'
+        assert sum(c[:1] == ('exec',) and c[1] in {'acc-f23-api-1', 'acc-f23-runtime-broker-1'}
+                   for c in engine.calls) == 2
+
+
+def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys):
+    import sys
+    import command_center.deployment as module
+    calls = []
+    monkeypatch.setattr(module, 'prepare', lambda *args, **kwargs: calls.append((args, kwargs)) or 'a' * 64)
+    monkeypatch.setattr(sys, 'argv', ['deployment', 'prepare', '--source', '/source', '--bundle', '/new',
+        '--control-uid', '1000', '--execution-uid', '1001', '--data-root', '/state',
+        '--first-experiment-config', '/private/config', '--openai-key-file', '/private/openai',
+        '--github-token-file', '/private/github'])
+    module.main()
+    assert json.loads(capsys.readouterr().out)['bundle_digest'] == 'a' * 64
+    assert calls[0][1] == dict(owner_password_origin=None, password_loopback_http=False,
+        telegram_connection_digest=None, first_experiment_config='/private/config',
+        openai_key_file='/private/openai', github_token_file='/private/github')
+
+
+def test_non_prepare_cli_cannot_silently_ignore_integration_binding(monkeypatch):
+    import sys
+    import command_center.deployment as module
+    monkeypatch.setattr(sys, 'argv', ['deployment', 'update', '--bundle', '/unused',
+                                     '--first-experiment-config', '/private/config'])
+    with pytest.raises(SystemExit) as error:
+        module.main()
+    assert error.value.code == 2
+
+
+def test_external_binding_cannot_point_inside_build_context_or_accept_secret_input_error(external_release):
+    from command_center.deployment_integrations import check_binding, prepare_binding
+    manifest, _, paths = external_release
+    manifest['source_root'] = str(paths['config_file'].parent)
+    with pytest.raises(ValueError, match='first_experiment_private_path_required'):
+        check_binding(manifest)
+    manifest['source_root'] = '/synthetic/source'
+    marker = 'PUBLIC_SYNTHETIC_CREDENTIAL_DO_NOT_ECHO'
+    paths['config_file'].write_text(json.dumps({'invalid': marker}))
+    with pytest.raises(ValueError, match='first_experiment_config_invalid') as error:
+        prepare_binding(manifest, **paths)
+    assert marker not in str(error.value)
+
+
+@pytest.fixture
 def release(tmp_path):
     root = tmp_path / 'state'
     initialize_state(root)

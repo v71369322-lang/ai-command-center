@@ -1,4 +1,5 @@
 """Trusted, versioned operator configuration. No tariffs/models guessed by code."""
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -54,12 +55,26 @@ class IntegrationConfig(Strict):
     @classmethod
     def load(cls):
         path = os.environ.get('F2_INTEGRATION_CONFIG_FILE')
+        expected = os.environ.get('F2_INTEGRATION_CONFIG_SHA256')
         if not path:
+            if expected is not None:
+                raise ValueError('integration_config_pin_without_file')
             return cls()
         p = Path(path)
         if p.is_symlink() or not p.is_file() or p.stat().st_size > 16384:
             raise ValueError('invalid_integration_config')
-        return cls.model_validate_json(p.read_text())
+        descriptor = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, 'rb') as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 16384:
+                raise ValueError('invalid_integration_config')
+            raw = stream.read(16385)
+        if len(raw) > 16384:
+            raise ValueError('invalid_integration_config')
+        if expected is not None and (not re.fullmatch('[a-f0-9]{64}', expected)
+                                     or hashlib.sha256(raw).hexdigest() != expected):
+            raise ValueError('integration_config_pin_changed')
+        return cls.model_validate_json(raw)
 
     def connected(self):
         return self.mode == 'http_mock' or (self.mode == 'live' and self.live_authorized

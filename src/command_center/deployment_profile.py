@@ -27,7 +27,7 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
     if 'telegram' in m:
@@ -59,6 +59,9 @@ def validate_manifest(m):
         raise ValueError('separate_unprivileged_users_required')
     for key in ('data_root', 'source_root'):
         absolute(m[key])
+    if 'first_experiment' in m:
+        from .deployment_integrations import validate_binding
+        validate_binding(m)
 
 
 def services(m):
@@ -164,6 +167,14 @@ def render(base, m):
     if 'telegram' in m:
         profile['networks']['telegram-access'] = {'internal': False}
         profile['services']['telegram'] = telegram_service(m)
+    if 'first_experiment' in m:
+        from .deployment_integrations import CONFIG_TARGET, mounts
+        profile['networks']['gateway-access'] = {'internal': False}
+        for name in ('api', 'runtime-broker'):
+            profile['services'][name]['environment']['F2_INTEGRATION_CONFIG_FILE'] = CONFIG_TARGET
+            profile['services'][name]['environment']['F2_INTEGRATION_CONFIG_SHA256'] = m['first_experiment']['config_sha256']
+            profile['services'][name]['volumes'] += mounts(m, name)
+        profile['services']['runtime-broker']['networks']['gateway-access'] = None
     validate_profile(profile, m)
     return profile
 
@@ -173,6 +184,15 @@ def validate_profile(p, m):
         raise ValueError('deployment_boundary_invalid')
     if p['secrets'] != {k: {'file': str(Path(m['data_root']) / 'secrets' / k)} for k in SECRETS}:
         raise ValueError('secret_source_changed')
+    expected_networks = {'control': {'internal': True}, 'access': {'internal': False}}
+    if 'telegram' in m:
+        expected_networks['telegram-access'] = {'internal': False}
+    if 'first_experiment' in m:
+        from .deployment_integrations import CONFIG_TARGET, mounts, validate_binding
+        validate_binding(m)
+        expected_networks['gateway-access'] = {'internal': False}
+    if p['networks'] != expected_networks:
+        raise ValueError('deployment_network_scope_changed')
     for name, s in p['services'].items():
         if name == 'telegram':
             if s != telegram_service(m) or p['networks'].get('telegram-access') != {'internal': False}:
@@ -182,7 +202,10 @@ def validate_profile(p, m):
             raise ValueError('restart_bypasses_boot_interlock')
         expected_image = (m['database_image'] if name == 'db' else m['redis_image'] if name == 'redis'
                           else m['images']['broker' if name in {'runtime-broker', 'watchdog'} else name])
-        if s['image'] != expected_image or set(s['networks']) != ({'control', 'access'} if name == 'api' else {'control'}):
+        expected_service_networks = {'control', 'access'} if name == 'api' else {'control'}
+        if name == 'runtime-broker' and 'first_experiment' in m:
+            expected_service_networks.add('gateway-access')
+        if s['image'] != expected_image or set(s['networks']) != expected_service_networks:
             raise ValueError('service_image_or_network_changed')
         allowed_secrets = {'db': {'db_admin_password'}, 'redis': {'redis_password'},
                            'api': {'db_password', 'redis_password', 'identities'},
@@ -218,13 +241,19 @@ def validate_profile(p, m):
         actual = {(v['source'], v['target'], v.get('read_only', False)) for v in s.get('volumes', [])}
         if 'owner_login' in m:
             allowed['api'] = {(str(root / 'secrets/owner_password'), OWNER_VERIFIER_PATH, True)}
+        if 'first_experiment' in m:
+            allowed[name].update((v['source'], v['target'], v['read_only']) for v in mounts(m, name))
         if actual != allowed[name]:
             raise ValueError('unapproved_mount')
         env = s.get('environment', {})
         expected_scope = canonical(m['telegram']) if name == 'api' and 'telegram' in m else None
         if env.get('F1_TELEGRAM_SCOPE') != expected_scope:
             raise ValueError('telegram_api_scope_changed')
-        if any(k.startswith(('F21_', 'F2_INTEGRATION')) for k in env):
+        external_environment = {k: v for k, v in env.items() if k.startswith(('F21_', 'F2_INTEGRATION'))}
+        expected_external = ({'F2_INTEGRATION_CONFIG_FILE': CONFIG_TARGET,
+                              'F2_INTEGRATION_CONFIG_SHA256': m['first_experiment']['config_sha256']}
+                             if 'first_experiment' in m and name in {'api', 'runtime-broker'} else {})
+        if external_environment != expected_external:
             raise ValueError('external_integration_not_authorized')
         if name == 'api' and env.get('F1_AUTH_MODE') != ('password' if 'owner_login' in m else 'oidc'):
             raise ValueError('synthetic_owner_access_forbidden')
