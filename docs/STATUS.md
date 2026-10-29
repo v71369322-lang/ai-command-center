@@ -59,6 +59,14 @@ choice/readback нового №131179132 и старого №131179125; /codin
 recovery/security/неопределённые исполнения остаются блокерами. Новая версия
 на VPS не доставляется автоматически; текущая live b2e71fe этой команды не имеет.
 
+Cloud continuation: [пакет доставки Telegram resume](infrastructure/TELEGRAM_RESUME_RELEASE.md)
+закрепляет target bdc8cbc (PR #37, full CI SUCCESS:694 Python /1 warning,
+отдельно143 infrastructure). Operator helper получает явно выбранный fixed
+profile b2e71fe→bdc8cbc; старый default f34 сохранён. Prepare-only script требует
+нового разрешения/точного operator SHA и создаёт отдельный кандидат, не update.
+На VPS ничего не выполнено, нового host bundle digest пока нет. Владельцу вне
+компьютера не требуется вводить команды или передавать credentials.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).

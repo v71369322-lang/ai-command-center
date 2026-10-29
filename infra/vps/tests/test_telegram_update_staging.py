@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
+import time
 
 import pytest
 
@@ -22,8 +24,9 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-@pytest.fixture
-def prepared(tmp_path, monkeypatch):
+@pytest.fixture(params=["f34", "telegram-resume"])
+def prepared(tmp_path, monkeypatch, request):
+    base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
     root.mkdir(mode=0o700)
     (root / "telegram").mkdir(mode=0o700)
@@ -32,11 +35,11 @@ def prepared(tmp_path, monkeypatch):
         mode="live",
         owner_id=1234567,
         bot_id=123456789,
-        source_revision=staging.BASE_REVISION,
+        source_revision=base_revision,
         token_file="/run/telegram/token",
     )
     atomic_json(root / "telegram/connection.json", config.model_dump())
-    env = dict(os.environ, F1_SOURCE_REVISION=staging.TARGET_REVISION, F1_DOCKER_GID="0")
+    env = dict(os.environ, F1_SOURCE_REVISION=target_revision, F1_DOCKER_GID="0")
     base = json.loads(
         subprocess.check_output(
             [
@@ -56,7 +59,7 @@ def prepared(tmp_path, monkeypatch):
     )
     m = dict(
         schema=1,
-        revision=staging.BASE_REVISION,
+        revision=base_revision,
         control_uid=os.getuid(),
         execution_uid=os.getuid() + 1,
         data_root=str(root),
@@ -79,7 +82,7 @@ def prepared(tmp_path, monkeypatch):
     previous = {"manifest": m, "compose": render(base, m)}
     target = copy.deepcopy(m)
     target.pop("telegram")
-    target["revision"] = staging.TARGET_REVISION
+    target["revision"] = target_revision
     target["source_root"] = str(tmp_path / "new-source")
     disabled = {"manifest": target, "compose": render(base, target)}
     old_dir, new_dir = tmp_path / "active", tmp_path / "disabled"
@@ -88,7 +91,7 @@ def prepared(tmp_path, monkeypatch):
         atomic_json(folder / "bundle.json", bundle)
         atomic_json(folder / "compose.json", bundle["compose"])
     state = dict(
-        phase="VERIFIED", revision=staging.BASE_REVISION, bundle=checksum(previous), directory=str(old_dir)
+        phase="VERIFIED", revision=base_revision, bundle=checksum(previous), directory=str(old_dir)
     )
     atomic_json(root / "deployment.json", state)
     calls = []
@@ -108,11 +111,15 @@ def prepared(tmp_path, monkeypatch):
     return previous, disabled, config, old_dir, new_dir, root, calls
 
 
+def release_for(prepared):
+    return "telegram-resume" if prepared[0]["manifest"]["revision"] == staging.TARGET_REVISION else "f34"
+
+
 def test_stage_keeps_live_binding_and_state_and_never_reads_token(prepared, tmp_path):
     previous, disabled, config, old_dir, new_dir, root, calls = prepared
     before = {p: p.read_bytes() for p in (root / "deployment.json", root / "telegram/connection.json")}
     output = tmp_path / "candidate"
-    result = staging.stage(old_dir, new_dir, output, checksum(previous))
+    result = staging.stage(old_dir, new_dir, output, checksum(previous), release=release_for(prepared))
     assert result["state"] == "STAGED_NOT_ACTIVATED"
     assert result["deployment_authorized"] is result["live_binding_modified"] is result["go_live"] is False
     assert {p: p.read_bytes() for p in before} == before
@@ -122,7 +129,7 @@ def test_stage_keeps_live_binding_and_state_and_never_reads_token(prepared, tmp_
     assert checksum(candidate) == result["candidate_bundle"]
     assert candidate["manifest"]["images"] == disabled["manifest"]["images"]
     # Re-rendering a validated disabled profile is identical to normalized-source rendering.
-    env = dict(os.environ, F1_SOURCE_REVISION=staging.TARGET_REVISION, F1_DOCKER_GID="0")
+    env = dict(os.environ, F1_SOURCE_REVISION=disabled["manifest"]["revision"], F1_DOCKER_GID="0")
     base = json.loads(
         subprocess.check_output(
             [
@@ -141,14 +148,14 @@ def test_stage_keeps_live_binding_and_state_and_never_reads_token(prepared, tmp_
         )
     )
     assert candidate["compose"] == render(base, candidate["manifest"])
-    assert ("source", staging.TARGET_REVISION) in calls
+    assert ("source", disabled["manifest"]["revision"]) in calls
     assert sum(call[0] == "images" for call in calls) == 2
     assert (output.stat().st_mode & 0o777) == 0o700
     assert all((p.stat().st_mode & 0o777) == 0o600 for p in output.iterdir())
-    assert connection(output / "connection.candidate.json").source_revision == staging.TARGET_REVISION
+    assert connection(output / "connection.candidate.json").source_revision == disabled["manifest"]["revision"]
     # Staging must NOT bypass the production binding/source guard.
     with pytest.raises(ValueError, match="exact_connection"):
-        binding(root, staging.TARGET_REVISION, candidate["manifest"]["telegram"]["connection_digest"])
+        binding(root, disabled["manifest"]["revision"], candidate["manifest"]["telegram"]["connection_digest"])
 
 
 @pytest.mark.parametrize(
@@ -169,7 +176,7 @@ def test_candidate_rejects_scope_and_schema_changes(prepared, field, value):
     changed["manifest"][field] = value
     changed["compose"] = render(disabled["compose"], changed["manifest"])
     with pytest.raises(ValueError, match="scope_or_migration"):
-        staging.candidate(previous, changed, config, checksum(previous))
+        staging.candidate(previous, changed, config, checksum(previous), release=release_for(prepared))
 
 
 @pytest.mark.parametrize(
@@ -208,7 +215,7 @@ def test_candidate_rejects_unapproved_source_or_binding(prepared, change):
         "live_target": "live_to_disabled_preparation_required",
     }.get(change, "active_telegram_binding_changed")
     with pytest.raises(ValueError, match=expected):
-        staging.candidate(previous, disabled, config, approved)
+        staging.candidate(previous, disabled, config, approved, release=release_for(prepared))
 
 
 @pytest.mark.parametrize("change", ["revision", "phase", "bundle"])
@@ -218,7 +225,7 @@ def test_staging_refuses_changed_deployment(prepared, tmp_path, change):
     state[change] = "INTENT" if change == "phase" else "a" * (40 if change == "revision" else 64)
     atomic_json(root / "deployment.json", state)
     with pytest.raises(ValueError, match="predecessor_changed"):
-        staging.stage(old_dir, new_dir, tmp_path / "candidate", checksum(previous))
+        staging.stage(old_dir, new_dir, tmp_path / "candidate", checksum(previous), release=release_for(prepared))
     assert not (tmp_path / "candidate").exists()
 
 
@@ -230,7 +237,7 @@ def test_image_inspection_race_is_rejected_before_output(prepared, tmp_path, mon
 
     monkeypatch.setattr(staging, "image_check", changed)
     with pytest.raises(ValueError, match="during_preparation"):
-        staging.stage(old_dir, new_dir, tmp_path / "candidate", checksum(previous))
+        staging.stage(old_dir, new_dir, tmp_path / "candidate", checksum(previous), release=release_for(prepared))
     assert not (tmp_path / "candidate").exists()
 
 
@@ -254,7 +261,7 @@ def test_output_cannot_overwrite_or_escape_private_staging(prepared, tmp_path, d
         folder.chmod(0o755)
         output = folder / "candidate"
     with pytest.raises(ValueError, match="private_candidate"):
-        staging.stage(old_dir, new_dir, output, checksum(previous))
+        staging.stage(old_dir, new_dir, output, checksum(previous), release=release_for(prepared))
 
 
 def test_partial_output_is_not_overwritten_on_retry(prepared, tmp_path, monkeypatch):
@@ -270,18 +277,18 @@ def test_partial_output_is_not_overwritten_on_retry(prepared, tmp_path, monkeypa
     monkeypatch.setattr(staging, "atomic_json", fail)
     output = tmp_path / "candidate"
     with pytest.raises(OSError):
-        staging.stage(old_dir, new_dir, output, checksum(previous))
+        staging.stage(old_dir, new_dir, output, checksum(previous), release=release_for(prepared))
     assert (output / "bundle.json").is_file()
     assert (root / "telegram/connection.json").read_bytes() == original
     with pytest.raises(ValueError, match="private_candidate"):
-        staging.stage(old_dir, new_dir, output, checksum(previous))
+        staging.stage(old_dir, new_dir, output, checksum(previous), release=release_for(prepared))
 
 
 @pytest.fixture
 def activation(prepared, tmp_path, monkeypatch):
-    previous, _, config, old_dir, new_dir, root, calls = prepared
+    previous, disabled, config, old_dir, new_dir, root, calls = prepared
     output = tmp_path / "candidate"
-    plan = staging.stage(old_dir, new_dir, output, checksum(previous))
+    plan = staging.stage(old_dir, new_dir, output, checksum(previous), release=release_for(prepared))
     events = []
     failure = {"at": None}
 
@@ -303,7 +310,7 @@ def activation(prepared, tmp_path, monkeypatch):
                 raise OSError("synthetic stop uncertainty")
 
         def apply(self, action, approval, *, expected_previous):
-            assert connection(root / "telegram/connection.json").source_revision == staging.TARGET_REVISION
+            assert connection(root / "telegram/connection.json").source_revision == disabled["manifest"]["revision"]
             assert json.loads((output / "activation.json").read_text())["phase"] == "DEPLOYMENT_ATTEMPTED"
             assert action == "update" and approval == plan["candidate_bundle"]
             assert expected_previous == checksum(previous)
@@ -313,7 +320,7 @@ def activation(prepared, tmp_path, monkeypatch):
             state = json.loads((root / "deployment.json").read_text())
             atomic_json(
                 root / "deployment.json",
-                {**state, "revision": staging.TARGET_REVISION, "bundle": approval, "directory": str(output)},
+                {**state, "revision": disabled["manifest"]["revision"], "bundle": approval, "directory": str(output)},
             )
             return {"state": "CLOSED_SYNTHETIC_SERVICES_RUNNING", "go_live": False}
 
@@ -331,6 +338,7 @@ def invoke_activation(activation, **overrides):
         approved_previous=checksum(previous),
         approved_candidate=plan["candidate_bundle"],
         approved_until=10100,
+        release=release_for(prepared),
     )
     arguments.update(overrides)
     return staging.apply_candidate(**arguments)
@@ -394,8 +402,8 @@ def test_activation_race_stops_before_pausing(activation):
 @pytest.mark.parametrize(
     "at,phase,revision",
     [
-        ("pause", "PAUSING_TELEGRAM", staging.BASE_REVISION),
-        ("apply", "DEPLOYMENT_ATTEMPTED", staging.TARGET_REVISION),
+        ("pause", "PAUSING_TELEGRAM", "old"),
+        ("apply", "DEPLOYMENT_ATTEMPTED", "new"),
     ],
 )
 def test_uncertainty_preserves_phase_and_never_retries_or_rolls_back(activation, at, phase, revision):
@@ -404,8 +412,85 @@ def test_uncertainty_preserves_phase_and_never_retries_or_rolls_back(activation,
     with pytest.raises(OSError):
         invoke_activation(activation)
     assert json.loads((output / "activation.json").read_text())["phase"] == phase
-    assert connection(prepared[5] / "telegram/connection.json").source_revision == revision
+    assert connection(prepared[5] / "telegram/connection.json").source_revision == prepared[0 if revision == "old" else 1]["manifest"]["revision"]
     with pytest.raises(ValueError, match="existing_activation"):
         invoke_activation(activation)
     assert events.count("pause-old") == 1
     assert events.count("existing-deployment-apply") == int(at == "apply")
+
+
+def test_profile_never_infers_a_new_transition_from_manifests(prepared, tmp_path):
+    previous, disabled, config, old_dir, new_dir, root, _ = prepared
+    wrong = "f34" if release_for(prepared) == "telegram-resume" else "telegram-resume"
+    before = (root / "telegram/connection.json").read_bytes()
+    with pytest.raises(ValueError, match="exact_source_revisions_required"):
+        staging.candidate(previous, disabled, config, checksum(previous), release=wrong)
+    with pytest.raises(ValueError, match="verified_predecessor_changed"):
+        staging.stage(old_dir, new_dir, tmp_path / "other", checksum(previous), release=wrong)
+    assert (root / "telegram/connection.json").read_bytes() == before
+    assert not (tmp_path / "other").exists()
+
+
+def test_wrong_apply_profile_does_not_pause_or_write_journal(activation):
+    prepared, output, _, events, _ = activation
+    wrong = "f34" if release_for(prepared) == "telegram-resume" else "telegram-resume"
+    with pytest.raises(ValueError, match="exact_source_revisions_required"):
+        invoke_activation(activation, release=wrong)
+    assert events == [] and not (output / "activation.json").exists()
+
+
+@pytest.mark.parametrize("value", [None, True, "", "latest", "main", "f34; unsafe"])
+def test_unknown_profile_is_rejected_before_loading_any_path(value):
+    with pytest.raises(ValueError, match="exact_release_profile_required"):
+        staging.stage("/not-loaded", "/not-loaded", "/not-created", "a" * 64, release=value)
+
+
+@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume"])
+def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, capsys):
+    argv = ["tool", "stage", "--active-bundle", "/active", "--disabled-bundle", "/disabled",
+            "--output", "/candidate", "--approved-previous", "a" * 64]
+    if profile:
+        argv += ["--release", profile]
+    seen = []
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(staging, "stage", lambda *args, **kw: seen.append(kw["release"]) or {"mock": True})
+    staging.main()
+    assert seen == [profile or "f34"]
+    assert json.loads(capsys.readouterr().out) == {"mock": True}
+
+
+@pytest.mark.parametrize("window", [None, "0", "not-a-time"])
+def test_prepare_script_missing_or_expired_scope_denied_before_host_access(window):
+    env = {"PATH": os.environ["PATH"]}
+    if window is not None:
+        env["ACC_PREPARE_APPROVED_UNTIL"] = window
+    result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
+                            env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode and "PREPARATION_APPROVAL_MISSING_OR_EXPIRED" in result.stderr
+    assert not result.stdout
+
+
+@pytest.mark.parametrize("revision", ["", "main", "x" * 40])
+def test_prepare_script_requires_exact_operator_revision_before_host_access(revision):
+    env = {"PATH": os.environ["PATH"], "ACC_PREPARE_APPROVED_UNTIL": str(int(time.time()) + 60),
+           "ACC_OPERATOR_REVISION": revision}
+    result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
+                            env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode and "EXACT_OPERATOR_REVISION_REQUIRED" in result.stderr
+    assert not result.stdout
+
+
+def test_prepare_shell_syntax_and_default_new_profile_rejection(prepared):
+    subprocess.run(["bash", "-n", str(ROOT / "infra/vps/prepare_telegram_resume.sh")], check=True)
+    if release_for(prepared) == "telegram-resume":
+        previous, disabled, config, *_ = prepared
+        with pytest.raises(ValueError, match="exact_source_revisions_required"):
+            staging.candidate(previous, disabled, config, checksum(previous))
+
+
+@pytest.mark.parametrize("name", ["src/command_center/models.py", "src/command_center/admin.py",
+    "requirements.lock", "uv.lock", "Dockerfile", "Dockerfile.executor", "compose.yaml", "web/package-lock.json"])
+def test_pinned_resume_release_has_no_schema_dependency_or_boundary_change(name):
+    old, new = staging.release_pair("telegram-resume")
+    blobs = [subprocess.check_output(["git", "show", f"{sha}:{name}"], cwd=ROOT) for sha in (old, new)]
+    assert blobs[0] == blobs[1]
