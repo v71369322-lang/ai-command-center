@@ -102,6 +102,15 @@ findings не подавлялись. Полный dependency/static scan final 
 Только этот false positive имеет локальный nosec с объяснением; список разрешённых
 Bandit rules не расширяется. Остальные retained findings продолжают проверяться.
 
+Cloud reader `/experiment` ограничен точным owner request key/payload и creation
+audit, source pin, grant digest/anchor и прежним Gateway ledger digest check.
+Он не создаёт Gateway/HTTP clients, не читает credentials, не выдаёт grants и
+не вызывает reconciliation. PR URL выходит только после completion/verification
+anchors и exact synthetic-repository URL validation. SETTLED трактуется как
+неопределённый результат в status так же, как в существующем no-repeat guard;
+settled money не означает полученный результат. Cached live fixtures не являются
+внешним live evidence. Новый reader не добавляет network/file execution sinks.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

@@ -38,6 +38,16 @@ def quote(rub_per_usd=CBR_RUB_PER_USD, extra_rub=Decimal(0)):
             'is_provider_hard_cap': False}
 
 
+REQUEST_KEY = 'first-experiment-f2-2'
+
+
+def task_payload():
+    """One immutable request shared by the API and read-only owner views."""
+    from .contract import CodingRequest, payload
+    return payload(CodingRequest(provider='openai', experiment_id=EXPERIMENT_ID, max_iterations=2,
+                                 max_units=2, max_tokens=4096, max_seconds=30))
+
+
 class Evidence(Strict):
     reference: str = Field(min_length=1, max_length=300)
     expires_at: str = Field(min_length=20, max_length=40)

@@ -218,6 +218,27 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
                 assert fake.ai_calls == 1 and not fake.prs
                 with pytest.raises(Denied):
                     service.submit(task['id'], settings.source_revision)
+            # Read the actual pipeline's persisted outcome through the new owner
+            # view; this must not recontact the provider or publish anything.
+            from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
+            from test_telegram_bridge import BotHTTP, OWNER, message
+            bot = BotHTTP()
+            telegram_client = MockTelegramHTTP(httpx.MockTransport(bot))
+            calls_before = len(fake.calls)
+            try:
+                bridge = TelegramBridge(store, telegram_client, OWNER)
+                bridge.receive(message(901, '/experiment'))
+                assert bridge.deliver_one()['state'] == 'SENT'
+                body = bot.sent[-1]['text']
+                assert task['id'] in body and 'HTTP-моки; настоящего AI нет' in body
+                if scenario == 'normal':
+                    assert 'Результат независимо проверен в HTTP-моках' in body
+                    assert 'реальный PR не опубликован' in body
+                elif scenario == 'lost_response':
+                    assert 'Внешняя операция не сверена' in body
+                assert len(fake.calls) == calls_before and 'Зафиксирован Draft PR:' not in body
+            finally:
+                telegram_client.close()
             g.close()
         finally:
             service.pool.shutdown(wait=True)

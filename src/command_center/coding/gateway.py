@@ -11,6 +11,8 @@ from ..store import Denied, digest
 from .integration_config import FileCredentials, IntegrationConfig
 from .spec import BASE_SHA
 
+UNRESOLVED_ACTION_STATES = frozenset({'INTENT', 'UNCERTAIN', 'SETTLED'})
+
 
 class Uncertain(Denied):
     pass
@@ -37,11 +39,12 @@ class Gateway:
                        'request': row.request_hash, 'state': row.state, 'reserved': row.reserved,
                        'actual': row.actual, 'evidence': row.evidence})
 
-    def check_ledger(self, s, rows):
+    @staticmethod
+    def check_ledger(s, rows):
         anchors = {a.event['action_id']: a.event['ledger_digest'] for a in s.execute(
             select(Audit).order_by(Audit.sequence)).scalars()
                    if 'action_id' in a.event and 'ledger_digest' in a.event}
-        if any(anchors.get(row.id) != self.action_digest(row) for row in rows):
+        if any(anchors.get(row.id) != Gateway.action_digest(row) for row in rows):
             raise Denied('external_ledger_integrity_failure')
 
     def authorize(self, actor, task_id, version, *, budget_nano_rub, seconds=120, final_confirmation=False,
@@ -215,7 +218,7 @@ class Gateway:
             self.check_ledger(s, count)
             if len(count) >= 64:
                 raise Denied('external_call_limit')
-            if method == 'POST' and any(r.state in {'INTENT', 'UNCERTAIN', 'SETTLED'}
+            if method == 'POST' and any(r.state in UNRESOLVED_ACTION_STATES
                                        and r.evidence.get('method') != 'GET' for r in count):
                 raise Denied('external_budget_or_pending_limit')
             amount = 0
@@ -336,7 +339,7 @@ class Gateway:
                     'actual_nano_rub': sum(r.actual for r in rows),
                     'uncertain_nano_rub': sum(r.reserved for r in rows),
                     'calls': sum(r.kind == 'openai' for r in rows),
-                    'result_uncertain': any(r.state in {'INTENT', 'UNCERTAIN'} for r in rows),
+                    'result_uncertain': any(r.state in UNRESOLVED_ACTION_STATES for r in rows),
                     'permission': bool(grant),
                     'actions': [{'id': r.id, 'kind': r.kind, 'state': r.state,
                                  'request_id': r.evidence.get('request_id')} for r in rows]}
