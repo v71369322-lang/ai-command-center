@@ -75,6 +75,15 @@ profile b2e71fe→bdc8cbc; старый default f34 сохранён. Prepare-on
 На текущем VPS b2e71fe этой команды нет. PR #38 по-прежнему доставляет только bdc8cbc;
 новую функцию нельзя считать включённой в прежний закреплённый пакет.
 
+Продолжение в облаке: [единый mobile-релиз Telegram](infrastructure/TELEGRAM_MOBILE_RELEASE.md)
+позволяет подготовить один переход b2e71fe→d932baa с `/resume` и `/readiness`.
+Application [PR #39](https://github.com/v71369322-lang/ai-command-center/pull/39)
+имеет успешный CI:724 Python /1 warning, отдельно210 infrastructure. Новый
+operator profile `telegram-mobile` явно выбирается; прежние default/profiles
+сохранены. Локально280 infrastructure passed. Source archive/manifest — только
+ignored cloud evidence; host candidate/image IDs пока отсутствуют. VPS не менялся,
+старые approvals не продлевались. Финальный operator HEAD/CI — в отдельном Draft PR.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).

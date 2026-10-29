@@ -12,7 +12,22 @@ if not value.isdigit() or not now < int(value) <= now + 7200:
     raise SystemExit('PREPARATION_APPROVAL_MISSING_OR_EXPIRED')
 if not re.fullmatch('[a-f0-9]{40}', os.environ.get('ACC_OPERATOR_REVISION', '')):
     raise SystemExit('EXACT_OPERATOR_REVISION_REQUIRED')
+if os.environ.get('ACC_TELEGRAM_RELEASE', 'telegram-resume') not in ('telegram-resume', 'telegram-mobile'):
+    raise SystemExit('EXACT_TELEGRAM_RELEASE_REQUIRED')
 PY_APPROVAL
+release=${ACC_TELEGRAM_RELEASE:-telegram-resume}
+case "$release" in
+  telegram-resume)
+    application=bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82
+    base=/home/acc-control/telegram-resume-release
+    marker=TELEGRAM_RESUME_CANDIDATE_PREPARED_NOT_APPLIED
+    ;;
+  telegram-mobile)
+    application=d932baafce53c0748396abfc019cf81b931ebfec
+    base=/home/acc-control/telegram-mobile-release
+    marker=TELEGRAM_MOBILE_CANDIDATE_PREPARED_NOT_APPLIED
+    ;;
+esac
 if [ "$(id -u)" != 1000 ] || [ "$(hostname -s)" != brain1 ]; then
   echo DEDICATED_CONTROL_HOST_REQUIRED >&2
   exit 1
@@ -37,7 +52,6 @@ if (p.get('phase') != 'VERIFIED'
     or p.get('directory') != '/home/acc-control/f34/candidate'):
     raise SystemExit('VERIFIED_PREDECESSOR_CHANGED')
 PY_BASELINE
-base=/home/acc-control/telegram-resume-release
 [ ! -e "$base" ] && [ ! -L "$base" ]
 for program in git ssh python3 docker flock timeout; do command -v "$program" >/dev/null; done
 [ "$(df --output=avail -B1 /home/acc-control | tail -1)" -ge 26843545600 ]
@@ -60,9 +74,9 @@ check_approval
 mkdir -m 700 "$base/source"
 git -C "$base/source" init --quiet --template=
 git -C "$base/source" remote add origin git@github.com:v71369322-lang/ai-command-center.git
-timeout 120s git -C "$base/source" fetch --depth=1 origin bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82
-git -C "$base/source" -c core.hooksPath=/dev/null checkout --detach bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82
-[ "$(git --no-replace-objects -C "$base/source" rev-parse HEAD)" = bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82 ]
+timeout 120s git -C "$base/source" fetch --depth=1 origin "$application"
+git -C "$base/source" -c core.hooksPath=/dev/null checkout --detach "$application"
+[ "$(git --no-replace-objects -C "$base/source" rev-parse HEAD)" = "$application" ]
 [ -z "$(git -C "$base/source" status --porcelain)" ]
 cd "$base/source"
 cmp requirements.lock /home/acc-control/f34/source/requirements.lock
@@ -76,8 +90,8 @@ check_approval
   --data-root /home/acc-control/f30/state \
   --owner-password-origin http://127.0.0.1:18000 --password-loopback-http
 check_approval
-"$tools" "$operator/infra/vps/stage_telegram_update.py" stage --release telegram-resume \
+"$tools" "$operator/infra/vps/stage_telegram_update.py" stage --release "$release" \
   --active-bundle /home/acc-control/f34/candidate \
   --disabled-bundle "$base/disabled-bundle" --output "$base/candidate" \
   --approved-previous a1cf9b0d783cc15a17e8d119167008a81584a051bcd55a0e9b359c519d8be9c8
-echo TELEGRAM_RESUME_CANDIDATE_PREPARED_NOT_APPLIED
+echo "$marker"

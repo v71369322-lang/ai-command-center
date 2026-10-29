@@ -24,7 +24,7 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-@pytest.fixture(params=["f34", "telegram-resume"])
+@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile"])
 def prepared(tmp_path, monkeypatch, request):
     base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
@@ -112,7 +112,8 @@ def prepared(tmp_path, monkeypatch, request):
 
 
 def release_for(prepared):
-    return "telegram-resume" if prepared[0]["manifest"]["revision"] == staging.TARGET_REVISION else "f34"
+    pair = (prepared[0]["manifest"]["revision"], prepared[1]["manifest"]["revision"])
+    return next(name for name, allowed in staging.RELEASES.items() if pair == allowed)
 
 
 def test_stage_keeps_live_binding_and_state_and_never_reads_token(prepared, tmp_path):
@@ -421,21 +422,23 @@ def test_uncertainty_preserves_phase_and_never_retries_or_rolls_back(activation,
 
 def test_profile_never_infers_a_new_transition_from_manifests(prepared, tmp_path):
     previous, disabled, config, old_dir, new_dir, root, _ = prepared
-    wrong = "f34" if release_for(prepared) == "telegram-resume" else "telegram-resume"
     before = (root / "telegram/connection.json").read_bytes()
-    with pytest.raises(ValueError, match="exact_source_revisions_required"):
-        staging.candidate(previous, disabled, config, checksum(previous), release=wrong)
-    with pytest.raises(ValueError, match="verified_predecessor_changed"):
-        staging.stage(old_dir, new_dir, tmp_path / "other", checksum(previous), release=wrong)
+    for wrong in set(staging.RELEASES) - {release_for(prepared)}:
+        with pytest.raises(ValueError, match="exact_source_revisions_required"):
+            staging.candidate(previous, disabled, config, checksum(previous), release=wrong)
+        expected = ("verified_predecessor_changed" if staging.release_pair(wrong)[0] != previous["manifest"]["revision"]
+                    else "exact_source_revisions_required")
+        with pytest.raises(ValueError, match=expected):
+            staging.stage(old_dir, new_dir, tmp_path / "other", checksum(previous), release=wrong)
     assert (root / "telegram/connection.json").read_bytes() == before
     assert not (tmp_path / "other").exists()
 
 
 def test_wrong_apply_profile_does_not_pause_or_write_journal(activation):
     prepared, output, _, events, _ = activation
-    wrong = "f34" if release_for(prepared) == "telegram-resume" else "telegram-resume"
-    with pytest.raises(ValueError, match="exact_source_revisions_required"):
-        invoke_activation(activation, release=wrong)
+    for wrong in set(staging.RELEASES) - {release_for(prepared)}:
+        with pytest.raises(ValueError, match="exact_source_revisions_required"):
+            invoke_activation(activation, release=wrong)
     assert events == [] and not (output / "activation.json").exists()
 
 
@@ -445,23 +448,30 @@ def test_unknown_profile_is_rejected_before_loading_any_path(value):
         staging.stage("/not-loaded", "/not-loaded", "/not-created", "a" * 64, release=value)
 
 
-@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume"])
-def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, capsys):
-    argv = ["tool", "stage", "--active-bundle", "/active", "--disabled-bundle", "/disabled",
+@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile"])
+@pytest.mark.parametrize("action", ["stage", "apply"])
+def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, action, capsys):
+    argv = ["tool", action, "--active-bundle", "/active", "--disabled-bundle", "/disabled",
             "--output", "/candidate", "--approved-previous", "a" * 64]
+    if action == "apply":
+        argv += ["--approved-candidate", "b" * 64, "--approved-until", "10100"]
     if profile:
         argv += ["--release", profile]
     seen = []
     monkeypatch.setattr(sys, "argv", argv)
-    monkeypatch.setattr(staging, "stage", lambda *args, **kw: seen.append(kw["release"]) or {"mock": True})
+    monkeypatch.setattr(staging, "stage" if action == "stage" else "apply_candidate",
+                        lambda *args, **kw: seen.append(kw["release"]) or {"mock": True})
     staging.main()
     assert seen == [profile or "f34"]
     assert json.loads(capsys.readouterr().out) == {"mock": True}
 
 
 @pytest.mark.parametrize("window", [None, "0", "not-a-time"])
-def test_prepare_script_missing_or_expired_scope_denied_before_host_access(window):
+@pytest.mark.parametrize("profile", [None, "telegram-mobile"])
+def test_prepare_script_missing_or_expired_scope_denied_before_host_access(window, profile):
     env = {"PATH": os.environ["PATH"]}
+    if profile:
+        env["ACC_TELEGRAM_RELEASE"] = profile
     if window is not None:
         env["ACC_PREPARE_APPROVED_UNTIL"] = window
     result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
@@ -471,9 +481,12 @@ def test_prepare_script_missing_or_expired_scope_denied_before_host_access(windo
 
 
 @pytest.mark.parametrize("revision", ["", "main", "x" * 40])
-def test_prepare_script_requires_exact_operator_revision_before_host_access(revision):
+@pytest.mark.parametrize("profile", [None, "telegram-mobile"])
+def test_prepare_script_requires_exact_operator_revision_before_host_access(revision, profile):
     env = {"PATH": os.environ["PATH"], "ACC_PREPARE_APPROVED_UNTIL": str(int(time.time()) + 60),
            "ACC_OPERATOR_REVISION": revision}
+    if profile:
+        env["ACC_TELEGRAM_RELEASE"] = profile
     result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
                             env=env, capture_output=True, text=True, timeout=5)
     assert result.returncode and "EXACT_OPERATOR_REVISION_REQUIRED" in result.stderr
@@ -482,7 +495,7 @@ def test_prepare_script_requires_exact_operator_revision_before_host_access(revi
 
 def test_prepare_shell_syntax_and_default_new_profile_rejection(prepared):
     subprocess.run(["bash", "-n", str(ROOT / "infra/vps/prepare_telegram_resume.sh")], check=True)
-    if release_for(prepared) == "telegram-resume":
+    if release_for(prepared) != "f34":
         previous, disabled, config, *_ = prepared
         with pytest.raises(ValueError, match="exact_source_revisions_required"):
             staging.candidate(previous, disabled, config, checksum(previous))
@@ -490,7 +503,45 @@ def test_prepare_shell_syntax_and_default_new_profile_rejection(prepared):
 
 @pytest.mark.parametrize("name", ["src/command_center/models.py", "src/command_center/admin.py",
     "requirements.lock", "uv.lock", "Dockerfile", "Dockerfile.executor", "compose.yaml", "web/package-lock.json"])
-def test_pinned_resume_release_has_no_schema_dependency_or_boundary_change(name):
-    old, new = staging.release_pair("telegram-resume")
+@pytest.mark.parametrize("profile", ["telegram-resume", "telegram-mobile"])
+def test_pinned_resume_release_has_no_schema_dependency_or_boundary_change(name, profile):
+    old, new = staging.release_pair(profile)
     blobs = [subprocess.check_output(["git", "show", f"{sha}:{name}"], cwd=ROOT) for sha in (old, new)]
     assert blobs[0] == blobs[1]
+
+
+@pytest.mark.parametrize("profile", [None, "telegram-resume", "telegram-mobile"])
+def test_prepare_selector_matches_pinned_profile_before_any_host_access(profile):
+    # Execute only the real validation/selection prefix, stopping BEFORE host
+    # identity, files, Git or Docker access. This is not a full script/VPS proof.
+    script = (ROOT / "infra/vps/prepare_telegram_resume.sh").read_text()
+    prefix, _ = script.split('if [ "$(id -u)" != 1000 ]', 1)
+    probe = prefix + '\nprintf "%s\\n" "$release" "$application" "$base" "$marker"\n'
+    env = {"PATH": os.environ["PATH"], "ACC_PREPARE_APPROVED_UNTIL": str(int(time.time()) + 60),
+           "ACC_OPERATOR_REVISION": "a" * 40}
+    if profile is not None:
+        env["ACC_TELEGRAM_RELEASE"] = profile
+    result = subprocess.run(["bash", "-s"], input=probe, env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode == 0 and not result.stderr
+    selected = profile or "telegram-resume"
+    assert result.stdout.splitlines() == [selected, staging.release_pair(selected)[1],
+        f"/home/acc-control/{selected}-release", selected.upper().replace("-", "_") + "_CANDIDATE_PREPARED_NOT_APPLIED"]
+
+
+@pytest.mark.parametrize("profile", ["", "latest", "main", "f34", "telegram-mobile; unsafe", "a" * 40])
+def test_prepare_unknown_profile_denied_without_host_access_or_input_echo(profile):
+    env = {"PATH": os.environ["PATH"], "ACC_PREPARE_APPROVED_UNTIL": str(int(time.time()) + 60),
+           "ACC_OPERATOR_REVISION": "a" * 40, "ACC_TELEGRAM_RELEASE": profile}
+    result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
+                            env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode and result.stderr.strip() == "EXACT_TELEGRAM_RELEASE_REQUIRED"
+    assert not result.stdout
+
+
+def test_prepare_overlong_approval_does_not_gain_host_access():
+    env = {"PATH": os.environ["PATH"], "ACC_PREPARE_APPROVED_UNTIL": str(int(time.time()) + 10800),
+           "ACC_OPERATOR_REVISION": "a" * 40, "ACC_TELEGRAM_RELEASE": "telegram-mobile"}
+    result = subprocess.run(["bash", str(ROOT / "infra/vps/prepare_telegram_resume.sh")],
+                            env=env, capture_output=True, text=True, timeout=5)
+    assert result.returncode and result.stderr.strip() == "PREPARATION_APPROVAL_MISSING_OR_EXPIRED"
+    assert not result.stdout

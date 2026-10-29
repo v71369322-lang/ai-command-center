@@ -24,6 +24,7 @@ TARGET_REVISION = 'b2e71fe073f3109e639dac43496884905ce86d9f'
 RELEASES = {
     'f34': (BASE_REVISION, TARGET_REVISION),
     'telegram-resume': (TARGET_REVISION, 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
+    'telegram-mobile': (TARGET_REVISION, 'd932baafce53c0748396abfc019cf81b931ebfec'),
 }
 
 
