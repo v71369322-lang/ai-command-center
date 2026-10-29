@@ -29,6 +29,8 @@ RELEASES = {
                          '0d44f31fe9e37045ed410751cbac7020c59b669a'),
     'first-experiment-readiness': ('d932baafce53c0748396abfc019cf81b931ebfec',
                                  '5a70a48e57d75eceac0526fe8abcf70d57489b8b'),
+    'first-experiment-status': ('d932baafce53c0748396abfc019cf81b931ebfec',
+                              '1fe45031c6570bd02e4f017169462a0b29649b15'),
 }
 
 
@@ -39,10 +41,10 @@ def release_pair(release):
 
 
 def integration_transition(old, new, release):
-    if release in {'first-experiment', 'first-experiment-readiness'}:
+    if release in {'first-experiment', 'first-experiment-readiness', 'first-experiment-status'}:
         if 'first_experiment' in old or 'first_experiment' not in new:
             raise ValueError('explicit_first_experiment_binding_required')
-        if bool(new['first_experiment'].get('telegram_readiness')) != (release == 'first-experiment-readiness'):
+        if bool(new['first_experiment'].get('telegram_readiness')) != (release != 'first-experiment'):
             raise ValueError('exact_readiness_profile_required')
     elif 'first_experiment' in old or 'first_experiment' in new:
         raise ValueError('first_experiment_release_required')

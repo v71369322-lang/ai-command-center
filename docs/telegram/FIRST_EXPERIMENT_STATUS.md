@@ -5,6 +5,15 @@ Cloud-продолжение [PR #43](https://github.com/v71369322-lang/ai-comma
 эксперимента. Её создаёт прежний API; эта команда задачу не создаёт и не запускает.
 На VPS функция пока не доставлена; target пакета PR #43 её не включает.
 
+Именованный operator profile `--release first-experiment-status` закрепляет
+переход от текущего application d932baafce53c0748396abfc019cf81b931ebfec к
+`1fe45031c6570bd02e4f017169462a0b29649b15`. Он требует прежний opt-in
+`--first-experiment-telegram-readiness` и три private file bindings. Один новый
+кандидат включает gateway profile, readiness и experiment snapshot; прежние
+targets не меняются. Operator checkout закрепляется отдельно от application.
+Host prepare, candidate digest/inspect и exact apply approval остаются отдельными
+этапами; этот cloud profile их не выполняет.
+
 ## Что видит владелец после доставки
 
 - UTC-время снимка, ID и состояние одной фиксированной задачи;
@@ -60,6 +69,9 @@ result_uncertain=true. Денежный резерв уже может быть 
 Это PostgreSQL + strict Bot API/provider HTTP mocks: новый reader, меню,
 task-status, прежние financial/Gateway и first-experiment regression tests.
 Пять container-dependent cases отложены до финального CI с exact-source images.
+После последних изменений текста/лимита повторён затронутый subset:65 passed;
+это пересекающиеся tests, не дополнительные65. Named staging transition:
+315 passed, все шесть release profiles и прежние uncertain-result interlocks.
 Существующий end-to-end dry-run дополнен чтением реального persisted результата
 pipeline через Telegram: success, wrong repository и response loss.
 
