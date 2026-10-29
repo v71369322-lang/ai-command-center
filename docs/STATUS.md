@@ -95,6 +95,18 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующий cloud-шаг после owner account setup —
+[явный deployment profile первого AI-эксперимента](f2-2/DEPLOYMENT_PROFILE.md).
+Прежний VPS profile отвергал F2 env/mounts/egress, поэтому сохранённые и проверенные
+owner credentials ещё не означали подключение runtime. Новый opt-in binding
+закрепляет config bytes и прежний profile hash, предоставляет config API/broker,
+а keys/egress только broker. Default closed и F1/финансовые guards сохраняются.
+Source/image build, новые host bundle/approvals и paid run этим не выполняются.
+Владелец подтвердил model metadata HTTP200 и App5524444/installation176497504
+identity/permissions/target binding; selected count, installation token, payment
+upper bound и новый actual runtime profile остаются отдельными проверками.
+Итоговые commit/PR/CI этого изменения сверять в его отдельной ветке.
+
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).
 - Предшествующая реализация до этапа меню: [Draft PR #31](https://github.com/v71369322-lang/ai-command-center/pull/31),
   `feat/telegram-coding-demo`, `b2b57ba8ae52d8ae7629c13647f250d0d92cfae7`.

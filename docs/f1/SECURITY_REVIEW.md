@@ -77,6 +77,24 @@ SQL interlock строится через psycopg.sql.SQL/Literal, не чере
 Deployment. Оба наблюдения сохраняются в Bandit JSON. LOW allowlist не изменён,
 новые MEDIUM/HIGH или неизвестные rules по-прежнему блокируют CI.
 
+## Первый experiment deployment binding
+
+Новый deployment_integrations проверяет config/credential custody через
+O_NOFOLLOW descriptors. Значения keys при prepare/preflight не читаются;
+App PEM не является installation token и превышает разрешённый size cap.
+Полный byte pin дополняет прежний profile hash, исключающий credential paths:
+redirect reference на другой runtime secret отклоняется ещё loader до Gateway.
+Readonly config находится только в API/broker, keys и opt-in egress только в
+broker. Прежний запрет произвольных mounts/env/networks остаётся для defaults.
+Binding не выдаёт grants и не ослабляет budget/final confirmation guards.
+
+В retained Bandit JSON добавились8 LOW observations: B105 — фиксированный
+in-container `/run/f2/github.token`, не secret value; B404/B603/B607 нового
+networkless cloud smoke — argv-only Git/local Unix Docker для exact source
+и публичных disposable fixtures, без shell=True/недоверенных task inputs.
+MEDIUM/HIGH отсутствуют в локальном scan. Allowlist rules не расширялись,
+findings не подавлялись. Полный dependency/static scan final SHA — в CI.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

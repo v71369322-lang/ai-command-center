@@ -95,7 +95,11 @@ def image_check(engine, images, revision):
 
 
 def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_password_origin=None,
-            password_loopback_http=False, telegram_connection_digest=None):
+            password_loopback_http=False, telegram_connection_digest=None,
+            first_experiment_config=None, openai_key_file=None, github_token_file=None):
+    external_files = (first_experiment_config, openai_key_file, github_token_file)
+    if any(v is not None for v in external_files) and any(v is None for v in external_files):
+        raise ValueError('first_experiment_all_bindings_required')
     source = Path(source).resolve()
     engine = Engine(control_uid)
     # config does not start containers. Keep all input paths in the exact checkout.
@@ -120,6 +124,10 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
     if telegram_connection_digest:
         from .telegram_release import binding
         manifest['telegram'] = binding(manifest['data_root'], revision, telegram_connection_digest)
+    if first_experiment_config is not None:
+        from .deployment_integrations import prepare_binding
+        manifest['first_experiment'] = prepare_binding(manifest, first_experiment_config,
+                                                       openai_key_file, github_token_file)
     source_check(manifest)
     image_check(engine, images, revision)
     bundle = {'manifest': manifest, 'compose': render(base, manifest)}
@@ -161,6 +169,9 @@ class Deployment:
         # redis.sh remains a host bind, so immutable images alone are insufficient.
         # Boot, updates, backups and rollback must reject changed source too.
         source_check(self.m)
+        if 'first_experiment' in self.m:
+            from .deployment_integrations import check_binding
+            check_binding(self.m)
         image_check(self.engine, {k: v for k, v in self.m['images'].items() if k not in {'executor', 'coding'}}, self.m['revision'])
         image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
         if fresh:
@@ -362,12 +373,32 @@ class Deployment:
 
     def postcheck(self):
         # Does not require an owner assertion or manufacture a session/MFA claim.
+        if 'first_experiment' in self.m:
+            from .deployment_integrations import CONFIG_TARGET, check_binding
+            check_binding(self.m)
+            code = ('import os;from command_center.coding.integration_config import IntegrationConfig;'
+                    'from command_center.store import digest;'
+                    f'assert os.environ.get("F2_INTEGRATION_CONFIG_FILE")=={CONFIG_TARGET!r};'
+                    f'assert os.environ.get("F2_INTEGRATION_CONFIG_SHA256")=={self.m["first_experiment"]["config_sha256"]!r};'
+                    f'assert digest(IntegrationConfig.load().model_dump())=={self.m["first_experiment"]["profile_hash"]!r}')
+            for service in ('api', 'runtime-broker'):
+                self.engine.run('exec', PROJECT + '-' + service + '-1', 'python', '-c', code)
         self.tool('from command_center.config import Settings;from command_center.store import Store;'
                   'from command_center.worker import broker;s=Settings.load();Store(s).checkpoint();assert broker(s).ping()')
         for name in services(self.m):
             metadata = self.engine.json('inspect', PROJECT + '-' + name + '-1')[0]
             if not metadata['State']['Running']:
                 raise ValueError('service_not_running:' + name)
+            if 'first_experiment' in self.m:
+                from .deployment_integrations import CONFIG_TARGET, CREDENTIAL_TARGETS, mounts
+                binding = self.m['first_experiment']
+                sources = {binding[k] for k in ('config_file', *CREDENTIAL_TARGETS)}
+                targets = {CONFIG_TARGET, *CREDENTIAL_TARGETS.values()}
+                actual = {(v['Source'], v['Destination'], v['RW']) for v in metadata.get('Mounts', [])
+                          if v.get('Source') in sources or v.get('Destination') in targets}
+                expected = {(v['source'], v['target'], False) for v in mounts(self.m, name)}
+                if actual != expected:
+                    raise ValueError('first_experiment_runtime_mount_mismatch')
         self.engine.run('exec', PROJECT + '-watchdog-1', 'python', '-c',
             'import os;from command_center.runtime_ledger import RuntimeLedger;'
             'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);l.verify();assert l.watchdog_ready()')
@@ -453,7 +484,13 @@ def main():
     parser.add_argument('--owner-password-origin')
     parser.add_argument('--password-loopback-http', action='store_true')
     parser.add_argument('--telegram-connection-digest')
+    parser.add_argument('--first-experiment-config')
+    parser.add_argument('--openai-key-file')
+    parser.add_argument('--github-token-file')
     args = parser.parse_args()
+    if args.action != 'prepare' and any(v is not None for v in (
+            args.first_experiment_config, args.openai_key_file, args.github_token_file)):
+        parser.error('first experiment file bindings only apply to prepare')
     if args.action == 'init-state':
         initialize_state(args.data_root)
         print('Private synthetic state initialized; no external credentials generated or displayed.')
@@ -475,7 +512,9 @@ def main():
             parser.error('prepare requires both UIDs and data root')
         print(json.dumps({'bundle_digest': prepare(args.source, args.bundle, args.control_uid, args.execution_uid, args.data_root,
             owner_password_origin=args.owner_password_origin, password_loopback_http=args.password_loopback_http,
-            telegram_connection_digest=args.telegram_connection_digest)}))
+            telegram_connection_digest=args.telegram_connection_digest,
+            first_experiment_config=args.first_experiment_config, openai_key_file=args.openai_key_file,
+            github_token_file=args.github_token_file)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())
