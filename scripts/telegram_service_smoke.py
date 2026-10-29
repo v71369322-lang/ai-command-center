@@ -25,6 +25,8 @@ calls=[]
 sent=[]
 menus=[]
 pickers=[]
+resume_cards=[]
+resume_mode=False
 def handle(request):
     method=request.url.path.rsplit('/',1)[-1]
     body=json.loads(request.content)
@@ -50,8 +52,18 @@ def handle(request):
                     result[index]={'update_id':7,'callback_query':{'id':'public-project-choice',
                         'from':{'id':owner,'is_bot':False},'data':'pj:1:0:lnauto',
                         'message':{'message_id':1,'chat':{'id':owner,'type':'private'}}}}
+        if resume_mode:
+            result=[]
+            if body['offset']<=100:
+                result=[{'update_id':100,'message':{'message_id':200,'date':1700000000,
+                    'from':{'id':owner,'is_bot':False},'chat':{'id':owner,'type':'private'},'text':'/resume'}}]
+            elif body['offset']==101:
+                message_id,data=resume_cards[-1]
+                result=[{'update_id':101,'callback_query':{'id':'public-normal-resume',
+                    'from':{'id':owner,'is_bot':False},'data':data,
+                    'message':{'message_id':message_id,'chat':{'id':owner,'type':'private'}}}}]
     elif method=='answerCallbackQuery':
-        assert body=={'callback_query_id':'public-project-choice'}
+        assert body in ({'callback_query_id':'public-project-choice'},{'callback_query_id':'public-normal-resume'})
         result=True
     elif method=='sendMessage':
         assert body['chat_id']==owner
@@ -59,7 +71,11 @@ def handle(request):
         if 'keyboard' in body.get('reply_markup',{}):
             menus.append(body['reply_markup'])
         elif 'inline_keyboard' in body.get('reply_markup',{}):
-            pickers.append(body['reply_markup'])
+            data=body['reply_markup']['inline_keyboard'][0][0]['callback_data']
+            if data.startswith('rs:'):
+                resume_cards.append((len(sent),data))
+            else:
+                pickers.append(body['reply_markup'])
         result={'message_id':len(sent),'date':1700000000,'chat':{'id':owner,'type':'private'}}
     else: raise AssertionError('unexpected method')
     return httpx.Response(200,json={'ok':True,'result':result})
@@ -97,11 +113,23 @@ try:
     assert coding_task['state']=='SUCCEEDED'
     assert [r['checks']['passed'] for r in coding_task['coding']['test_runs']]==[False,True]
     assert coding_task['coding']['pr']['published'] is False and coding_task['coding']['pr']['url'] is None
+    # Run the real service/PG action from a separately confirmed normal stop.
+    # The callback is returned only after its sendMessage receipt was observed.
+    store.halt('owner')
+    before=store.snapshot()
+    resume_mode=True
+    resumed=service.run(max_cycles=3)
+    after=store.snapshot()
+    assert resumed['completed_cycles']==3 and len(resume_cards)==1
+    assert after['halted'] is False and after['epoch']==before['epoch']+1
+    assert after['budget']==before['budget'] and after['tasks']==before['tasks']
+    assert any('Обычная остановка снята для новых разрешённых задач' in value for value in sent)
     assert all(len(value)<=4096 for value in sent)
     print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':17,'project_assignments':1,
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,
         'coding_task_id':task_id,'coding_repair_checks':[False,True],'mock_pr_published':False,
+        'normal_stop_resume_confirmed':True,'resume_confirmation_cards':len(resume_cards),
         'actual_telegram_contacted':False}))
 finally:
     client.close();store.engine.dispose()

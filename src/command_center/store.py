@@ -366,23 +366,29 @@ class Store:
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
-            self.check_audit(s)
-            c = s.get(Control, 1)
-            last = s.execute(select(Audit).order_by(Audit.sequence.desc()).limit(1)).scalar_one()
-            if c.recovery or not c.halted or c.epoch != epoch or last.digest != checkpoint_digest:
-                raise Denied("stale_or_recovery_resume")
-            active = s.execute(select(Task).where(Task.state.in_([
-                "RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED", "SECURITY_BLOCKED"]))).first()
-            if active:
-                raise Denied("unreconciled_resume")
-            for task in s.execute(select(Task).where(Task.state.not_in(TERMINAL))).scalars():
-                task.state = "CANCELLED"
-                task.version += 1
-            for approval in s.execute(select(Approval)).scalars():
-                approval.revoked = True
-            c.halted = False
-            c.epoch += 1
-            self.audit(s, "normal_stop_resumed", actor, epoch=c.epoch)
+            self._resume_locked(s, actor, epoch, checkpoint_digest)
+
+    def _resume_locked(self, s, actor, epoch, checkpoint_digest):
+        """Internal transaction composition; caller must hold transaction() lock."""
+        if actor != "owner":
+            raise Denied("owner_required")
+        self.check_audit(s)
+        c = s.get(Control, 1)
+        last = s.execute(select(Audit).order_by(Audit.sequence.desc()).limit(1)).scalar_one()
+        if c.recovery or not c.halted or c.epoch != epoch or last.digest != checkpoint_digest:
+            raise Denied("stale_or_recovery_resume")
+        active = s.execute(select(Task).where(Task.state.in_([
+            "RUNNING", "VERIFYING", "RECONCILING", "CANCEL_REQUESTED", "SECURITY_BLOCKED"]))).first()
+        if active:
+            raise Denied("unreconciled_resume")
+        for task in s.execute(select(Task).where(Task.state.not_in(TERMINAL))).scalars():
+            task.state = "CANCELLED"
+            task.version += 1
+        for approval in s.execute(select(Approval)).scalars():
+            approval.revoked = True
+        c.halted = False
+        c.epoch += 1
+        self.audit(s, "normal_stop_resumed", actor, epoch=c.epoch)
 
     def security_trip(self, task_id, fence):
         with self.transaction() as s:
