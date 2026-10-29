@@ -140,6 +140,7 @@ def test_timeout_restart_retains_money_and_prevents_retry(store, after_response)
     action_id = fresh.status(task['id'])['actions'][0]['id']
     fresh.reconcile_usage('owner', action_id, 100, 32, 'owner-verified fixture billing evidence')
     assert fresh.status(task['id'])['uncertain_nano_rub'] == 0
+    assert fresh.status(task['id'])['result_uncertain'] is True
     with pytest.raises(Uncertain):
         send(fresh, task)  # Settling money does not authorize a second request.
     fresh.close()

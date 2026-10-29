@@ -283,13 +283,11 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.post('/api/experiments/first/task', status_code=201)
     def create_first_experiment(role=Depends(identity)):
-        from .coding.first_experiment import EXPERIMENT_ID
+        from .coding.first_experiment import REQUEST_KEY, task_payload
         if role != 'owner':
             raise Denied('owner_required')
         # Stable request identity makes repeated phone taps return the same task.
-        request = CodingRequest(provider='openai', experiment_id=EXPERIMENT_ID, max_iterations=2,
-                                max_units=2, max_tokens=4096, max_seconds=30)
-        return store.create(role, 'first-experiment-f2-2', coding_payload(request))
+        return store.create(role, REQUEST_KEY, task_payload())
 
     @app.post('/api/experiments/first/{task_id}/authorize')
     def authorize_first_experiment(task_id: str, command: FinalExperimentApproval, role=Depends(identity)):

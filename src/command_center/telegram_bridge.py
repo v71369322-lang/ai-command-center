@@ -146,6 +146,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'tasks'}
         if value == '/readiness':
             return str(uid), {'kind': 'readiness'}
+        if value == '/experiment':
+            return str(uid), {'kind': 'experiment'}
+        if value.split()[:1] == ['/experiment']:
+            raise Denied('telegram_experiment_arguments_forbidden')
         if value.split()[:1] == ['/readiness']:
             raise Denied('telegram_readiness_arguments_forbidden')
         if value in {'/coding_demo', '/coding_plan'}:
@@ -360,7 +364,7 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness'}:
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness', 'experiment'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -375,6 +379,9 @@ class TelegramBridge:
                 if kind == 'readiness':
                     from .telegram_readiness import reply as readiness_reply
                     reply = readiness_reply(self, session)
+                elif kind == 'experiment':
+                    from .telegram_experiment import reply as experiment_reply
+                    reply = experiment_reply(self, session)
                 elif kind == 'coding_plan':
                     from .telegram_coding import plan
                     reply = plan()
@@ -443,10 +450,12 @@ class TelegramBridge:
                         '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
+                        '/experiment — состояние и результат первого AI-эксперимента; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
-                        'Голос и реальные AI пока отключены.', keyboard())
+                        'Голос отключён. Обычные запросы ожидают планирования; '
+                        'AI-эксперимент требует отдельного разрешения. Условия: /readiness.', keyboard())
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
             return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}

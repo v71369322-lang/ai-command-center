@@ -95,6 +95,14 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение поверх PR #43 — [просмотр первого AI-эксперимента](telegram/FIRST_EXPERIMENT_STATUS.md).
+`/experiment` читает одну фиксированную API-задачу и проверенные локальные
+result/financial anchors без Gateway/HTTP client construction и ключей.
+Сохранены строгая Telegram scope для обычных тестов, paid approval и F1 guards.
+Уточнён status после billing settlement: SETTLED сохраняет неопределённость
+результата и запрет повтора. Финальные source/PR/CI — в отдельной ветке;
+на VPS ничего не применяется автоматически.
+
 Следующий cloud-шаг после owner account setup —
 [явный deployment profile первого AI-эксперимента](f2-2/DEPLOYMENT_PROFILE.md).
 Прежний VPS profile отвергал F2 env/mounts/egress, поэтому сохранённые и проверенные
