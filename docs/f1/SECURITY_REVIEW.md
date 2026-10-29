@@ -127,6 +127,19 @@ operator ownership и переходы; новый путь не создаёт 
 Accounting/grants/reserves не изменяются даже при отмене во время HTTP. Неизвестный
 исход сохраняет no-repeat; подтверждение намерения не обещает фактической остановки.
 
+Operator-only GitHub token preparation связывает clean source/public key/paths
+с reviewed plan и свежим owner deadline. Credential creation ограничена одним
+POST с exact repository ID/permissions; effective token count и baseline читаются
+после выдачи, runtime/config/grants не меняются. Unknown outcomes и partial files
+не перезаписываются и не разрешают автоматический повтор. Scoped-token count
+не выдаётся за полное число repos установки. PEM/JWT не передаются runtime.
+
+Security scan теперь включает prepare_github_token.py. Его6 новых retained LOW:
+B404/B603/B607 — argv-only local Git с удалением inherited GIT_* selectors;
+B105 — fixed enumeration endpoint и два boolean status fields, не credentials.
+Ни одно наблюдение не подавлено, allowlist не расширяется; MED/HIGH блокируют CI.
+Текущая triage не является независимой сертификацией custody host/private key.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,
