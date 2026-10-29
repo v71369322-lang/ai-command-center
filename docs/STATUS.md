@@ -43,8 +43,21 @@ max_updates=0, сам не продлевается и не останавлив
 
 Следующий отдельный этап — [F34: подготовка Telegram update](infrastructure/F34_TELEGRAM_UPDATE_PREPARATION.md).
 Target application SHA b2e71fe. Новые operator tools готовят private staged
-binding и требуют отдельного exact approval для apply; rootless source build,
-read-only repository credential и live update ещё не выполнялись.
+binding и требуют отдельного exact approval для apply.
+
+Актуализация **29 октября, МСК**: [F34 применён владельцем на VPS](infrastructure/F34_LIVE_VALIDATION_2026-10-28.md).
+Application b2e71fe, operator tools 364c5eb, live bundle a1cf9b0d…be9c8,
+activation VERIFIED и F34_UPDATE_VERIFIED. Проверены Telegram capture/project
+choice/readback нового №131179132 и старого №131179125; /coding_plan доступен.
+Это owner-provided SSH logs + desktop Telegram Web, не прямой cloud host probe.
+Новые запуски остаются остановлены; post-update coding cycle и iPhone acceptance
+пока не выполнены. AI/CRM/paid APIs/public HTTPS не подключены. Исторические
+описания прежнего VPS состояния ниже не заменяют этот более поздний результат.
+
+Следующая ограниченная cloud-доработка — [снятие обычной остановки через Telegram](telegram/NORMAL_STOP_RESUME.md):
+двухшаговый /resume и одноразовая owner button используют прежний F1 resume;
+recovery/security/неопределённые исполнения остаются блокерами. Новая версия
+на VPS не доставляется автоматически; текущая live b2e71fe этой команды не имеет.
 
 ## Command Center: исходники и проверки
 

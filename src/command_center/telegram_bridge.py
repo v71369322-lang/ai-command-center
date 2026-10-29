@@ -106,6 +106,9 @@ class TelegramBridge:
             if token.startswith('pj:'):
                 from .telegram_project_picker import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('rs:'):
+                from .telegram_control import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             else:
                 if not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token):
                     raise Denied('telegram_callback_invalid')
@@ -135,6 +138,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'cancel', 'task_id': task_id}
         if value == '/stop':
             return str(uid), {'kind': 'stop'}
+        if value == '/resume':
+            return str(uid), {'kind': 'resume_request'}
+        if value.split()[:1] == ['/resume']:
+            raise Denied('telegram_resume_arguments_forbidden')
         if value == '/tasks':
             return str(uid), {'kind': 'tasks'}
         if value in {'/coding_demo', '/coding_plan'}:
@@ -294,6 +301,26 @@ class TelegramBridge:
         elif kind == 'stop':
             self.store.halt('owner', _scope_installer=lambda session, control:
                             self.finish(session, iid, 'Новые запуски остановлены; активные исполнения требуют сверки.'))
+        elif kind in {'resume_request', 'resume_confirm'}:
+            from .telegram_control import issue, confirm
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                row = session.get(TelegramInbox, iid)
+                if row.state == 'DONE':
+                    return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+                anchor = session.execute(select(Audit).where(
+                    Audit.event['kind'].as_string() == 'telegram_update_received',
+                    Audit.event['profile'].as_string() == self.profile,
+                    Audit.event['update_id'].as_string() == iid.rsplit(':', 1)[1],
+                    Audit.event['intent_hash'].as_string() == digest(intent),
+                    Audit.event['revision'].as_string() == self.store.settings.source_revision)).first()
+                if row.state != 'RECEIVED' or row.fingerprint != digest(intent) or row.intent != intent or not anchor:
+                    raise Denied('telegram_control_intent_integrity_or_source_changed')
+                if kind == 'resume_request':
+                    issue(self, session, iid)
+                else:
+                    confirm(self, session, iid, intent)
         elif kind == 'assign':
             from .project_inbox import classify, PROJECTS
             from .telegram_project_picker import verify
@@ -409,7 +436,8 @@ class TelegramBridge:
                         '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
-                        '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop. '
+                        '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
+                        '/resume — запросить снятие обычной остановки с подтверждением. '
                         'Голос и реальные AI пока отключены.', keyboard())
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
