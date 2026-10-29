@@ -95,6 +95,15 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение поверх PR #46 — [операторская подготовка GitHub token](infrastructure/FIRST_EXPERIMENT_GITHUB_TOKEN.md).
+Offline plan связывает source/key identity/paths с одной scoped credential
+операцией. Future prepare после owner approval выпускает токен только для
+ID1438229730, проверяет его effective repository count/permissions/baseline и
+сохраняет private0600 без подключения runtime. Unknown outcomes не повторяются.
+Полное число repos установки не выводится из scoped token; отдельный false
+сохраняется. Реальные credentials/API/VPS пока не использованы; app target и
+release pins PR #46 не меняются. Итоговый operator SHA/CI — в отдельном Draft PR.
+
 Следующее cloud-продолжение поверх PR #45 — [отмена первого эксперимента](telegram/EXPERIMENT_CANCELLATION.md):
 `/cancel_experiment` вызывает прежний F1 cancel для UUID, закреплённого при
 получении команды. Повтор/перезапуск не отменяют будущую или заменённую задачу.
