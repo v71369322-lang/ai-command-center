@@ -3,6 +3,13 @@
 Cloud-продолжение [PR #44](https://github.com/v71369322-lang/ai-command-center/pull/44).
 Source target предыдущего пакета не включает новые команды. VPS пока не менялся.
 
+Operator profile `--release first-experiment-notifications` закрепляет d932baaf →
+`8bab523f6f6e50a8a63e13a094f7fccf59ca889f`. Требуются прежние private file
+bindings и readiness opt-in; подписка всё равно выключена до явной команды
+владельца. Один кандидат включает gateway/readiness/snapshot/notifications;
+старые targets не переименовываются. Operator checkout закрепляется отдельно.
+Host prepare и exact candidate apply approval остаются отдельными этапами.
+
 ## Использование после доставки
 
 `/watch_experiment` без аргументов подписывает личный чат владельца на исход
@@ -70,6 +77,8 @@ revision mismatch в двух прежних container cases. Старые image
 суммируются с ним. Ruff/OpenAPI/current-runtime-secret guard/diff check PASS;
 locked audit:64 Python dependencies,0 Python/npm advisories,0 Bandit MED/HIGH,
 92 retained reviewed LOW. Эти проверки сделаны до source commit; final SHA — в CI.
+Named staging transition:360 passed, все семь release profiles. Это отдельный
+infrastructure run; его пересекающиеся cases не суммируются с другими наборами.
 Окончательные suite counts, source/PR/CI и выполненные container результаты —
 в отдельном Draft PR. Rootful cloud tests не являются rootless VPS/systemd или
-физической phone-приёмкой. Реальные сообщения, AI и публикации не выполнялись.
+физической phone-приёмкой. Реальные сообщения бота, AI-вызовы и runtime PR не выполнялись.
