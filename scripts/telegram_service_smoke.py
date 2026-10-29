@@ -39,7 +39,7 @@ def handle(request):
         values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
                 '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1',
                 '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all',
-                '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS]]
+                '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS],'/readiness']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -87,7 +87,9 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==21
+    assert calls.count('sendMessage')==22
+    assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
+               and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
     assert pickers==[picker_keyboard('1',0),picker_keyboard('1',0),picker_keyboard('1',1)]
     assert calls.count('answerCallbackQuery')==1
@@ -125,7 +127,8 @@ try:
     assert after['budget']==before['budget'] and after['tasks']==before['tasks']
     assert any('Обычная остановка снята для новых разрешённых задач' in value for value in sent)
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':17,'project_assignments':1,
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':18,'project_assignments':1,
+        'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,
         'coding_task_id':task_id,'coding_repair_checks':[False,True],'mock_pr_published':False,

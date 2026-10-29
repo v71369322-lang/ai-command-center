@@ -67,6 +67,14 @@ profile b2e71fe→bdc8cbc; старый default f34 сохранён. Prepare-on
 На VPS ничего не выполнено, нового host bundle digest пока нет. Владельцу вне
 компьютера не требуется вводить команды или передавать credentials.
 
+Следующий отдельный cloud-шаг — [сводка готовности в Telegram](telegram/READINESS_SUMMARY.md)
+поверх PR #38. `/readiness` читает F1 control, очередь этого подключения и, если
+доступен, локальный профиль первого эксперимента; отсутствие gateway config
+честно остаётся unknown. Не выдаёт grants и не читает ключи, не меняет спорные
+резервы. Локально126 targeted passed; полный итоговый CI — в отдельном Draft PR.
+На текущем VPS b2e71fe этой команды нет. PR #38 по-прежнему доставляет только bdc8cbc;
+новую функцию нельзя считать включённой в прежний закреплённый пакет.
+
 ## Command Center: исходники и проверки
 
 - Репозиторий: [v71369322-lang/ai-command-center](https://github.com/v71369322-lang/ai-command-center).

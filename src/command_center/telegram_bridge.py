@@ -144,6 +144,10 @@ class TelegramBridge:
             raise Denied('telegram_resume_arguments_forbidden')
         if value == '/tasks':
             return str(uid), {'kind': 'tasks'}
+        if value == '/readiness':
+            return str(uid), {'kind': 'readiness'}
+        if value.split()[:1] == ['/readiness']:
+            raise Denied('telegram_readiness_arguments_forbidden')
         if value in {'/coding_demo', '/coding_plan'}:
             return str(uid), {'kind': value[1:]}
         if value.split()[:1] in [['/coding_demo'], ['/coding_plan']]:
@@ -356,7 +360,7 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan'}:
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -368,7 +372,10 @@ class TelegramBridge:
                 control = session.get(Control, 1)
                 if control.halted or control.recovery:
                     suffix += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
-                if kind == 'coding_plan':
+                if kind == 'readiness':
+                    from .telegram_readiness import reply as readiness_reply
+                    reply = readiness_reply(self, session)
+                elif kind == 'coding_plan':
                     from .telegram_coding import plan
                     reply = plan()
                 elif kind == 'projects':
@@ -435,6 +442,7 @@ class TelegramBridge:
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
                         '/projects — проекты и назначение; '
+                        '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
