@@ -57,7 +57,8 @@ def issue(bridge, session, iid):
         Audit.event['intent_hash'].as_string() == digest({'kind': 'resume_request'}),
         Audit.event['revision'].as_string() == bridge.store.settings.source_revision)).scalar_one()
     expires = datetime.fromisoformat(received.event['time']) + timedelta(seconds=120)
-    if expires <= bridge.store.now(session):
+    now = bridge.store.now(session)
+    if not expires - timedelta(seconds=120) <= now < expires:
         return bridge.finish(session, iid, 'Запрос подтверждения истёк. Отправьте /resume заново.')
     head = session.execute(select(Audit).order_by(Audit.sequence.desc()).limit(1)).scalar_one()
     token = secrets.token_urlsafe(24)
@@ -67,6 +68,7 @@ def issue(bridge, session, iid):
     delivery = bridge.finish(session, iid, text, keyboard(token))
     bridge.store.audit(session, ISSUED, 'owner', profile=bridge.profile, delivery_id=delivery,
                        card=hashlib.sha256(token.encode()).hexdigest(), epoch=control.epoch,
+                       connection_digest=getattr(bridge.client, 'approved', bridge.profile),
                        checkpoint={'sequence': head.sequence, 'digest': head.digest},
                        expires_at=expires.isoformat())
     return delivery
@@ -102,10 +104,12 @@ def confirm(bridge, session, iid, intent):
         return bridge.finish(session, iid, 'Это подтверждение уже использовано. Ничего не изменено.')
     # Source/card TTL and checkpoint are server evidence, never callback input.
     anchor = event['checkpoint']
+    expires = datetime.fromisoformat(event['expires_at'])
     bridge.store.check_audit(session, anchor)
     later = session.execute(select(Audit).where(Audit.sequence > anchor['sequence']).order_by(Audit.sequence)).scalars().all()
     if (event['revision'] != bridge.store.settings.source_revision
-            or datetime.fromisoformat(event['expires_at']) <= bridge.store.now(session)
+            or event['connection_digest'] != getattr(bridge.client, 'approved', bridge.profile)
+            or not expires - timedelta(seconds=120) <= bridge.store.now(session) < expires
             or any(row.event['kind'] not in TRANSPORT_EVENTS
                    or row.event['revision'] != bridge.store.settings.source_revision for row in later)):
         return bridge.finish(session, iid, 'Подтверждение устарело или состояние изменилось. '
@@ -121,6 +125,10 @@ def confirm(bridge, session, iid, intent):
             raise
         return bridge.finish(session, iid, 'Снять остановку нельзя: нужна сверка состояния или завершение '
                              'восстановления. Выполнение не возобновлено этой командой.')
+    # A slow guard/DB operation must not carry a confirmation past its window.
+    # Raising here rolls the F1 mutation back, together with its audit event.
+    if not expires - timedelta(seconds=120) <= bridge.store.now(session) < expires:
+        raise Denied('telegram_resume_expired_during_commit')
     bridge.store.audit(session, CONSUMED, 'owner', profile=bridge.profile, card=intent['card'],
                        inbox_id=iid, checkpoint=anchor, epoch=event['epoch'])
     return bridge.finish(session, iid, 'Обычная остановка снята для новых разрешённых задач. '

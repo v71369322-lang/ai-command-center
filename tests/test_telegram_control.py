@@ -14,7 +14,7 @@ from command_center.store import Denied, Store
 from command_center.telegram_bridge import TelegramBridge
 from command_center.telegram_control import CONSUMED, ISSUED, allowed_markup, keyboard
 from test_control_plane import create
-from test_telegram_service import FakeBot, OWNER, client_for, update
+from test_telegram_service import FakeBot, OWNER, PUBLIC_TOKEN, client_for, update
 from test_telegram_service import configured as configured
 from test_telegram_task_status import authority
 
@@ -202,6 +202,20 @@ def test_card_expires_without_restart_extending_authority(bridge, store, monkeyp
     assert 'Подтверждение устарело' in fake.sent[-1]['text']
 
 
+@pytest.mark.parametrize('seconds', [-121, 121])
+def test_expiry_or_clock_rollback_during_f1_mutation_rolls_back(bridge, store, monkeypatch, seconds):
+    service, _ = bridge
+    click = issued(bridge, store)
+    original_resume, original_clock = store._resume_locked, store.now
+    def slow_resume(*args):
+        original_resume(*args)
+        monkeypatch.setattr(store, 'now', lambda s: original_clock(s) + timedelta(seconds=seconds))
+    monkeypatch.setattr(store, '_resume_locked', slow_resume)
+    with pytest.raises(Denied, match='expired_during_commit'):
+        service.receive(click)
+    assert store.snapshot()['halted'] is True and count(store, CONSUMED) == 0
+
+
 def test_interrupted_card_request_does_not_gain_fresh_ttl_on_restart(bridge, store, monkeypatch):
     service, fake = bridge
     store.halt('owner')
@@ -327,6 +341,25 @@ def test_old_revision_card_cannot_resume_new_source(bridge, store, configured):
     finally:
         client.close()
         changed.engine.dispose()
+
+
+def test_reapproved_connection_cannot_reuse_old_control_card(bridge, store, configured):
+    service, fake = bridge
+    click = issued(bridge, store)
+    path, config = configured
+    token = path.parent / 'rotated-public-token'
+    token.write_text(PUBLIC_TOKEN)
+    token.chmod(0o600)
+    changed_config = config.model_copy(update={'token_file': str(token)})
+    path.write_text(changed_config.model_dump_json())
+    client = client_for((path, changed_config), fake)
+    try:
+        restarted = TelegramBridge(store, client, OWNER)
+        assert restarted.profile == service.profile
+        restarted.receive(click)
+        assert store.snapshot()['halted'] is True and count(store, CONSUMED) == 0
+    finally:
+        client.close()
 
 
 def test_audit_corruption_and_database_failure_fail_closed(bridge, store, admin, monkeypatch):

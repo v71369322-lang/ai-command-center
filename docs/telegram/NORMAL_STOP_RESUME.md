@@ -33,7 +33,9 @@ RECONCILING/CANCEL_REQUESTED/SECURITY_BLOCKED. Его тело вынесено 
 Telegram — второй trusted caller этой же операции, не второй механизм F1.
 Под lock он проверяет receipt/fingerprint исходного Update, одноразовый random
 callback, профиль владельца/бота, source revision, expiry, audit-issued delivery,
-её body hash, SENT и наблюдавшийся message_id. Карточка/consumption записываются
+её body hash, SENT и наблюдавшийся message_id, exact approved connection digest.
+Повторное подключение с другим credential reference не переносит старую кнопку.
+Карточка/consumption записываются
 в прежний append-only Audit, транспорт — в прежние Inbox/Delivery. Новых таблиц
 и миграции нет.
 
@@ -65,6 +67,16 @@ restart/atomic rollback/expiry, чужого отправителя, групп�
 подмену body, неопределённый sendMessage, source change, PostgreSQL outage,
 audit corruption, recovery и все пять опасных task states. Источник поддельного
 HTTP — documented Telegram Bot API shapes, реального Telegram контакта нет.
+
+Локально первый итоговый набор — 40 passed; после проверки срока ещё перед
+commit и clock rollback/connection reapproval guards — 43 новых проверки.
+Прежний расширенный Telegram набор на checkpoint 48cbea7: 270 passed /1 прежний
+Starlette/httpx warning. Его первый запуск дал 264 passed /3 failed на старых
+images bbd4d08; после сборки exact images 48cbea7 все 270 прошли. Pinning не
+менялся. 40/43 входят в соответствующие расширенные наборы, не суммируются.
+Отдельно 143 infrastructure, Ruff/OpenAPI/TypeScript/Vite/security/dependency
+проверки прошли. Полный CI final HEAD/merge-ref проверяется отдельно в PR;
+старые локальные images не переименовываются в новую source revision.
 
 `scripts/telegram_service_smoke.py` дополнен отдельной фазой normal stop →
 fake HTTP request → SENT confirmation → callback → actual PG/F1 resume в том же
