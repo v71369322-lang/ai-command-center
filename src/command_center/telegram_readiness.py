@@ -38,8 +38,8 @@ def reply(bridge, session):
              f'Управление: {state}.', f'Исполнения, требующие сверки перед resume: {unresolved}.',
              f'Запросы этого Telegram-подключения, ожидающие планирования: {pending}.',
              'AI-планирование этих запросов пока не подключено. /coding_plan — только mock-упражнение.']
-    # The Telegram container intentionally need not mount the gateway profile or
-    # credentials. Absence here must NOT be advertised as global live-disabled.
+    # Only the opt-in deployment shares the pinned config, never credential files.
+    # Absence here must NOT be advertised as global live-disabled.
     if not os.environ.get('F2_INTEGRATION_CONFIG_FILE'):
         lines += ['AI-профиль не предоставлен этому обработчику. Состояние gateway неизвестно.']
     else:

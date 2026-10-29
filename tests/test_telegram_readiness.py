@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
+import hashlib
 import json
 
 import httpx
@@ -142,6 +143,24 @@ def test_unavailable_local_config_reports_unknown_without_echoing_errors(bridge,
     body = fake.sent[-1]['text']
     assert 'Локальный AI-профиль не удалось проверить' in body and 'Состояние gateway неизвестно' in body
     assert 'PRIVATE_' not in body and str(tmp_path) not in body
+
+
+@pytest.mark.parametrize('tampered', [False, True])
+def test_deployment_byte_pin_is_checked_before_readiness(bridge, store, tmp_path, monkeypatch, tampered):
+    service, fake = bridge
+    profile = tmp_path / 'config.json'
+    raw = IntegrationConfig(mode='live', first_experiment=FirstExperiment()).model_dump_json().encode()
+    profile.write_bytes(raw + (b'\n' if tampered else b''))
+    monkeypatch.setenv('F2_INTEGRATION_CONFIG_FILE', str(profile))
+    monkeypatch.setenv('F2_INTEGRATION_CONFIG_SHA256', hashlib.sha256(raw).hexdigest())
+    monkeypatch.setattr(FileCredentials, 'get', lambda *a: pytest.fail('no credential read'))
+    before = authority(store), ledger(store)
+    report(service)
+    body = fake.sent[-1]['text']
+    assert ('Состояние gateway неизвестно' in body) == tampered
+    assert ('Режим локального AI-профиля: live' in body) != tampered
+    assert (authority(store), ledger(store)) == before
+    assert [method for method, _ in fake.calls] == ['sendMessage']
 
 
 def test_duplicate_concurrent_replay_and_restart_keep_original_snapshot(bridge, store):

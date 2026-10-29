@@ -96,8 +96,11 @@ def image_check(engine, images, revision):
 
 def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_password_origin=None,
             password_loopback_http=False, telegram_connection_digest=None,
-            first_experiment_config=None, openai_key_file=None, github_token_file=None):
+            first_experiment_config=None, openai_key_file=None, github_token_file=None,
+            first_experiment_telegram_readiness=False):
     external_files = (first_experiment_config, openai_key_file, github_token_file)
+    if first_experiment_telegram_readiness and first_experiment_config is None:
+        raise ValueError('first_experiment_config_required')
     if any(v is not None for v in external_files) and any(v is None for v in external_files):
         raise ValueError('first_experiment_all_bindings_required')
     source = Path(source).resolve()
@@ -127,7 +130,7 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
     if first_experiment_config is not None:
         from .deployment_integrations import prepare_binding
         manifest['first_experiment'] = prepare_binding(manifest, first_experiment_config,
-                                                       openai_key_file, github_token_file)
+            openai_key_file, github_token_file, telegram_readiness=first_experiment_telegram_readiness)
     source_check(manifest)
     image_check(engine, images, revision)
     bundle = {'manifest': manifest, 'compose': render(base, manifest)}
@@ -381,7 +384,9 @@ class Deployment:
                     f'assert os.environ.get("F2_INTEGRATION_CONFIG_FILE")=={CONFIG_TARGET!r};'
                     f'assert os.environ.get("F2_INTEGRATION_CONFIG_SHA256")=={self.m["first_experiment"]["config_sha256"]!r};'
                     f'assert digest(IntegrationConfig.load().model_dump())=={self.m["first_experiment"]["profile_hash"]!r}')
-            for service in ('api', 'runtime-broker'):
+            observers = ['telegram'] if ('telegram' in self.m
+                and self.m['first_experiment'].get('telegram_readiness')) else []
+            for service in ('api', 'runtime-broker', *observers):
                 self.engine.run('exec', PROJECT + '-' + service + '-1', 'python', '-c', code)
         self.tool('from command_center.config import Settings;from command_center.store import Store;'
                   'from command_center.worker import broker;s=Settings.load();Store(s).checkpoint();assert broker(s).ping()')
@@ -487,9 +492,10 @@ def main():
     parser.add_argument('--first-experiment-config')
     parser.add_argument('--openai-key-file')
     parser.add_argument('--github-token-file')
+    parser.add_argument('--first-experiment-telegram-readiness', action='store_true')
     args = parser.parse_args()
-    if args.action != 'prepare' and any(v is not None for v in (
-            args.first_experiment_config, args.openai_key_file, args.github_token_file)):
+    if args.action != 'prepare' and (args.first_experiment_telegram_readiness or any(v is not None for v in (
+            args.first_experiment_config, args.openai_key_file, args.github_token_file))):
         parser.error('first experiment file bindings only apply to prepare')
     if args.action == 'init-state':
         initialize_state(args.data_root)
@@ -514,7 +520,8 @@ def main():
             owner_password_origin=args.owner_password_origin, password_loopback_http=args.password_loopback_http,
             telegram_connection_digest=args.telegram_connection_digest,
             first_experiment_config=args.first_experiment_config, openai_key_file=args.openai_key_file,
-            github_token_file=args.github_token_file)}))
+            github_token_file=args.github_token_file,
+            first_experiment_telegram_readiness=args.first_experiment_telegram_readiness)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())
