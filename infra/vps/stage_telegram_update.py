@@ -30,7 +30,7 @@ RELEASES = {
     'first-experiment-readiness': ('d932baafce53c0748396abfc019cf81b931ebfec',
                                  '5a70a48e57d75eceac0526fe8abcf70d57489b8b'),
     'first-experiment-status': ('d932baafce53c0748396abfc019cf81b931ebfec',
-                              '1fe45031c6570bd02e4f017169462a0b29649b15'),
+                              '185e6e32a60f8b5d62ed7046648560844a6eb19d'),
 }
 
 

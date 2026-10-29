@@ -7,7 +7,7 @@ Cloud-продолжение [PR #43](https://github.com/v71369322-lang/ai-comma
 
 Именованный operator profile `--release first-experiment-status` закрепляет
 переход от текущего application d932baafce53c0748396abfc019cf81b931ebfec к
-`1fe45031c6570bd02e4f017169462a0b29649b15`. Он требует прежний opt-in
+`185e6e32a60f8b5d62ed7046648560844a6eb19d`. Он требует прежний opt-in
 `--first-experiment-telegram-readiness` и три private file bindings. Один новый
 кандидат включает gateway profile, readiness и experiment snapshot; прежние
 targets не меняются. Operator checkout закрепляется отдельно от application.
@@ -76,6 +76,8 @@ task-status, прежние financial/Gateway и first-experiment regression tes
 После последних изменений текста/лимита повторён затронутый subset:65 passed;
 это пересекающиеся tests, не дополнительные65. Named staging transition:
 315 passed, все шесть release profiles и прежние uncertain-result interlocks.
+После numeric-JSON correction reader/menu subset:66 passed /1 warning; это
+также пересекающийся прогон. Application target включает именно этот guard.
 Существующий end-to-end dry-run дополнен чтением реального persisted результата
 pipeline через Telegram: success, wrong repository и response loss.
 
