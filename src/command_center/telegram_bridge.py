@@ -671,7 +671,11 @@ class TelegramBridge:
             recent = [r for r in rows if r.created_at >= self.store.now(session) - timedelta(days=7)]
             offset = min(int(r.id.split(':')[-1]) for r in pending) if pending else max(
                 (int(r.id.split(':')[-1]) + 1 for r in recent), default=0)
-        updates = self.client.call('getUpdates', {'offset': offset, 'limit': 20, 'timeout': timeout,
+            reply_pending = session.scalar(select(select(TelegramDelivery.id).where(
+                TelegramDelivery.profile == self.profile, TelegramDelivery.state == 'NEW').exists()))
+        # Check inbound controls before sending, but do not long-poll while a
+        # durable reply is waiting. Sending first could stall a queued /stop.
+        updates = self.client.call('getUpdates', {'offset': offset, 'limit': 20, 'timeout': 0 if reply_pending else timeout,
                                                  'allowed_updates': ['message', 'callback_query']})
         if not isinstance(updates, list) or len(updates) > 20:
             raise Denied('telegram_batch_invalid')

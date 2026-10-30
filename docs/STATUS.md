@@ -95,6 +95,14 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующая cloud-доработка: [Telegram response latency](telegram/RESPONSE_LATENCY.md).
+Известный NEW ответ текущего profile переводит getUpdates в timeout0; idle default
+уменьшен10→2секунды. Inbound controls остаются перед sends, batch/delivery bounds
+и uncertain-send guards прежние. Это не замер VPS и не ускорение самой AI-генерации.
+Новые exact-source images/пакет потребуются для доставки этой доработки; уже
+собранный application a5d867c и восемь release targets не меняются.
+Итоговые tests/source/CI фиксируются в отдельном Draft PR.
+
 Cloud checkpoint **30 октября, после отъезда владельца**:
 [единый порядок продолжения первого AI-запуска](f2-2/LAUNCH_CHECKPOINT.md)
 связывает сохранённые credentials/build с оставшимися financial/config/deployment/

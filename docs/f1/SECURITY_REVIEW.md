@@ -8,6 +8,21 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Telegram polling latency, 30 октября 2026
+
+Проверка наличия NEW delivery текущего profile влияет только на getUpdates
+timeout, без чтения body/credentials и выдачи полномочий. Отправка остаётся после
+обработки входящих controls: перенос sends перед poll или между updates мог бы
+задержать уже ожидающий `/stop` сетевым ожиданием. Этот порядок сохранён и
+закреплён PG/MockTransport tests. Предел20deliveries, source/connection/leadership
+guards, rate-limit/backoff и запрет повтора UNCERTAIN прежние.
+
+Idle default2секунды вместо10 увеличивает частоту Telegram requests, но не
+создаёт AI calls или новые threads/clients. SENT/UNCERTAIN/SENDING/CANCELLED и
+чужой profile не включают timeout0. Cloud tests проверяют протокол, а не реальную
+VPS/phone latency. Named release pins и уже собранные owner images не меняются;
+новый код требует отдельной доставки exact-source images.
+
 ## Исправления
 
 | Находка | Последствие | Исправление / проверка |
