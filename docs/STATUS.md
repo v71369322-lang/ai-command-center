@@ -95,6 +95,15 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующий независимый cloud-шаг: [офлайн-контракт обычного AI-плана](planning/SAVED_REQUEST_CONTRACT.md).
+Owner snapshot связывает saved request/project version/intake+current source/control;
+Responses formatter и строгий parser проверяют advisory proposal без HTTP clients,
+provider keys, задач или grants. Read-only review сверяет актуальный PG context;
+model fields/usage не являются provider/billing evidence. Локально198PG/mock passed,
+61новых cases включены в198. Финальный HEAD/CI — в отдельном Draft PR.
+Новых Telegram/API команд и подключения обычного AI-планирования пока нет.
+Десять существующих release targets и прежний first-experiment scope не меняются.
+
 Следующая cloud-доработка: [явное платное разрешение из Telegram](telegram/EXPERIMENT_AUTHORIZATION.md).
 `/authorize_experiment` показывает точные условия; только отдельная observed
 private-owner кнопка использует прежний F1 authorize/approve с финансовым scope.
