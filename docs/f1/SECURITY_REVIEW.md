@@ -218,6 +218,27 @@ size/list/string/usage/model/context checks и запрет tool/refusal/multipl
 usage/billing evidence или качество плана. Никаких DB writes, task/grant/outbox
 созданий, live I/O, нового API/Telegram route, schema или deployment transition.
 
+## Durable advisory drafts и Telegram readback
+
+Owner-supplied response сохраняется только после прежнего locked snapshot/contract
+review, в одном bounded append-only audit event. Role/source/normalized document
+hash/identity/per-request version/strict false flags проверяются reader; JSON
+bool/numeric coercion не подменяет schema/authorization. Никакого provider/billing
+provenance не выводится из response ID или usage. Модель не имеет доступа к writer
+или trusted composition hook. Unknown provider I/O этим кодом не повторяется.
+
+100records/32KiB per document, отсутствие raw response/intake text, sensitive-content recheck,
+exact dedup/conflict и atomic receipt composition ограничивают retention/повтор.
+Содержимое draft остаётся чувствительным пользовательским текстом в существующей
+private PG/audit и backup; универсальной secret detection или semantic plan safety
+нет. Нет удаления/перехода в исполняемую задачу и финансовых изменений.
+
+Private-owner/profile-scoped reader скрывает stale body и закрепляет version/page;
+новый черновик не подменяет продолжение старого. Plain-text ответ имеет постоянную
+метку unverified proposal. Каждая команда даёт≤1bounded delivery, не fan-out всех
+страниц. Existing source/credential/runtime guards, rate limits, inbox replay и
+UNCERTAIN no-resend сохраняются. Hook/reader не меняют F1 execution authority.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

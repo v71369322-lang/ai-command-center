@@ -187,14 +187,22 @@ def review_response(store, role, snapshot, data, model, *, context_tokens, max_o
         raise Denied('planning_context_invalid')
     with store.transaction() as session:
         store.check_audit(session)
-        if _context(store, session, snapshot.request_id).binding != snapshot.binding:
-            raise Denied('planning_context_changed')
-        plan, envelope = decode_response(data, snapshot, model, context_tokens=context_tokens,
-                                         max_output_tokens=max_output_tokens)
-        for value in [plan.summary, *plan.questions,
-                      *[text for step in plan.steps for text in [step.description, *step.acceptance]]]:
-            check_content(store, value)
-        return {'context_digest': snapshot.binding, 'proposal': plan.model_dump(),
-                'response_id': envelope.id, 'model': envelope.model, 'usage': envelope.usage.model_dump(),
-                'provider_evidence_verified': False, 'execution_authorized': False,
-                'task_created': False, 'stored': False}
+        return _review_response(store, session, snapshot, data, model, context_tokens=context_tokens,
+                                max_output_tokens=max_output_tokens)
+
+
+def _review_response(store, session, snapshot, data, model, *, context_tokens, max_output_tokens):
+    """Composition inside the caller's checked Control transaction; never commits."""
+    if not isinstance(snapshot, PlanningContext):
+        raise Denied('planning_context_invalid')
+    if _context(store, session, snapshot.request_id).binding != snapshot.binding:
+        raise Denied('planning_context_changed')
+    plan, envelope = decode_response(data, snapshot, model, context_tokens=context_tokens,
+                                     max_output_tokens=max_output_tokens)
+    for value in [plan.summary, *plan.questions,
+                  *[text for step in plan.steps for text in [step.description, *step.acceptance]]]:
+        check_content(store, value)
+    return {'context_digest': snapshot.binding, 'proposal': plan.model_dump(),
+            'response_id': envelope.id, 'model': envelope.model, 'usage': envelope.usage.model_dump(),
+            'provider_evidence_verified': False, 'execution_authorized': False,
+            'task_created': False, 'stored': False}

@@ -95,6 +95,16 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение: [сохранение и Telegram-просмотр черновиков](planning/DRAFT_STORAGE_AND_TELEGRAM.md).
+Внутренний owner import повторяет общий locked review и сохраняет bounded
+unverified advisory document в прежний audit, без task/grants/расходов. Версии
+и identity обеспечивают concurrent dedup и recovery; `/plan номер` и закреплённые
+страницы показывают только current context. Stale body скрыт; источник явно
+не подтверждён, исполнения нет. Локально314PG/mock passed,56новых cases включены.
+Источник реальных AI-планов пока не подключён. Фактический VPS и все10 release
+pins остаются прежними; новая команда требует будущего отдельного source package.
+Итоговый HEAD/CI — в отдельном Draft PR.
+
 Следующий независимый cloud-шаг: [офлайн-контракт обычного AI-плана](planning/SAVED_REQUEST_CONTRACT.md).
 Owner snapshot связывает saved request/project version/intake+current source/control;
 Responses formatter и строгий parser проверяют advisory proposal без HTTP clients,
