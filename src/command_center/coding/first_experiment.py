@@ -132,11 +132,23 @@ class FirstExperiment(Strict):
                 raise Denied('first_experiment_total_cost_bound')
 
 
-def validate_repository(metadata, branch, expected_name, expected_id):
+def validate_repository_identity(metadata, branch, expected_name, expected_id):
+    permissions = metadata.get('permissions')
     if (type(expected_id) is not int or type(metadata.get('id')) is not int or metadata.get('id') != expected_id
             or metadata.get('full_name') != expected_name or metadata.get('archived') is not False
-            or metadata.get('disabled') is not False or metadata.get('permissions', {}).get('admin') is not False
-            or metadata.get('permissions', {}).get('push') is not True
+            or metadata.get('disabled') is not False or not isinstance(permissions, dict)
+            or permissions.get('admin') is not False
             or branch.get('name') != 'main' or branch.get('protected') is not True
             or branch.get('commit', {}).get('sha') != BASE_SHA):
+        raise Denied('first_experiment_repository_preflight')
+
+
+def validate_repository(metadata, branch, expected_name, expected_id, *, git_discovery=None):
+    from .git_capability import valid_discovery
+    validate_repository_identity(metadata, branch, expected_name, expected_id)
+    permissions = metadata['permissions']
+    if git_discovery is not None:
+        if not valid_discovery(git_discovery, expected_name, BASE_SHA):
+            raise Denied('first_experiment_repository_preflight')
+    elif permissions.get('push') is not True:
         raise Denied('first_experiment_repository_preflight')

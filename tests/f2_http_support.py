@@ -10,6 +10,13 @@ from command_center.coding.integration_config import IntegrationConfig, Tariff
 from command_center.coding.spec import BASE_SHA, FIRST, CORRECT
 
 
+def git_advertisement(main_sha=BASE_SHA):
+    def packet(value):
+        return ('%04x' % (len(value) + 4)).encode() + value
+    return (packet(b'# service=git-receive-pack\n') + b'0000'
+            + packet(main_sha.encode() + b' refs/heads/main\0report-status delete-refs\n') + b'0000')
+
+
 def config(**changes):
     # Numbers are fake fixture accounting, NEVER a real tariff.
     fields = {'mode': 'http_mock', 'synthetic_repository': 'fixture/acc-f2-synthetic-test',
@@ -38,6 +45,7 @@ class FakeHTTP:
         self.model = model
         self.repository_id = 725000001  # Public fixture ID only, not an actual repository.
         self.protected = True
+        self.push = True
 
     def handle(self, request):
         self.calls.append((request.method, request.url.path))
@@ -54,6 +62,14 @@ class FakeHTTP:
                               json=data, headers={'x-request-id': 'fixture-request-id'})
 
     def dispatch(self, request):
+        if request.url.host == 'github.com':
+            import base64
+            assert request.method == 'GET' and not request.content
+            assert str(request.url) == 'https://github.com/fixture/acc-f2-synthetic-test.git/info/refs?service=git-receive-pack'
+            expected = base64.b64encode(('x-access-token:' + Credentials.values['github-installation-token']).encode()).decode()
+            assert request.headers['Authorization'] == 'Basic ' + expected
+            return httpx.Response(200, content=git_advertisement(self.base_sha), headers={
+                'content-type': 'application/x-git-receive-pack-advertisement', 'x-github-request-id': 'AB12:CDEF:0011'})
         body = json.loads(request.content) if request.content else None
         if request.url.host == 'api.openai.com':
             assert request.url.path == '/v1/responses' and request.method == 'POST'
@@ -86,7 +102,7 @@ class FakeHTTP:
         if request.method == 'GET':
             if path == '':
                 return {'id': self.repository_id, 'full_name': 'fixture/acc-f2-synthetic-test',
-                        'archived': False, 'disabled': False, 'permissions': {'admin': False, 'push': True}}
+                        'archived': False, 'disabled': False, 'permissions': {'admin': False, 'push': self.push}}
             if path == '/branches/main':
                 return {'name': 'main', 'protected': self.protected, 'commit': {'sha': self.base_sha}}
             if path == '/git/ref/heads/main':

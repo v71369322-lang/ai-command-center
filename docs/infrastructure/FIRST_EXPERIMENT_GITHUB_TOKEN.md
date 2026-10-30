@@ -1,5 +1,10 @@
 # Подготовка GitHub credential для первого эксперимента
 
+Последующее подтверждение и scoped Git discovery fallback:
+[фактическая диагностика30октября2026](GITHUB_APP_CAPABILITY_2026-10-30.md).
+Исторический operator8e605 сохраняет строгий push:true guard; новое исправление
+проверяет Git discovery отдельно, не подменяя metadata и не расширяя App rights.
+
 Продолжение [PR #46](https://github.com/v71369322-lang/ai-command-center/pull/46).
 Это операторский инструмент, не новый runtime adapter или механизм grants.
 Разработка и mock tests выполнены в облаке; настоящий App key остаётся на VPS.
@@ -149,7 +154,9 @@ file не создаётся. Candidate остаётся в private катало
 Явный `inspect --probe` использует только существующий candidate с проверенными
 UID/mode/regular/no-links, SHA-256, unexpired response binding и exact scope.
 App key и новое owner approval на выдачу ему не нужны. Клиент разрешает только
-три fixed GET токеном: enumeration, repo, main. POST/App JWT endpoints отвергаются
+три fixed REST GET токеном: enumeration, repo, main. При false/absent metadata.push
+новая версия добавляет один fixed readonly Git discovery GET и полный pkt-line
+parser. POST/App JWT endpoints отвергаются
 самим client capability. Probe не выпускает/не отзывает токены, не записывает
 файлы/receipt, не переводит candidate в final, не снимает NO_RETRY и не разрешает
 deployment/расходы. Даже successful probe — отдельный readonly снимок, не

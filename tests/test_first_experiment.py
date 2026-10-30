@@ -157,10 +157,12 @@ def test_live_authorization_needs_exact_final_permission_and_profile(store, monk
     g.close()
 
 
-@pytest.mark.parametrize('scenario', ['normal', 'wrong_repo', 'lost_response'])
+@pytest.mark.parametrize('scenario', ['normal', 'app_token', 'wrong_repo', 'lost_response'])
 def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_path, scenario):
     from fastapi.testclient import TestClient
     c, fake = experiment_config(), FakeHTTP(model=MODEL)
+    if scenario == 'app_token':
+        fake.push = False
     if scenario == 'wrong_repo':
         fake.repository_id = 1
     if scenario == 'lost_response':
@@ -192,12 +194,14 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
             result = store.get(task['id'])
             g = gateway()
             status = g.status(task['id'])
-            if scenario == 'normal':
+            if scenario in {'normal', 'app_token'}:
                 assert result['state'] == 'SUCCEEDED', result['coding'].get('failure')
                 assert [r['checks']['passed'] for r in result['coding']['test_runs']] == [False, True]
                 assert fake.ai_calls == 2 and len(fake.prs) == 1
                 assert result['coding']['pr']['published'] is False and result['coding']['pr']['mode'] == 'http_mock'
                 assert status['actual_nano_rub'] < CAP and status['uncertain_nano_rub'] == 0
+                if scenario == 'app_token':
+                    assert sum('info/refs' in path for _, path in fake.calls) >= 2
                 with store.transaction() as s:
                     grant = s.get(ExternalGrant, task['id'])
                     assert grant.document['repository_id'] == 725000001
@@ -231,7 +235,7 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
                 assert bridge.deliver_one()['state'] == 'SENT'
                 body = bot.sent[-1]['text']
                 assert task['id'] in body and 'HTTP-моки; настоящего AI нет' in body
-                if scenario == 'normal':
+                if scenario in {'normal', 'app_token'}:
                     assert 'Результат независимо проверен в HTTP-моках' in body
                     assert 'реальный PR не опубликован' in body
                 elif scenario == 'lost_response':
@@ -245,7 +249,7 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
                 assert len(delivered) == 1 and delivered[0]['state'] == 'SENT'
                 notice = bot.sent[-1]['text']
                 assert notice.startswith('Уведомление первого AI-эксперимента') and task['id'] in notice
-                assert ('Результат независимо проверен в HTTP-моках' in notice) == (scenario == 'normal')
+                assert ('Результат независимо проверен в HTTP-моках' in notice) == (scenario in {'normal', 'app_token'})
                 assert bridge.poll_once(timeout=0) == [] and len(fake.calls) == calls_before
             finally:
                 telegram_client.close()

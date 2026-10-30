@@ -19,7 +19,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import httpx
 import jwt
 
-from command_center.coding.first_experiment import validate_repository
+from command_center.coding.first_experiment import validate_repository, validate_repository_identity
+from command_center.coding.git_capability import advertisement, discovery_path
 from command_center.deployment_integrations import _open_private
 from command_center.deployment_profile import atomic_json
 from command_center.store import Denied, digest
@@ -28,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 APP_ID, INSTALLATION_ID, ACCOUNT_ID, REPOSITORY_ID = 5524444, 176497504, 346751364, 1438229730
 OWNER, APP_SLUG = 'v71369322-lang', 'acc-first-v71369322'
 REPOSITORY = OWNER + '/acc-f2-synthetic-first'
+GIT_DISCOVERY = discovery_path(REPOSITORY)
 PERMISSIONS = {'contents': 'write', 'pull_requests': 'write', 'metadata': 'read'}
 APP_INSTALLATION = f'/app/installations/{INSTALLATION_ID}'
 REPO = '/repos/' + REPOSITORY
@@ -37,7 +39,7 @@ REQUEST = {'repository_ids': [REPOSITORY_ID], 'permissions': PERMISSIONS}
 ALLOWED = {('GET', '/app'), ('GET', APP_INSTALLATION), ('GET', REPO + '/installation'),
            ('POST', TOKEN_ENDPOINT), ('GET', TOKEN_REPOSITORIES), ('GET', REPO), ('GET', REPO + '/branches/main')}
 TOKEN_READS = {('GET', TOKEN_REPOSITORIES), ('GET', REPO), ('GET', REPO + '/branches/main')}
-STAGES = {'identity', 'token_request', 'token_response', 'candidate_store', 'repository_enumeration',
+STAGES = {'identity', 'token_request', 'token_response', 'candidate_store', 'repository_enumeration', 'git_discovery',
           'repository_metadata', 'branch_metadata', 'repository_validation', 'final_checks', 'final_store', 'complete'}
 SAFE_ERRORS = {
     'exact_operator_revision_required', 'operator_source_changed', 'private_path_outside_source_required',
@@ -49,6 +51,7 @@ SAFE_ERRORS = {
     'installation_token_expiry', 'installation_token_repository_scope', 'first_experiment_repository_preflight',
     'token_preparation_requires_inspection', 'operator_arguments_invalid', 'plan_does_not_consume_approval',
     'candidate_binding_invalid', 'candidate_expired', 'inspect_arguments_forbidden', 'private_attempt_required',
+    'github_git_advertisement_invalid',
     'github_timeout', 'github_transport_failed', 'local_io_failed', 'operator_check_failed',
 }
 
@@ -170,6 +173,21 @@ class GitHub:
             raise Blocked('github_response_invalid')
         return result
 
+    def git_discovery(self, token):
+        event = {'method': 'GET', 'endpoint': GIT_DISCOVERY, 'http_status': None}
+        self.events.append(event)
+        with self.client.stream('GET', 'https://github.com' + GIT_DISCOVERY,
+                                auth=httpx.BasicAuth('x-access-token', token)) as response:
+            event['http_status'] = response.status_code
+            if response.status_code != 200:
+                raise Blocked('github_http_rejected')
+            raw = bytearray()
+            for chunk in response.iter_bytes(chunk_size=8192):
+                raw.extend(chunk)
+                if len(raw) > 65536:
+                    raise Blocked('github_response_too_large')
+            return advertisement(raw, response.headers.get('content-type', ''), REPOSITORY)
+
 
 def identity(github, assertion):
     app = github.call('GET', '/app', assertion)
@@ -243,8 +261,14 @@ def verify_repository(github, token, journal, checkpoint):
     branch = github.call('GET', REPO + '/branches/main', token)
     journal['repository_checks'] = repository_checks(metadata, branch)
     checkpoint('repository_validation')
-    # Keep the runtime's existing strict permissions/baseline guard unchanged.
-    validate_repository(metadata, branch, REPOSITORY, REPOSITORY_ID)
+    validate_repository_identity(metadata, branch, REPOSITORY, REPOSITORY_ID)
+    discovery = None
+    if metadata.get('permissions', {}).get('push') is not True:
+        checkpoint('git_discovery')
+        discovery = github.git_discovery(token)
+        journal['git_discovery'] = discovery
+    checkpoint('repository_validation')
+    validate_repository(metadata, branch, REPOSITORY, REPOSITORY_ID, git_discovery=discovery)
 
 
 def prepare(key_file, output_directory, revision, approved_plan, approved_until, *, transport=None):
@@ -346,7 +370,7 @@ def inspect_attempt(output_directory, revision, *, probe=False, transport=None):
     report['recorded_http_events'] = [
         {k: event.get(k) for k in ('method', 'endpoint', 'http_status')}
         for event in events if isinstance(event, dict)
-        and (event.get('method'), event.get('endpoint')) in ALLOWED
+        and (event.get('method'), event.get('endpoint')) in ALLOWED | {('GET', GIT_DISCOVERY)}
         and (event.get('http_status') is None or type(event.get('http_status')) is int
              and 100 <= event['http_status'] <= 599)
     ] if isinstance(events, list) else []

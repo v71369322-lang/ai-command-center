@@ -28,6 +28,13 @@ REVISION, NOW = 'a' * 40, 1793289600
 TOKEN = 'ghs_5524444.PUBLIC_SYNTHETIC_TOKEN_ONLY.fake_signature'
 
 
+def git_advertisement(main_sha=BASE_SHA):
+    def packet(value):
+        return ('%04x' % (len(value) + 4)).encode() + value
+    return (packet(b'# service=git-receive-pack\n') + b'0000'
+            + packet(main_sha.encode() + b' refs/heads/main\0report-status delete-refs\n') + b'0000')
+
+
 @pytest.fixture(autouse=True)
 def no_live_http(monkeypatch):
     monkeypatch.setattr(httpx.HTTPTransport, 'handle_request',
@@ -61,8 +68,17 @@ def fixture(tmp_path, monkeypatch, rsa_key):
 class FakeGitHub:
     def __init__(self, public_key):
         self.public_key, self.calls, self.after, self.mutate = public_key, [], None, None
+        self.git_status, self.git_body = 403, None
 
     def handle(self, request):
+        if request.url.host == 'github.com':
+            import base64
+            assert request.method == 'GET' and request.url.raw_path.decode() == operator.GIT_DISCOVERY
+            assert request.headers['Authorization'] == 'Basic ' + base64.b64encode(('x-access-token:' + TOKEN).encode()).decode()
+            assert not request.content
+            self.calls.append(('GET', operator.GIT_DISCOVERY))
+            return httpx.Response(self.git_status, content=self.git_body or b'Forbidden',
+                headers={'content-type': 'application/x-git-receive-pack-advertisement'})
         assert request.url.scheme == 'https' and request.url.host == 'api.github.com'
         path = request.url.raw_path.decode()
         method = request.method
@@ -510,12 +526,76 @@ def test_real_shape_guard_failure_has_boolean_diagnostics_and_no_promotion(fixtu
         run(fixture, fake)
     output = fixture[1]
     receipt = json.loads((output / 'receipt.json').read_text())
-    assert receipt['error_code'] == 'first_experiment_repository_preflight'
-    assert receipt['stage'] == 'repository_validation'
+    assert receipt['error_code'] == ('github_http_rejected' if problem == 'no_push' else 'first_experiment_repository_preflight')
+    assert receipt['stage'] == ('git_discovery' if problem == 'no_push' else 'repository_validation')
     field = {'missing_permissions': 'permissions_present', 'admin_true': 'admin_false', 'no_push': 'push_true',
              'unprotected': 'main_protected', 'wrong_base': 'baseline_matches'}[problem]
     assert receipt['repository_checks'][field] is False
     assert (output / 'candidate.token').exists() and not (output / 'installation.token').exists()
+
+
+@pytest.mark.parametrize('push', [False, None])
+def test_app_token_uses_git_discovery_without_forging_metadata_push(fixture, rsa_key, push):
+    fake = FakeGitHub(rsa_key.public_key())
+    fake.git_status, fake.git_body = 200, git_advertisement()
+    def mutate(path, row):
+        if path == operator.REPO:
+            if push is None:
+                row['permissions'].pop('push')
+            else:
+                row['permissions']['push'] = False
+    fake.mutate = mutate
+    result = run(fixture, fake)
+    assert result['phase'] == 'TOKEN_STORED_NOT_CONNECTED'
+    assert result['repository_checks']['push_true'] is False
+    assert result['git_discovery']['main_sha'] == BASE_SHA
+    assert result['repository_binding_and_baseline_verified'] is True
+    assert (fixture[1] / 'installation.token').read_text() == TOKEN
+    assert sum(method == 'POST' for method, _ in fake.calls) == 1
+    assert fake.calls[-1] == ('GET', operator.GIT_DISCOVERY)
+    assert TOKEN not in json.dumps(result)
+
+
+@pytest.mark.parametrize('case', ['bad_main', 'html', 'redirect', 'forbidden', 'created'])
+def test_failed_git_discovery_retains_candidate_without_final_file(fixture, rsa_key, case):
+    fake = FakeGitHub(rsa_key.public_key())
+    fake.git_status = {'redirect': 302, 'forbidden': 403, 'created': 201}.get(case, 200)
+    fake.git_body = b'<html>ok</html>' if case == 'html' else git_advertisement('f' * 40 if case == 'bad_main' else BASE_SHA)
+    def mutate(path, row):
+        if path == operator.REPO:
+            row['permissions']['push'] = False
+    fake.mutate = mutate
+    with pytest.raises(operator.Blocked):
+        run(fixture, fake)
+    output = fixture[1]
+    receipt = json.loads((output / 'receipt.json').read_text())
+    assert receipt['phase'] == 'REQUIRES_INSPECTION_NO_RETRY'
+    assert (output / 'candidate.token').read_text() == TOKEN
+    assert not (output / 'installation.token').exists()
+    assert sum(method == 'POST' for method, _ in fake.calls) == 1
+    report = operator.inspect_attempt(output, REVISION)
+    assert report['recorded_http_events'][-1]['endpoint'] == operator.GIT_DISCOVERY
+    assert report['recorded_http_events'][-1]['http_status'] == fake.git_status
+    assert TOKEN not in json.dumps(receipt) + json.dumps(report)
+
+
+def test_read_only_probe_can_verify_legacy_push_false_without_promoting_or_issuing(fixture, rsa_key):
+    fake = failed_candidate(fixture, rsa_key)
+    fake.after = None
+    fake.git_status, fake.git_body = 200, git_advertisement()
+    def mutate(path, row):
+        if path == operator.REPO:
+            row['permissions']['push'] = False
+    fake.mutate = mutate
+    fake.calls.clear()
+    before = files_snapshot(fixture[1])
+    result = operator.inspect_attempt(fixture[1], REVISION, probe=True, transport=httpx.MockTransport(fake.handle))
+    assert result['phase'] == 'READ_ONLY_PROBE_PASSED'
+    assert result['repository_checks']['push_true'] is False
+    assert result['git_discovery']['main_sha'] == BASE_SHA
+    assert result['external_calls'] == 4 and all(method == 'GET' for method, _ in fake.calls)
+    assert files_snapshot(fixture[1]) == before
+    assert not (fixture[1] / 'installation.token').exists()
 
 
 def test_offline_inspection_never_opens_credential_or_constructs_client(fixture, rsa_key, monkeypatch):

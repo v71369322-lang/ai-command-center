@@ -95,6 +95,18 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Новая фактическая диагностика: [GitHub App capability, 30 октября](infrastructure/GITHUB_APP_CAPABILITY_2026-10-30.md).
+Owner собрал2822320 на двух rootless daemons, не применял. UI OpenAI подтвердил
+Responses/write, List models/read, баланс$8, auto-reload OFF. Вторая token attempt
+выдала и сохранила candidate, но strict repository guard отказал только на
+push:true. Отдельный readonly Git discovery дал200; expiry09:41:31UTC/12:41:31МСК.
+Новый код добавляет scoped bounded GET/полный parser при false/absent push,
+сохраняя identity/main/admin/F1 checks и старый strict default. Это ещё cloud
+исправление; NO_RETRY/отсутствие final token и actual VPS d932baaf сохраняются.
+Нужен новый source package; старые10 pins не переназначаются. Final CI — в Draft PR.
+Новый11-й named transition first-experiment-github-capability: d932baaf→322186d;
+runtime checkpoint322186d, последующие изменения только operator/tests/docs.
+
 Следующее cloud-продолжение: [закрытый F1 planning gateway](planning/F1_HTTP_MOCK_GATEWAY.md).
 Owner-only waiting task, отдельный узкий ExternalGrant и прежние F1 Approval/
 lease/fence/source/financial ledger дают один точный HTTP-mock planning request.
