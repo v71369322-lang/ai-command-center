@@ -3,7 +3,37 @@
 Продолжение [PR #46](https://github.com/v71369322-lang/ai-command-center/pull/46).
 Это операторский инструмент, не новый runtime adapter или механизм grants.
 Разработка и mock tests выполнены в облаке; настоящий App key остаётся на VPS.
-Ни один live запрос этого инструмента пока не выполнен.
+В cloud-разработке live App запросы не выполнялись. Первая owner-operated
+попытка30октября2026 описана ниже; её каталог нельзя использовать повторно.
+
+## Наблюдение владельца 30 октября 2026
+
+Владелец сверил VPS: прежний deployment VERIFIED на d932baaf, bundle fcab8e82…,
+private key files UID1000/0600, private parents0700 и69GiB свободно. Подготовлен
+operator0476b4c, offline plan a20ec688… с публичным SPKI SHA-256
+3a3a41b6d4436f4f680f6e37c72f357d79fa86357b43d87fd3aab26e4a30a750,
+совпадающим с прежним owner fingerprint. Затем выполнена локальная сборка
+application a5d867c с FIRST_EXPERIMENT_IMAGES_BUILT_NOT_DEPLOYED.
+
+Владелец выполнил одну выдачу по этому плану. Generic CLI вернул BLOCKED.
+Read-only inspection в03:09:06UTC показал private receipt857bytes,
+REQUIRES_INSPECTION_NO_RETRY, token_request_attempted=true и
+expires_at=2026-10-30T04:06:33+00:00 (07:06:33МСК). installation.token и pending
+receipt отсутствуют; application_configuration_changed=false, paid_calls=0.
+
+По control flow0476b4c наличие expires_at означает, что POST вернул ответ и
+первичный token metadata/scope check прошёл. Последующий этап отказал до
+сохранения credential. Этот старый инструмент не записал ни точный stage, ни
+ошибку и не удержал credential. Причину нельзя восстановить из этой квитанции;
+legacy inspection не придумывает её. Значение токена отсутствует, но это не
+отзыв upstream доступа. Исходная попытка остаётся неизменной, без удаления,
+повтора или автоматического выпуска замены.
+
+Отдельные read-only GET через Codex connection подтвердили ID1438229730,
+main=a41d5fdf083fa0a162299b74ac9c155b58b140cb и protected=true. Это другая
+identity, не проверка потерянного runtime токена. Защита permissions/baseline
+в runtime не изменена. Здесь только owner-provided SSH evidence и отдельные
+GitHub metadata reads; не прямой cloud SSH или новое deployment evidence.
 
 ## Закрываемый пробел
 
@@ -19,8 +49,10 @@ endpoint или расширения прав. Не создаются ветк�
 
 ## Будущее применение владельцем
 
-Пока владелец вне компьютера, достаточно cloud code review/CI. Следующие команды
-описывают будущую separately authorized операцию; сейчас на VPS их не выполнять.
+Следующие команды описывают separately authorized операцию после reconciliation.
+Первоначальный first-token-attempt уже занят: новую выдачу нельзя запускать
+переименованием старого каталога или слепым повтором. Новый attempt/source/plan
+и дополнительная выдача требуют нового конкретного решения владельца.
 Операторский checkout нужно закрепить полным SHA из итогового Draft PR.
 Application target `a5d867cb734a4954926a4e77c71e6f5be217057c` и восемь прежних
 release profiles этим этапом не меняются. Новый runtime bundle здесь не создаётся.
@@ -31,7 +63,7 @@ release profiles этим этапом не меняются. Новый runtime
    ```text
    .venv/bin/python infra/vps/prepare_github_token.py plan
      --key-file /home/acc-control/github-app-access/app-private-key.pem
-     --output-directory /home/acc-control/github-app-access/first-token-attempt
+     --output-directory NEW_CANONICAL_PRIVATE_ATTEMPT_PATH
      --operator-revision EXACT_OPERATOR_SHA
    ```
 
@@ -52,7 +84,7 @@ release profiles этим этапом не меняются. Новый runtime
    CLI flags фиксируют разрешение оператора; они не заменяют внешнее решение владельца.
 
 3. Успех — `TOKEN_STORED_NOT_CONNECTED`. В новом private0700 каталоге находятся
-   `installation.token` и redacted `receipt.json`, owner UID/0600. Не открывать
+   `candidate.token`, `installation.token` и redacted `receipt.json`, owner UID/0600. Не открывать
    значение токена в чат/browser/Git/logs. PEM остаётся вне контейнеров.
 
 4. Получать токен непосредственно перед approved deployment preparation, чтобы
@@ -96,6 +128,38 @@ bounded response и no retry. URL из ответов не используют�
 
 ## Неопределённый исход и отзыв
 
+Исправленный оператор сохраняет response-bound candidate.token (fsync,0600)
+сразу после первичной проверки ответа выдачи, до последующих repository GET.
+Receipt содержит его SHA-256, stage, allowlisted error_code, fixed endpoint/method/
+numeric HTTP status и только булевы repository checks. Raw provider messages,
+токен, JWT и paths не попадают в диагностику. Неразобранная ошибка получает
+фиксированный operator_check_failed. Область доступа/1024byte cap и прежний
+строгий validate_repository сохраняются.
+
+При успешных остальных проверках отдельно создаётся installation.token.
+Candidate не становится runtime credential автоматически: при failure final
+file не создаётся. Candidate остаётся в private каталоге для проверки без
+новой выдачи. Не монтировать candidate вместо проверенного final credential.
+
+`inspect --output-directory EXISTING_ATTEMPT --operator-revision EXACT_OPERATOR_SHA`
+по умолчанию offline: читает только private receipt и metadata файлов, не PEM
+или token values, не создаёт HTTP client. Legacy receipt без новых полей
+показывается с UNRECORDED stage/error, а не с вымышленной причиной.
+
+Явный `inspect --probe` использует только существующий candidate с проверенными
+UID/mode/regular/no-links, SHA-256, unexpired response binding и exact scope.
+App key и новое owner approval на выдачу ему не нужны. Клиент разрешает только
+три fixed GET токеном: enumeration, repo, main. POST/App JWT endpoints отвергаются
+самим client capability. Probe не выпускает/не отзывает токены, не записывает
+файлы/receipt, не переводит candidate в final, не снимает NO_RETRY и не разрешает
+deployment/расходы. Даже successful probe — отдельный readonly снимок, не
+продолжение старой операции. Следующее применение требует reviewed owner решения.
+
+Legacy попытка без candidate не может получить такой probe: значение утрачено,
+новой выдачи в inspect нет. Дополнительная credential операция возможна только
+после явного решения владельца по новому source/plan/каталогу; первые records
+и уже выданный upstream token не объявляются отсутствующими или отозванными.
+
 Новый каталог атомарно резервирует попытку; существующий каталог, symlink или
 неверная custody отвергаются до HTTP. Receipt fsync сохраняется до POST. Crash,
 одновременный дубль и повтор той же команды не вызывают новую выдачу. Каталог
@@ -129,9 +193,12 @@ scope, baseline, lifetime, exact source/plan, custody, concurrency, response los
 local commit loss и отсутствие runtime/DB/AI side effects. Это не живой auth probe.
 Итоговые counts и final-source CI фиксируются в Draft PR.
 
-Локально64 targeted tests passed, включая redaction ошибок самого argument parser.
+Последний исправленный локальный scope:657 infrastructure tests passed;
+89 operator cases входят в657 и не суммируются с ним. Они включают сохранение
+candidate после HTTP403/timeout и strict repository denial, safe diagnostics,
+readonly probe без новой выдачи/продвижения/записей, legacy receipt и tamper guards.
 Ruff/OpenAPI/current-runtime-secret guard/diff
 check PASS; locked security audit:64 Python dependencies,0 Python/npm advisories,
-0 Bandit MED/HIGH,98 retained reviewed LOW. Эти результаты получены до commit;
+0 Bandit MED/HIGH,99 retained reviewed LOW. Эти результаты получены до commit;
 полный infrastructure suite и прежние runtime/container checks проверяются
 заново на final PR merge-ref. Пересекающиеся наборы не суммируются.

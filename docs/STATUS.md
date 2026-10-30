@@ -95,6 +95,17 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Актуализация30октября2026: владелец подтвердил прежний live d932baaf и private
+custody ключей; offline plan operator0476b4c получен, application a5d867c локально
+собран без deployment. Одна выдача GitHub token вернула BLOCKED: receipt
+03:09UTC содержит token_request_attempted=true, expires_at04:06:33UTC, но
+token file отсутствует и точный post-response stage/error не сохранён.
+Это owner evidence, не cloud host probe. Не повторять исходную попытку/не
+удалять её журнал. [Разбор и исправление диагностики/candidate custody](infrastructure/FIRST_EXPERIMENT_GITHUB_TOKEN.md)
+идут отдельным cloud PR поверх #47; runtime guard/release targets остаются прежними.
+Новая выдача не выполнена, paid_calls=0; дополнительные credentials требуют
+нового reviewed owner решения, а не повторного использования прежнего плана.
+
 Следующее cloud-продолжение поверх PR #46 — [операторская подготовка GitHub token](infrastructure/FIRST_EXPERIMENT_GITHUB_TOKEN.md).
 Offline plan связывает source/key identity/paths с одной scoped credential
 операцией. Future prepare после owner approval выпускает токен только для

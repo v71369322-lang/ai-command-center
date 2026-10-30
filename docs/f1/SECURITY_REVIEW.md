@@ -140,6 +140,17 @@ B105 — fixed enumeration endpoint и два boolean status fields, не creden
 Ни одно наблюдение не подавлено, allowlist не расширяется; MED/HIGH блокируют CI.
 Текущая triage не является независимой сертификацией custody host/private key.
 
+Следующее operator-only исправление удерживает response-bound candidate0600 до
+дальнейших GET, сохраняя запрет финального credential при отказе. Stage, HTTP
+status и allowlisted error/boolean checks диагностируют failure без provider
+body, token/JWT/paths. Inspect offline не читает credential; явный probe читает
+только private hash-bound unexpired candidate, его client capability запрещает
+POST/App endpoints. Probe не меняет receipt/files/authority и не продвигает token.
+Legacy lost credential не восстанавливается выдуманным receipt или новой выдачей.
+Strict runtime validate_repository и прежние source/approval/custody guards
+сохранены. Новый retained LOW B105 относится к boolean token_issued_by_inspection,
+не secret value; всего99 reviewed LOW, без расширения allowlist или suppression.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

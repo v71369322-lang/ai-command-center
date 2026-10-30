@@ -222,7 +222,7 @@ def test_unsafe_custody_rejected_before_network(fixture, monkeypatch, attack):
     'token_permissions', 'token_selection', 'token_repo_missing', 'token_repo_extra',
     'token_size', 'token_newline', 'token_expired', 'token_long_life', 'scope_count',
     'scope_extra', 'scope_id_float', 'scope_name', 'repository_id', 'repository_admin', 'unprotected', 'base'])
-def test_wrong_remote_scope_never_persists_credential_or_retries(fixture, rsa_key, attack):
+def test_wrong_remote_scope_never_promotes_credential_or_retries(fixture, rsa_key, attack):
     fake = FakeGitHub(rsa_key.public_key())
     def mutate(path, row):
         if path == '/app':
@@ -277,6 +277,9 @@ def test_wrong_remote_scope_never_persists_credential_or_retries(fixture, rsa_ke
         run(fixture, fake)
     output = fixture[1]
     assert not (output / 'installation.token').exists()
+    assert (output / 'candidate.token').exists() == (attack in {
+        'scope_count', 'scope_extra', 'scope_id_float', 'scope_name',
+        'repository_id', 'repository_admin', 'unprotected', 'base'})
     receipt = json.loads((output / 'receipt.json').read_text())
     assert receipt['phase'] == 'REQUIRES_INSPECTION_NO_RETRY'
     assert sum(method == 'POST' for method, _ in fake.calls) <= 1
@@ -447,3 +450,230 @@ def test_argument_parser_never_repeats_mistakenly_pasted_values(fixture, monkeyp
     assert error.value.code == 2 and json.loads(result.out)['status'] == 'BLOCKED'
     assert TOKEN not in result.out + result.err and str(key) not in result.out + result.err
     assert result.err == '' and not output.exists()
+
+
+def failed_candidate(fixture, rsa_key):
+    fake = FakeGitHub(rsa_key.public_key())
+    fake.after = lambda path: (_ for _ in ()).throw(httpx.ReadTimeout('PUBLIC_RESPONSE_LOSS')) if (
+        path == operator.TOKEN_REPOSITORIES) else None
+    with pytest.raises(operator.Blocked):
+        run(fixture, fake)
+    return fake
+
+
+def files_snapshot(output):
+    return {p.name: p.read_bytes() for p in output.iterdir()}
+
+
+def test_valid_token_survives_later_http_rejection_without_exposing_provider_body(fixture, rsa_key, caplog):
+    caplog.set_level(logging.DEBUG)
+    key, output = fixture
+    fake = FakeGitHub(rsa_key.public_key())
+    def handler(request):
+        result = fake.handle(request)
+        if request.url.path == operator.REPO + '/branches/main':
+            return httpx.Response(403, json={'message': TOKEN + str(key) + 'PRIVATE_PROVIDER_TEXT'})
+        return result
+    plan = operator.describe(key, output, REVISION)[2]['plan_digest']
+    with pytest.raises(operator.Blocked):
+        operator.prepare(key, output, REVISION, plan, NOW + 300, transport=httpx.MockTransport(handler))
+    receipt = json.loads((output / 'receipt.json').read_text())
+    assert receipt['phase'] == 'REQUIRES_INSPECTION_NO_RETRY'
+    assert receipt['stage'] == 'branch_metadata' and receipt['error_code'] == 'github_http_rejected'
+    assert receipt['http_events'][-1]['http_status'] == 403
+    assert receipt['token_repository_count_verified'] is True
+    assert (output / 'candidate.token').read_text() == TOKEN
+    assert not (output / 'installation.token').exists()
+    assert TOKEN not in json.dumps(receipt) + caplog.text
+    assert 'PRIVATE_PROVIDER_TEXT' not in json.dumps(receipt) + caplog.text
+    assert sum(m == 'POST' for m, _ in fake.calls) == 1
+
+
+@pytest.mark.parametrize('problem', ['missing_permissions', 'admin_true', 'no_push', 'unprotected', 'wrong_base'])
+def test_real_shape_guard_failure_has_boolean_diagnostics_and_no_promotion(fixture, rsa_key, problem):
+    fake = FakeGitHub(rsa_key.public_key())
+    def mutate(path, row):
+        if path == operator.REPO:
+            if problem == 'missing_permissions':
+                row.pop('permissions')
+            elif problem == 'admin_true':
+                row['permissions']['admin'] = True
+            elif problem == 'no_push':
+                row['permissions']['push'] = False
+        if path == operator.REPO + '/branches/main':
+            if problem == 'unprotected':
+                row['protected'] = False
+            elif problem == 'wrong_base':
+                row['commit']['sha'] = 'f' * 40
+    fake.mutate = mutate
+    with pytest.raises(operator.Blocked):
+        run(fixture, fake)
+    output = fixture[1]
+    receipt = json.loads((output / 'receipt.json').read_text())
+    assert receipt['error_code'] == 'first_experiment_repository_preflight'
+    assert receipt['stage'] == 'repository_validation'
+    field = {'missing_permissions': 'permissions_present', 'admin_true': 'admin_false', 'no_push': 'push_true',
+             'unprotected': 'main_protected', 'wrong_base': 'baseline_matches'}[problem]
+    assert receipt['repository_checks'][field] is False
+    assert (output / 'candidate.token').exists() and not (output / 'installation.token').exists()
+
+
+def test_offline_inspection_never_opens_credential_or_constructs_client(fixture, rsa_key, monkeypatch):
+    failed_candidate(fixture, rsa_key)
+    key, output = fixture
+    key.unlink()  # No App private key is needed for inspection.
+    before = files_snapshot(output)
+    original = operator._open_private
+    def read(path, *args, **kwargs):
+        assert Path(path).name == 'receipt.json', 'offline inspection cannot read a credential value'
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(operator, '_open_private', read)
+    monkeypatch.setattr(operator, 'GitHub', lambda **k: pytest.fail('offline inspection cannot construct HTTP'))
+    report = operator.inspect_attempt(output, REVISION)
+    assert report['phase'] == 'OFFLINE_INSPECTION' and report['credential_value_read'] is False
+    assert report['stage'] == 'repository_enumeration' and report['error_code'] == 'github_timeout'
+    assert report['recorded_http_events'][-1]['http_status'] is None
+    assert report['candidate_file']['present'] is True
+    assert report['files_changed'] is report['token_issued_by_inspection'] is False and report['external_calls'] == 0
+    assert files_snapshot(output) == before and TOKEN not in json.dumps(report)
+
+
+def test_read_only_probe_reuses_bound_candidate_without_new_issue_or_promotion(fixture, rsa_key):
+    fake = failed_candidate(fixture, rsa_key)
+    output = fixture[1]
+    before = files_snapshot(output)
+    fake.after = None
+    fake.calls.clear()
+    report = operator.inspect_attempt(output, REVISION, probe=True, transport=httpx.MockTransport(fake.handle))
+    assert report['phase'] == 'READ_ONLY_PROBE_PASSED' and report['probe_ok'] is True
+    assert report['observed_phase'] == 'REQUIRES_INSPECTION_NO_RETRY'
+    assert report['observed_error_code'] == 'github_timeout' and report['error_code'] is None
+    assert fake.calls == [('GET', operator.TOKEN_REPOSITORIES), ('GET', operator.REPO),
+                          ('GET', operator.REPO + '/branches/main')]
+    assert report['external_calls'] == 3 and report['token_issued_by_inspection'] is False
+    assert files_snapshot(output) == before and not (output / 'installation.token').exists()
+    assert TOKEN not in json.dumps(report)
+
+
+@pytest.mark.parametrize('failure', ['http_403', 'scope_changed', 'permissions_absent', 'expiry_during_probe'])
+def test_probe_failure_is_diagnostic_only_and_preserves_all_original_files(fixture, rsa_key, monkeypatch, failure):
+    fake = failed_candidate(fixture, rsa_key)
+    output = fixture[1]
+    before = files_snapshot(output)
+    fake.after = None
+    fake.calls.clear()
+    def handler(request):
+        response = fake.handle(request)
+        if failure == 'http_403':
+            return httpx.Response(403, json={'message': TOKEN + 'DO_NOT_ECHO'})
+        row = response.json()
+        if failure == 'scope_changed' and request.url.raw_path.decode() == operator.TOKEN_REPOSITORIES:
+            row['total_count'] = 2
+        if failure == 'permissions_absent' and request.url.path == operator.REPO:
+            row.pop('permissions')
+        if failure == 'expiry_during_probe' and request.url.path == operator.REPO + '/branches/main':
+            monkeypatch.setattr(operator.time, 'time', lambda: NOW + 3601)
+        return httpx.Response(200, json=row)
+    report = operator.inspect_attempt(output, REVISION, probe=True, transport=httpx.MockTransport(handler))
+    assert report['phase'] == 'READ_ONLY_PROBE_BLOCKED' and report['probe_ok'] is False
+    assert report['error_code'] == {'http_403': 'github_http_rejected', 'scope_changed': 'installation_token_repository_scope',
+        'permissions_absent': 'first_experiment_repository_preflight', 'expiry_during_probe': 'candidate_expired'}[failure]
+    assert all(method == 'GET' for method, _ in fake.calls)
+    assert files_snapshot(output) == before and not (output / 'installation.token').exists()
+    assert TOKEN not in json.dumps(report) and 'DO_NOT_ECHO' not in json.dumps(report)
+
+
+def test_read_only_client_cannot_issue_or_authenticate_as_app():
+    github = operator.GitHub(read_only=True, transport=httpx.MockTransport(lambda request: pytest.fail('no HTTP')))
+    try:
+        for method, path, body in [('POST', operator.TOKEN_ENDPOINT, operator.REQUEST), ('GET', '/app', None)]:
+            with pytest.raises(operator.Blocked):
+                github.call(method, path, TOKEN, body)
+        assert github.events == []
+    finally:
+        github.client.close()
+
+
+@pytest.mark.parametrize('tamper', ['digest', 'contents', 'symlink', 'hardlink', 'mode', 'expiry', 'response_binding',
+                                  'id_float', 'permissions'])
+def test_inspection_rejects_unbound_unsafe_or_expired_candidate_before_http(fixture, rsa_key, monkeypatch, tamper):
+    failed_candidate(fixture, rsa_key)
+    output = fixture[1]
+    candidate = output / 'candidate.token'
+    receipt_path = output / 'receipt.json'
+    receipt = json.loads(receipt_path.read_text())
+    if tamper == 'digest':
+        receipt['token_sha256'] = '0' * 64
+    elif tamper == 'contents':
+        candidate.write_text('PUBLIC_REPLACEMENT_NOT_THE_BOUND_TOKEN')
+    elif tamper == 'symlink':
+        candidate.unlink()
+        candidate.symlink_to(fixture[0])
+    elif tamper == 'hardlink':
+        os.link(candidate, output / 'other.token')
+    elif tamper == 'mode':
+        candidate.chmod(0o644)
+    elif tamper == 'expiry':
+        receipt['expires_at'] = datetime.fromtimestamp(NOW - 1, timezone.utc).isoformat()
+    elif tamper == 'response_binding':
+        receipt['token_response_binding_verified'] = False
+    elif tamper == 'id_float':
+        receipt['repository_id'] = float(operator.REPOSITORY_ID)
+    else:
+        receipt['permissions']['administration'] = 'write'
+    receipt_path.write_text(json.dumps(receipt))
+    def metadata_snapshot():
+        # Reads may update kernel atime; content/authority/inode/mode must stay unchanged.
+        return {p.name: (s.st_ino, s.st_size, s.st_mode, s.st_mtime_ns, s.st_ctime_ns)
+                for p in output.iterdir() for s in [p.lstat()]}
+    before = metadata_snapshot()
+    monkeypatch.setattr(operator, 'GitHub', lambda **k: pytest.fail('binding/custody before HTTP'))
+    with pytest.raises((operator.Blocked, ValueError, OSError)):
+        operator.inspect_attempt(output, REVISION, probe=True)
+    assert before == metadata_snapshot()
+
+
+def test_legacy_receipt_is_observed_without_fabricating_diagnostics_or_reissuing(fixture, monkeypatch):
+    output = fixture[1]
+    output.mkdir(mode=0o700)
+    receipt = {'phase': 'REQUIRES_INSPECTION_NO_RETRY', 'token_request_attempted': True,
+               'expires_at': '2026-10-30T04:06:33+00:00', 'operator_revision': REVISION}
+    path = output / 'receipt.json'
+    path.write_text(json.dumps(receipt))
+    path.chmod(0o600)
+    before = path.read_bytes()
+    monkeypatch.setattr(operator, 'GitHub', lambda **k: pytest.fail('legacy token was not retained'))
+    report = operator.inspect_attempt(output, REVISION)
+    assert report['legacy_receipt'] is True and report['candidate_file']['present'] is False
+    assert report['error_code'] == report['stage'] == 'UNRECORDED' and report['external_calls'] == 0
+    with pytest.raises(operator.Blocked, match='candidate_binding_invalid'):
+        operator.inspect_attempt(output, REVISION, probe=True)
+    assert path.read_bytes() == before
+
+
+def test_untrusted_exception_text_never_becomes_a_public_diagnostic(fixture, monkeypatch):
+    key, output = fixture
+    def fail(*a, **k):
+        raise operator.Blocked(TOKEN + str(key))
+    monkeypatch.setattr(operator, 'identity', fail)
+    with pytest.raises(operator.Blocked):
+        run(fixture, FakeGitHub(None))
+    receipt = (output / 'receipt.json').read_text()
+    assert json.loads(receipt)['error_code'] == 'operator_check_failed'
+    assert TOKEN not in receipt and str(key) not in receipt
+
+
+def test_inspect_cli_needs_no_key_or_approval_and_probe_flags_cannot_escape_scope(fixture, rsa_key, monkeypatch, capsys):
+    failed_candidate(fixture, rsa_key)
+    key, output = fixture
+    key.unlink()
+    argv = ['tool', 'inspect', '--output-directory', str(output), '--operator-revision', REVISION]
+    monkeypatch.setattr(sys, 'argv', argv)
+    monkeypatch.setattr(operator, 'GitHub', lambda **k: pytest.fail('inspect default is offline'))
+    operator.main()
+    assert json.loads(capsys.readouterr().out)['phase'] == 'OFFLINE_INSPECTION'
+    monkeypatch.setattr(sys, 'argv', argv + ['--approved-plan', '0' * 64])
+    with pytest.raises(SystemExit) as error:
+        operator.main()
+    result = json.loads(capsys.readouterr().out)
+    assert error.value.code == 2 and result['error_code'] == 'inspect_arguments_forbidden'
