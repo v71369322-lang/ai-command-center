@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Следующий облачный шаг **30 октября 2026**:
+[автоматическая подготовка отключённого recovery-профиля](infrastructure/FIRST_RECOVERY_DISABLED_PROFILE.md).
+Из защищённого исходного config и свежего локального отчёта создаётся только
+новый private draft с mode=disabled, снятыми operator/tariff confirmations,
+пустыми evidence/budget evidence и неподтверждённым балансом. Один вызов,
+суммарный финансовый предел и original parent digest сохраняются; runtime,
+release pairs и build-only пакет не меняются. Реальный host draft здесь не
+создавался. Предыдущий PR #59 проверен заново: HEAD2f758aa, full CI1317 Python
+/1 прежнее предупреждение и872 infra SUCCESS; offline872 — тот же набор.
+
 Продолжение **30 октября 2026, после PR #58**: владелец снова без компьютера и
 попросил продолжить облачную подготовку. [Один read-only recovery отчёт](infrastructure/FIRST_RECOVERY_READ_ONLY_INSPECTION.md)
 объединяет PG/SQLite/локальный Docker/profile expiry перед следующим owner SSH

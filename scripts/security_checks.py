@@ -30,7 +30,7 @@ def main():
     (target / 'npm-audit.json').write_bytes(npm.stdout)
     run([sys.executable, '-m', 'bandit', '-r', 'src', 'scripts', 'infra/vps/operations',
          'infra/vps/stage_telegram_update.py', 'infra/vps/prepare_github_token.py',
-         'infra/vps/inspect_first_recovery.py', '-f', 'json',
+         'infra/vps/inspect_first_recovery.py', 'infra/vps/prepare_first_recovery_profile.py', '-f', 'json',
          '-o', str(target / 'bandit.json')], expected=(0, 1))
     static = json.loads((target / 'bandit.json').read_text())
     # Keep every finding. These LOW rules were manually reviewed in

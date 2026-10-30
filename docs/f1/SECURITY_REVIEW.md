@@ -8,6 +8,24 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Отключённый черновик recovery-профиля
+
+Это review выполняющего агента. Новый operator-only helper не создаёт F1 tasks,
+grants, tokens или deployment и не конструирует HTTP/DB clients. Исторический
+профиль связывается с local inspection по digest, report age и фиксированной
+задаче. Отчёт не превращается в authority: будущий RecoveryExperiment.verify_parent
+и observed owner consent остаются обязательными. Расход плюс один новый резерв
+должны помещаться в старый grant budget и прежний общий потолок.
+
+В output принудительно disabled mode, live_authorized=false, tariff.confirmed=false,
+пустые финансовые/evidence references и неподтверждённый баланс. Сохраняются
+исторические числовые параметры, не свежесть или полномочия. Создаётся новый
+private каталог вне active state/source, по plan pin входных bytes и output path;
+0600 exclusive writes не повторяются поверх полного или частичного результата.
+Путь к provider credential принимается только как прежний фиксированный container
+reference; значение credential не читается. CLI скрывает validation/IO/argument
+text. Это cloud preparation, не owner host/paid authorization.
+
 ## Операторский read-only отчёт перед восстановлением
 
 Это review выполняющего агента. Reader принимает только фиксированный task ID
