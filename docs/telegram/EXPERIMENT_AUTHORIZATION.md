@@ -58,9 +58,13 @@ constraint. Stop/recovery/source/version/price/reference changes блокиру�
 ## Доставка и проверки
 
 Нужны новые exact-source images и отдельный named release; прежние девять targets
-и уже собранный владельцем a5d867c новой команды не содержат. Runtime checkpoint
-и десятый profile фиксируются следующим operator-only commit; старые pins/default
-не переназначаются. Сохраняются prepare/inspect/exact approval/apply/postcheck,
+и уже собранный владельцем a5d867c новой команды не содержат. Десятый profile
+`--release first-experiment-authorize` закрепляет переход
+`d932baafce53c0748396abfc019cf81b931ebfec` → runtime checkpoint
+`2822320569ca442ff5579140875ec074e1058898`. Он включает предыдущие integration/
+readiness/status/watch/cancel/latency/prepare функции. Operator checkout закрепляется
+отдельным полным SHA; source/images должны соответствовать runtime checkpoint.
+Старые девять pins/default f34 не переназначаются. Сохраняются prepare/inspect/exact approval/apply/postcheck,
 private integration/readiness bindings, custody, backup, predecessor и journal.
 
 Локально **654 PG/strict-mock tests passed /9 execution cases deselected /1 прежний
@@ -74,6 +78,11 @@ atomic rollback и uncertain/lost replies. Fake live-shaped declarations не
 Ruff/OpenAPI/tracked-secret/diff checks PASS. Locked audit:64Python dependencies,
 0Python/npm advisories,0Bandit MED/HIGH,99reviewed LOW. Final fresh-source CI и
 точные source/operator SHA фиксируются в Draft PR.
+После добавления десятого профиля **748 infrastructure tests passed**: staging
+matrix нового source pair, explicit integration/readiness, CLI/default и regression
+guard всех девяти прежних pins. После runtime checkpoint2822320 менялись только
+operator map/tests/docs; runtime/image inputs идентичны. Это отдельный scope,
+не добавка к пересекающимся PG/mock прогонам.
 
 Последний подтверждённый VPS остаётся d932baaf; фактическое подключение runtime,
 сверка обеих GitHub token attempts, финансовых условий, deployment и первый

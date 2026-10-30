@@ -104,6 +104,9 @@ reply атомарны, повтор/lost acknowledgement не создают н
 654PG/mock passed /9 execution deselected; поздний targeted84passed /3deselected
 включает65 новых cases и пересекается с654. Итоговые SHA/CI — в Draft PR.
 Новая команда ещё не доставлена на VPS; реальных provider calls не было.
+Runtime checkpoint2822320; отдельный десятый profile first-experiment-authorize
+закрепляет один переход d932baaf→2822320. Прежние девять source pairs/default f34
+сохранены; integration/readiness binding и новый exact host build остаются обязательны.
 
 Следующий шаг к первому AI-запуску: [подготовка фиксированной задачи из Telegram](telegram/EXPERIMENT_PREPARATION.md).
 `/prepare_experiment` использует общий с API owner-only creator и единственный
