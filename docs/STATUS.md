@@ -95,6 +95,15 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Cloud checkpoint **30 октября, после отъезда владельца**:
+[единый порядок продолжения первого AI-запуска](f2-2/LAUNCH_CHECKPOINT.md)
+связывает сохранённые credentials/build с оставшимися financial/config/deployment/
+paid gates. Owner offline inspect/новый plan operator8e60568 получены; результат
+предложенной второй выдачи неизвестен. При возвращении сначала read-only сверка
+обеих попыток, expiry и deployment, без повторного prepare. Длительные prerequisites
+готовятся до нового часового token. В облаке изменяется только документация;
+VPS/credentials/paid calls не затрагиваются, повтор всей установки не требуется.
+
 Актуализация30октября2026: владелец подтвердил прежний live d932baaf и private
 custody ключей; offline plan operator0476b4c получен, application a5d867c локально
 собран без deployment. Одна выдача GitHub token вернула BLOCKED: receipt
