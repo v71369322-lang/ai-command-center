@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Крупный cloud-этап **30 октября 2026, после PR #63**: владелец попросил большой
+рывок вместо отдельных маленьких доработок. [Единый процесс подготовки проекта](projects/SETUP_WORKBENCH.md)
+объединяет сводку, редактируемый draft, preview/save, историю/restore и запись
+из Telegram в одном PG/audit workflow. Версии и idempotency общие для web/API/
+Telegram; ошибочная/устаревшая запись не затирает новую. Полнота draft не является
+проверкой подключения, все execution/probe flags остаются false. Новые события
+скрыты из общей API timeline; подробности только owner setup readers.
+VPS/реальные проекты/расходы не менялись, release/build/recovery pins сохранены.
+Итоговые HEAD/CI этой единой доработки — в отдельном Draft PR, не host acceptance.
+
 Продолжение **30 октября 2026, после PR #62**: владелец без компьютера просит
 продолжить. [Telegram-план подключения](telegram/PROJECT_CONNECTION_PLAN.md)
 добавляет `/connection project-id`, guide без аргумента и навигацию из

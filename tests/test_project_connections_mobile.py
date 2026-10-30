@@ -28,7 +28,9 @@ def test_mobile_owner_can_inspect_each_connection_plan_without_starting_work(set
             expect(plan.get_by_text('v71369322-lang/' + name, exact=True)).to_be_visible()
             expect(plan.get_by_text('Репозиторий: не проверено.', exact=True)).to_be_visible()
             expect(plan.get_by_text('Доставка на сервер: не проверено.', exact=True)).to_be_visible()
-            assert plan.get_by_role('button').count() == 0
+            setup = plan.get_by_role('region', name='Черновик подключения: ' + label, exact=True)
+            expect(setup.get_by_role('button', name='Сохранить черновик', exact=True)).to_be_disabled()
+            assert setup.get_by_role('button', name='Подключить', exact=True).count() == 0
             if width == 390 and label == 'LNAuto':
                 plan.screenshot(path='.runtime/project-connection-mobile.png')
             summary.click()

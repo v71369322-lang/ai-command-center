@@ -233,7 +233,10 @@ def run_drill(source, revision, engine):
     try:
         created = True
         old.apply('install', checksum(old.bundle))
-        with httpx.Client(base_url=origin, headers={'Origin': origin}, trust_env=False, timeout=10) as client:
+        # API containers are deliberately replaced below. Preserve the cookies
+        # for the old-session rejection check, but never reuse the old TCP peer.
+        with httpx.Client(base_url=origin, headers={'Origin': origin}, trust_env=False, timeout=10,
+                          limits=httpx.Limits(max_keepalive_connections=0)) as client:
             login(client)
             resume(client)
             original = task(client, 'before actual Telegram schema transition')

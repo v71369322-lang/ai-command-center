@@ -384,6 +384,31 @@ UNCERTAIN no-resend сохраняются; disabled connection блокируе
 Ни модель, ни репозиторий/сервер не опрашиваются ради текста плана. Обычная
 остановка сохраняется; AI configuration не требуется для просмотра.
 
+## Versioned project setup drafts
+
+Новая owner-only область хранит только строгие декларации в прежнем Audit/F1
+Control lock. Ни complete draft, ни preview/restore, ни операция UUID не являются
+grant. Нет произвольного repository/URL/command/credential selector, probe или
+нового execution path. Typed models и readers воспроизводят последовательность
+save/patch/clear/restore, canonical/hash/project bindings, exact versions и
+UUID conflicts. Global500 events/12288 bytes/8 bounded criteria ограничивают
+retention. Данные экрануются при записи и чтении; неизвестные секреты/DLP не
+гарантируются. Удаления/сокрытия защищённой истории ради допуска нет.
+
+Telegram edit + DONE + reply атомарны; current profile/source/receive audit
+anchor/runtime guard проверяются повторно внутри commit. Модель содержимое не
+интерпретирует, CLI вложенных commands не исполняется. Revocation/rollback и
+UNCERTAIN no-repeat сохраняются. Оба канала используют одну optimistic version.
+Client write uncertainty требует чтения, не автоматического POST retry.
+Queued Bot API replies повторно проверяются по текущим известным credentials
+перед sending intent/HTTP, включая ротацию после формирования текста.
+
+Generic /state скрывает raw draft/action values для всех ролей, оставляя явно
+redacted проекцию и неизменный checkpoint/hash. Полные документы — только
+screened owner readers. Legacy raw-audit API readers не являются безопасной
+границей privacy при downgrade; host migration/apply сюда не входят. Новых
+schema/roles/mounts/egress и изменений старых F1 grants/финансового ledger нет.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

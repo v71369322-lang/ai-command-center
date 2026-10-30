@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {ProjectSetup} from './ProjectSetup';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 const components=[
@@ -19,7 +20,7 @@ function parse(value:unknown,projectId:string):string{
  return value.expected_repository;
 }
 
-export function ProjectConnection({projectId,label,request}:{projectId:string;label:string;request:Request}){
+export function ProjectConnection({projectId,label,request,onSaved}:{projectId:string;label:string;request:Request;onSaved:()=>Promise<void>}){
  const [open,setOpen]=useState(false),[attempt,setAttempt]=useState(0);
  const [repository,setRepository]=useState<string|null>(null),[error,setError]=useState(false);
  useEffect(()=>{
@@ -47,6 +48,7 @@ export function ProjectConnection({projectId,label,request}:{projectId:string;la
     <ol>{components.map(([id,title,description])=><li key={id}><strong>{title}: не проверено.</strong> {description}</li>)}</ol>
     <p>После подключения: задача → проверка изменений → PR → разрешённое обновление → отчёт.</p>
     <p>Просмотр плана не подключает проект, не запускает задачи и не разрешает расходы.</p>
+    <ProjectSetup projectId={projectId} label={label} repository={repository} request={request} onSaved={onSaved}/>
    </>:<p role="status">Загружаем план подключения…</p>}
   </div>}
  </details>
