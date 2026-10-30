@@ -1554,6 +1554,69 @@
         "summary": "Project Assignment"
       }
     },
+    "/api/projects/{project_id}/connection-plan": {
+      "get": {
+        "operationId": "project_connection_plan_api_projects__project_id__connection_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Connection Plan"
+      }
+    },
     "/api/simulator/commands": {
       "post": {
         "operationId": "create_api_simulator_commands_post",

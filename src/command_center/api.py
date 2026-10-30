@@ -431,6 +431,12 @@ def create_app(settings=None, gateway_factory=None):
         from .project_inbox import classify
         return classify(store, role, **body.model_dump())
 
+    @app.get('/api/projects/{project_id}/connection-plan')
+    def project_connection_plan(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],
+                                role=Depends(identity)):
+        from .project_connections import connection_plan
+        return connection_plan(role, project_id)
+
     @app.get('/api/telegram/requests')
     def telegram_requests(role=Depends(identity)):
         from sqlalchemy import select

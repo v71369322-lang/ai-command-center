@@ -362,6 +362,18 @@ external effects через container reconcile. Watchdog сохраняет unk
 Новых schema/mount/egress/runtime/deployment transitions нет; live планировщик
 требует отдельной реализации и проверки всех interlocks.
 
+## Планы подключения проектов
+
+Новый GET connection-plan использует прежнюю owner identity и ограничен четырьмя
+существующими project IDs. Фиксированные имена репозиториев — ожидаемые цели,
+не evidence доступа или проверенные runtime bindings. PLAN_ONLY/NOT_CHECKED,
+пустые actions и отсутствие checked_at не позволяют объявить живое подключение.
+Нет сетевых probes, credential reads, записи конфигурации или новых полномочий.
+UI загружает план отдельно по раскрытию, отбрасывает несовпадающие IDs и признаки
+live/verified/connected, не выводит raw errors. Logout/закрытие прерывают запрос;
+ошибка плана не блокирует прежнюю очередь или назначение. Состояние grants,
+бюджета, admission, source pins и deployment transitions не меняется.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,
