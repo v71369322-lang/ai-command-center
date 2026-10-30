@@ -42,6 +42,8 @@ class RuntimeBroker:
             self.ledger.verify()
             if revision != self.store.settings.source_revision:
                 raise Denied('broker_revision_mismatch')
+            if self.store.get(task_id)['payload']['kind'] == 'saved_request_plan':
+                raise Denied('planning_runtime_not_connected')
             if not self.ledger.watchdog_ready(self.limits.watchdog_seconds):
                 raise Denied('watchdog_unavailable')
             if self.ledger.runs():

@@ -93,40 +93,46 @@ def save(store, role, snapshot, data, model, *, context_tokens, max_output_token
         raise Denied('planning_context_invalid')
     with store.transaction() as session:
         store.check_audit(session)
-        reviewed = _review_response(store, session, snapshot, data, model, context_tokens=context_tokens,
-                                    max_output_tokens=max_output_tokens)
-        try:
-            document = Document(schema_version=1, request_id=snapshot.request_id, context_digest=snapshot.binding,
-                project_id=snapshot.project_id, assignment_version=snapshot.assignment_version,
-                revision=snapshot.source_revision, proposal=Plan.model_validate(reviewed['proposal']),
-                model=reviewed['model'], response_id=reviewed['response_id'], usage=Usage.model_validate(reviewed['usage']),
-                context_tokens=context_tokens, max_output_tokens=max_output_tokens,
-                origin='owner_supplied_unverified', provider_evidence_verified=False, execution_authorized=False)
-        except ValidationError:
-            raise Denied('planning_draft_invalid') from None
-        _screen(store, document)
-        raw = document.model_dump()
-        if len(canonical(raw).encode()) > MAX_DOCUMENT_BYTES:
-            raise Denied('planning_draft_size')
-        records = _records(session)
-        pid = identity(raw)
-        previous = records.get(pid)
-        if previous:
-            if canonical(previous[0]['document']) != canonical(raw):
-                raise Denied('planning_draft_idempotency_conflict')
-            version = previous[0]['version']
-        else:
-            if len(records) >= MAX_PROPOSALS:
-                raise Denied('planning_draft_capacity')
-            version = sum(value[1].request_id == snapshot.request_id for value in records.values()) + 1
-            store.audit(session, EVENT, 'owner', proposal_id=pid, request_id=snapshot.request_id, version=version,
-                        document=raw, document_digest=digest(raw))
-        receipt = {'proposal_id': pid, 'request_id': snapshot.request_id, 'context_digest': snapshot.binding,
-                   'version': version, 'stored': True, 'origin': 'owner_supplied_unverified', 'provider_evidence_verified': False,
-                   'execution_authorized': False, 'task_created': False}
-        if _scope_installer:
-            _scope_installer(session, receipt)
-        return receipt
+        return _save_locked(store, session, snapshot, data, model, context_tokens=context_tokens,
+                            max_output_tokens=max_output_tokens, _scope_installer=_scope_installer)
+
+
+def _save_locked(store, session, snapshot, data, model, *, context_tokens, max_output_tokens, _scope_installer=None):
+    """Trusted composition under an already checked Control transaction."""
+    reviewed = _review_response(store, session, snapshot, data, model, context_tokens=context_tokens,
+                                max_output_tokens=max_output_tokens)
+    try:
+        document = Document(schema_version=1, request_id=snapshot.request_id, context_digest=snapshot.binding,
+            project_id=snapshot.project_id, assignment_version=snapshot.assignment_version,
+            revision=snapshot.source_revision, proposal=Plan.model_validate(reviewed['proposal']),
+            model=reviewed['model'], response_id=reviewed['response_id'], usage=Usage.model_validate(reviewed['usage']),
+            context_tokens=context_tokens, max_output_tokens=max_output_tokens,
+            origin='owner_supplied_unverified', provider_evidence_verified=False, execution_authorized=False)
+    except ValidationError:
+        raise Denied('planning_draft_invalid') from None
+    _screen(store, document)
+    raw = document.model_dump()
+    if len(canonical(raw).encode()) > MAX_DOCUMENT_BYTES:
+        raise Denied('planning_draft_size')
+    records = _records(session)
+    pid = identity(raw)
+    previous = records.get(pid)
+    if previous:
+        if canonical(previous[0]['document']) != canonical(raw):
+            raise Denied('planning_draft_idempotency_conflict')
+        version = previous[0]['version']
+    else:
+        if len(records) >= MAX_PROPOSALS:
+            raise Denied('planning_draft_capacity')
+        version = sum(value[1].request_id == snapshot.request_id for value in records.values()) + 1
+        store.audit(session, EVENT, 'owner', proposal_id=pid, request_id=snapshot.request_id, version=version,
+                    document=raw, document_digest=digest(raw))
+    receipt = {'proposal_id': pid, 'request_id': snapshot.request_id, 'context_digest': snapshot.binding,
+               'version': version, 'stored': True, 'origin': 'owner_supplied_unverified', 'provider_evidence_verified': False,
+               'execution_authorized': False, 'task_created': False}
+    if _scope_installer:
+        _scope_installer(session, receipt)
+    return receipt
 
 
 def read(store, role, request_id, *, version=None):

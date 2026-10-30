@@ -42,7 +42,7 @@ class Watchdog:
         try:
             task = self.store.get(row['id'])
             self.store.abort(row['id'], row['fence'], 'watchdog_' + reason, confirmed,
-                             usage_unknown=task['payload']['kind'] == 'coding_synthetic')
+                             usage_unknown=task['payload']['kind'] in {'coding_synthetic', 'saved_request_plan'})
             if confirmed:
                 self.ledger.phase(row['id'], row['fence'], 'DONE')
             with self.store.transaction() as session:
@@ -108,7 +108,7 @@ class Watchdog:
                 raise Denied('runtime_stop_unconfirmed')
             task = self.store.get(task_id)
             self.store.abort(task_id, fence, 'verified_no_effect', True,
-                             usage_unknown=task['payload']['kind'] == 'coding_synthetic')
+                             usage_unknown=task['payload']['kind'] in {'coding_synthetic', 'saved_request_plan'})
             with self.store.transaction() as session:
                 session.get(Control, 1).halted = True
                 self.store.check_audit(session)

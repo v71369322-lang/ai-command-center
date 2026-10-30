@@ -107,7 +107,8 @@ class Gateway:
         return {'authorized': True, 'task_id': task_id, 'budget_nano_rub': budget_nano_rub,
                 'mode': c.mode, 'repository': c.synthetic_repository}
 
-    def authority(self, s, task_id, fence):
+    def f1_authority(self, s, task_id, fence):
+        """Shared F1 grant, lease, fence, source and ledger-scope authority."""
         c = self.config
         if not c.connected():
             raise Denied('integration_not_connected')
@@ -117,25 +118,53 @@ class Gateway:
         approval, grant = s.get(Approval, task_id), s.get(ExternalGrant, task_id)
         now = self.store.now(s)
         if (control.halted or control.recovery or task.state != 'RUNNING' or task.fence != fence
-                or task.epoch != control.epoch or task.lease_until <= now or not approval or not approval.used
+                or task.epoch != control.epoch or task.lease_until is None or task.lease_until <= now or not approval or not approval.used
                 or approval.revoked or approval.expires_at <= now or approval.task_version != task.version
                 or approval.payload_hash != task.payload_hash or approval.epoch != control.epoch or not grant):
             raise Denied('external_authority_lost')
         doc = grant.document
-        if (digest(doc) != grant.digest or doc['payload_hash'] != digest(task.payload)
-                or doc['task_version'] != task.version or doc['revision'] != self.store.settings.source_revision
-                or doc['config_hash'] != digest(c.model_dump()) or doc['base_sha'] != BASE_SHA):
+        if (digest(doc) != grant.digest or doc.get('payload_hash') != digest(task.payload)
+                or doc.get('task_version') != task.version or doc.get('revision') != self.store.settings.source_revision
+                or doc.get('config_hash') != digest(c.model_dump())):
             raise Denied('external_scope_changed')
         anchored = any(a.event.get('grant_digest') == grant.digest for a in s.execute(
             select(Audit).where(Audit.event['task_id'].astext == task_id)).scalars())
         if not anchored:
             raise Denied('external_grant_unanchored')
+        return task, doc
+
+    def authority(self, s, task_id, fence):
+        task, doc = self.f1_authority(s, task_id, fence)
+        c = self.config
+        if (task.payload.get('kind') != 'coding_synthetic' or task.payload.get('coding', {}).get('provider') != 'openai'
+                or doc.get('scope') is not None or doc.get('base_sha') != BASE_SHA):
+            raise Denied('external_task_scope')
         if c.first_experiment:
-            c.first_experiment.validate_scope(c, task.payload['coding'], doc['budget'], now,
+            c.first_experiment.validate_scope(c, task.payload['coding'], doc['budget'], self.store.now(s),
                                               final_confirmation=doc.get('final_confirmation') is True)
             if doc.get('experiment_id') != c.first_experiment.id or doc.get('repository_id') != c.first_experiment.repository_id:
                 raise Denied('first_experiment_binding_changed')
         return task, doc
+
+    def admit_provider_request(self, task, doc, body, count):
+        """Coding-only request policy; shared transport/accounting stays below."""
+        tariff = self.config.tariff
+        if not tariff or not tariff.confirmed or body.get('model') != doc['model']:
+            raise Denied('tariff_or_model_unconfirmed')
+        from .http_contract import request_document
+        try:
+            context = json.loads(body['input'][1]['content'])
+            if (body != request_document(context, tariff.model, tariff.max_output_tokens)
+                    or context['base_sha'] != doc['base_sha']):
+                raise ValueError('changed_request')
+        except (ValueError, KeyError, TypeError, IndexError):
+            raise Denied('provider_request_contract') from None
+        if sum(r.kind == 'openai' for r in count) >= doc['max_calls']:
+            raise Denied('external_iteration_limit')
+        known_tokens = sum(r.evidence.get('usage', {}).get('total_tokens', 0) for r in count if r.kind == 'openai')
+        if known_tokens >= task.payload['coding']['max_tokens']:
+            raise Denied('external_token_limit')
+        return tariff.maximum()
 
     def endpoint(self, kind, path, method):
         c = self.config
@@ -189,6 +218,8 @@ class Gateway:
             raise Denied('external_key_limit')
         if not self.store.pulse(task_id, fence):
             raise Denied('external_authority_lost')
+        admitted_tariff = None
+        require_default_tier = False
         with self.store.transaction() as s:
             task, doc = self.authority(s, task_id, fence)
             if kind == 'github':
@@ -232,23 +263,9 @@ class Gateway:
                 raise Denied('external_budget_or_pending_limit')
             amount = 0
             if kind == 'openai':
-                tariff = self.config.tariff
-                if not tariff or not tariff.confirmed or body.get('model') != doc['model']:
-                    raise Denied('tariff_or_model_unconfirmed')
-                from .http_contract import request_document
-                try:
-                    context = json.loads(body['input'][1]['content'])
-                    if (body != request_document(context, tariff.model, tariff.max_output_tokens)
-                            or context['base_sha'] != doc['base_sha']):
-                        raise ValueError('changed_request')
-                except (ValueError, KeyError, TypeError, IndexError):
-                    raise Denied('provider_request_contract') from None
-                if sum(r.kind == 'openai' for r in count) >= doc['max_calls']:
-                    raise Denied('external_iteration_limit')
-                known_tokens = sum(r.evidence.get('usage', {}).get('total_tokens', 0) for r in count if r.kind == 'openai')
-                if known_tokens >= task.payload['coding']['max_tokens']:
-                    raise Denied('external_token_limit')
-                amount = tariff.maximum()
+                amount = self.admit_provider_request(task, doc, body, count)
+                admitted_tariff = self.config.tariff.model_copy(deep=True)
+                require_default_tier = bool(self.config.first_experiment and self.config.mode == 'live')
                 self._reserve(s, task_id, doc, amount)
             action = ExternalAction(id=str(uuid4()), task_id=task_id, key=opkey, kind=kind,
                                     request_hash=fingerprint, state='INTENT', reserved=amount,
@@ -287,13 +304,13 @@ class Gateway:
                     # Financial settlement requires documented, bounded usage. Bad/missing usage stays reserved.
                     from .http_contract import ResponseEnvelope
                     parsed = ResponseEnvelope.model_validate(data)
-                    if self.config.first_experiment and self.config.mode == 'live' and data.get('service_tier') != 'default':
+                    if require_default_tier and data.get('service_tier') != 'default':
                         raise Uncertain('first_experiment_pricing_tier_mismatch')
-                    if (parsed.model != self.config.tariff.model or parsed.usage.total_tokens !=
+                    if (parsed.model != admitted_tariff.model or parsed.usage.total_tokens !=
                             parsed.usage.input_tokens + parsed.usage.output_tokens):
                         raise Uncertain('provider_model_or_usage_mismatch')
                     usage = parsed.usage.model_dump()
-                    price = self.config.tariff.cost(usage['input_tokens'], usage['output_tokens'])
+                    price = admitted_tariff.cost(usage['input_tokens'], usage['output_tokens'])
                     operation.actual, operation.reserved = price, 0
                     now = self.store.now(s)
                     evidence.update(settled_day=now.strftime('%Y-%m-%d'), settled_month=now.strftime('%Y-%m'),
@@ -340,6 +357,8 @@ class Gateway:
         with self.store.transaction() as s:
             self.store.check_audit(s)
             task = self.store.task(s, task_id)
+            if task.payload.get('kind') != 'coding_synthetic' or task.payload.get('coding', {}).get('provider') != 'openai':
+                raise Denied('external_task_scope')
             rows = s.execute(select(ExternalAction).where(ExternalAction.task_id == task_id)).scalars().all()
             self.check_ledger(s, rows)
             grant = s.get(ExternalGrant, task_id)

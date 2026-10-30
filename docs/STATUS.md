@@ -95,6 +95,16 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующее cloud-продолжение: [закрытый F1 planning gateway](planning/F1_HTTP_MOCK_GATEWAY.md).
+Owner-only waiting task, отдельный узкий ExternalGrant и прежние F1 Approval/
+lease/fence/source/financial ledger дают один точный HTTP-mock planning request.
+Draft и task result атомарны; cached COMPLETE не отправляется повторно, unknown
+outcome/context change не позволяют новый вызов. Coding/first-pilot scopes не
+переносятся на planning. Generic APIs и production broker отвергают неподдержанный
+путь; live mode/keys/env/UI/runtime пока отсутствуют. Все10 release pins/VPS прежние.
+Финальный локальный scope338PG/mock passed /5execution deselected включает52
+новых cases; core67passed пересекается с ним. Итоговые HEAD/CI — в отдельном Draft PR.
+
 Следующее cloud-продолжение: [сохранение и Telegram-просмотр черновиков](planning/DRAFT_STORAGE_AND_TELEGRAM.md).
 Внутренний owner import повторяет общий locked review и сохраняет bounded
 unverified advisory document в прежний audit, без task/grants/расходов. Версии
