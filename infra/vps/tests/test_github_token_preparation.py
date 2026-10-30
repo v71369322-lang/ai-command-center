@@ -556,10 +556,10 @@ def test_app_token_uses_git_discovery_without_forging_metadata_push(fixture, rsa
     assert TOKEN not in json.dumps(result)
 
 
-@pytest.mark.parametrize('case', ['bad_main', 'html', 'redirect', 'forbidden'])
+@pytest.mark.parametrize('case', ['bad_main', 'html', 'redirect', 'forbidden', 'created'])
 def test_failed_git_discovery_retains_candidate_without_final_file(fixture, rsa_key, case):
     fake = FakeGitHub(rsa_key.public_key())
-    fake.git_status = {'redirect': 302, 'forbidden': 403}.get(case, 200)
+    fake.git_status = {'redirect': 302, 'forbidden': 403, 'created': 201}.get(case, 200)
     fake.git_body = b'<html>ok</html>' if case == 'html' else git_advertisement('f' * 40 if case == 'bad_main' else BASE_SHA)
     def mutate(path, row):
         if path == operator.REPO:

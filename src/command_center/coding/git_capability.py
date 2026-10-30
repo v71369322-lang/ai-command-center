@@ -45,7 +45,8 @@ def advertisement(raw, content_type, repository):
                 break
             if not refs:
                 value, capabilities = value.split(b'\0')
-                if not capabilities.rstrip(b'\n') or b'\n' in capabilities.rstrip(b'\n'):
+                capabilities = capabilities.removesuffix(b'\n')
+                if not capabilities or any(byte < 32 or byte > 126 for byte in capabilities):
                     raise ValueError()
             row = re.fullmatch(b'([0-9a-f]{40}) ([^\x00-\x20\x7f]+)\n?', value)
             if not row or row[2] in refs or len(refs) >= 256:

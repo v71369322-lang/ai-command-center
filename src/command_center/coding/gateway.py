@@ -306,7 +306,8 @@ class Gateway:
                         raise Uncertain('external_output_limit')
                 if token.encode() in raw:
                     raise Uncertain('credential_echo_blocked')
-                if response.status_code not in {200, 201}:
+                allowed_status = {200} if kind == 'github_git' else {200, 201}
+                if response.status_code not in allowed_status:
                     raise Uncertain('external_http_' + str(response.status_code))
                 if kind == 'github_git':
                     from .git_capability import advertisement

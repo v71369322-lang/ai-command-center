@@ -62,7 +62,7 @@ def test_complete_pkt_stream_produces_only_a_bound_projection():
         "duplicate_ref",
         "nul",
         "oversize",
-        "bad_sha",
+        "bad_sha", "caps_newline", "caps_control",
     ],
 )
 def test_malformed_or_unbounded_discovery_is_rejected(case):
@@ -94,6 +94,11 @@ def test_malformed_or_unbounded_discovery_is_rejected(case):
         data += b"x" * 65536
     if case == "bad_sha":
         data = data.replace(BASE_SHA.encode(), b"x" * 40)
+    if case in {"caps_newline", "caps_control"}:
+        start = data.index(BASE_SHA.encode()) - 4
+        caps = b"report-status\n\n" if case == "caps_newline" else b"report-status\x01\n"
+        record = BASE_SHA.encode() + b" refs/heads/main\0" + caps
+        data = data[:start] + ("%04x" % (len(record) + 4)).encode() + record + b"0000"
     with pytest.raises(Denied, match="advertisement_invalid"):
         advertisement(data, typ, REPO)
 
@@ -185,7 +190,7 @@ def test_real_f1_discovery_uses_basic_auth_and_anchored_ledger_without_ai(store)
     g.close()
 
 
-@pytest.mark.parametrize("case", ["redirect", "forbidden", "timeout", "html", "bad_packet", "stop"])
+@pytest.mark.parametrize("case", ["redirect", "forbidden", "timeout", "html", "bad_packet", "stop", "created"])
 def test_discovery_failures_cannot_continue_to_ai_or_publication(store, case):
     fake = FakeHTTP()
     fake.push = False
@@ -199,6 +204,8 @@ def test_discovery_failures_cannot_continue_to_ai_or_publication(store, case):
         if case == "stop":
             store.halt("owner")
             return original(request)
+        if case == "created":
+            return httpx.Response(201, content=git_advertisement(), headers={"content-type": CONTENT_TYPE})
         return httpx.Response(
             {"redirect": 302, "forbidden": 403}.get(case, 200),
             content=b"<html>ok</html>" if case == "html" else b"0001",
