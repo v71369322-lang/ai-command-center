@@ -52,12 +52,19 @@ class RemotePublisher:
         g, task = self.gateway, self.task
         if not g.config.first_experiment:
             return
-        from .first_experiment import validate_repository
+        from .first_experiment import validate_repository, validate_repository_identity
         prefix = '/repos/' + g.config.synthetic_repository
         nonce = uuid4().hex[:8]
         metadata = g.request(task['id'], task['fence'], 'repo/' + nonce, 'github', 'GET', prefix)
         branch = g.request(task['id'], task['fence'], 'protection/' + nonce, 'github', 'GET', prefix + '/branches/main')
-        validate_repository(metadata, branch, g.config.synthetic_repository, g.config.first_experiment.repository_id)
+        validate_repository_identity(metadata, branch, g.config.synthetic_repository, g.config.first_experiment.repository_id)
+        discovery = None
+        if metadata.get('permissions', {}).get('push') is not True:
+            from .git_capability import discovery_path
+            discovery = g.request(task['id'], task['fence'], 'git-discovery/' + uuid4().hex, 'github_git', 'GET',
+                                  discovery_path(g.config.synthetic_repository))
+        validate_repository(metadata, branch, g.config.synthetic_repository, g.config.first_experiment.repository_id,
+                            git_discovery=discovery)
 
     def publish(self, result):
         g, task = self.gateway, self.task

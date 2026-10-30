@@ -8,6 +8,25 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## GitHub App metadata.push и Git discovery
+
+После owner-provided false push /200 Git advertisement реализован отдельный
+bounded readonly discovery fallback, не безусловное удаление guard. Strict
+validate_repository без сетевой projection всё ещё требует push:true. Общие
+ID/name/lifecycle/admin/main/protection/BASE_SHA checks выполняются независимо
+от metadata flag; projection привязана к repo/service/base. Runtime получает её
+только через прежний F1 Gateway/ExternalAction/audit и проверяет authority после
+I/O. Model/task/UI flags не разрешают fallback и не являются evidence.
+
+Новый host github.com разрешён только для одного synthetic repo GET discovery
+в first-experiment profile, без произвольных query/body/method и redirects.
+Basic auth остаётся в trusted gateway; raw packet body не сохраняется. Parser
+ограничен64KiB/256refs, проверяет полный stream и нормализует шесть полей.
+Operator использует тот же parser; неясный исход не продвигает candidate и не
+создаёт новый POST. Probe остаётся readonly. Наблюдение discovery не выдаёт
+task/deployment consent и не гарантирует будущие branch-rule/REST write results.
+Это review выполняющего агента, не независимое внешнее заключение.
+
 ## Telegram preparation: единственная waiting AI-задача
 
 Новая `/prepare_experiment` вызывает общий с API fixed owner-only creator, а не

@@ -1,4 +1,5 @@
 """Trusted external action gateway. Durable intent always precedes network I/O."""
+import base64
 import json
 import re
 from uuid import uuid4
@@ -170,6 +171,12 @@ class Gateway:
         c = self.config
         if kind == 'openai' and path == '/v1/responses' and method == 'POST':
             return 'https://api.openai.com' + path, c.openai_secret_ref
+        if kind == 'github_git':
+            from .git_capability import discovery_path
+            if (not c.first_experiment or not c.synthetic_repository or method != 'GET'
+                    or path != discovery_path(c.synthetic_repository)):
+                raise Denied('external_endpoint_forbidden')
+            return 'https://github.com' + path, c.github_secret_ref
         prefix = '/repos/' + c.synthetic_repository
         if kind == 'github' and c.first_experiment and method == 'GET' and path in {prefix, prefix + '/branches/main'}:
             return 'https://api.github.com' + path, c.github_secret_ref
@@ -201,6 +208,8 @@ class Gateway:
 
     def request(self, task_id, fence, key, kind, method, path, body=None, *, query=None, reconcile=False):
         url, secret_ref = self.endpoint(kind, path, method)
+        if kind == 'github_git' and (body is not None or query is not None):
+            raise Denied('github_git_request_scope')
         if not self.config.connected():
             raise Denied('integration_not_connected')
         if self.config.mode == 'live' and self.runtime_guard is None:
@@ -280,10 +289,14 @@ class Gateway:
         request_id = ''
         try:
             headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/json'}
+            if kind == 'github_git':
+                headers = {'Authorization': 'Basic ' + base64.b64encode(('x-access-token:' + token).encode()).decode(),
+                           'Accept': 'application/x-git-receive-pack-advertisement'}
             with self.client.stream(method, url, json=body, params=query, headers=headers,
                                     follow_redirects=False, timeout=8) as response:
                 request_id = response.headers.get('x-request-id', response.headers.get('x-github-request-id', ''))
-                if not re.fullmatch(r'[A-Za-z0-9_-]{0,128}', request_id) or token in request_id:
+                id_pattern = r'[A-Za-z0-9_:-]{0,128}' if kind in {'github', 'github_git'} else r'[A-Za-z0-9_-]{0,128}'
+                if not re.fullmatch(id_pattern, request_id) or token in request_id:
                     request_id = ''
                     raise Uncertain('invalid_request_identifier')
                 raw = bytearray()
@@ -295,7 +308,11 @@ class Gateway:
                     raise Uncertain('credential_echo_blocked')
                 if response.status_code not in {200, 201}:
                     raise Uncertain('external_http_' + str(response.status_code))
-                data = json.loads(raw)
+                if kind == 'github_git':
+                    from .git_capability import advertisement
+                    data = advertisement(raw, response.headers.get('content-type', ''), self.config.synthetic_repository)
+                else:
+                    data = json.loads(raw)
             with self.store.transaction() as s:
                 self.store.check_audit(s)
                 operation = s.get(ExternalAction, action_id)
