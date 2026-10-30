@@ -239,6 +239,33 @@ Private-owner/profile-scoped reader скрывает stale body и закреп�
 страниц. Existing source/credential/runtime guards, rate limits, inbox replay и
 UNCERTAIN no-resend сохраняются. Hook/reader не меняют F1 execution authority.
 
+## Closed planning gateway поверх F1
+
+Новый kind всегда owner-only WAITING_APPROVAL. Immutable/current request payload
+проверяется в Store.create, scope approval и перед I/O/result acceptance. Узкий
+ExternalGrant не заменяет прежний F1 Approval. Общий role/lease/fence/source/
+grant anchor guard и financial request/ledger implementation переиспользуются;
+coding и planning purpose checks остаются разными. Exact-context grant dedup,
+constant single-call key, endpoint/body whitelist и unresolved-request prohibition
+не позволяют сменой creation key/context обойти no-repeat. Generic APIs не
+создают и не одобряют planning scope; production broker блокирует dispatch.
+
+Mode live отсутствует, ключевых files/env bindings нет, constructor принимает
+только MockTransport и public mock credential. Это closed backend без новых
+реальных полномочий сети/расходов, не дополнительный permission system.
+Response settlement использует admitted tariff copy; profile mutation не
+переоценивает уже отправленный request. Перед дальнейшим принятием результата
+действуют прежние revocation/config guards. Draft+result commits атомарны,
+подтверждённый mock spend не откатывается вместе с invalid/local-failed result.
+Completed response переиспользуется локально, unresolved outcome не отправляется
+повторно. Никакой semantic/model quality либо live provenance этим не доказаны.
+
+Generic synthetic Runner не получает planning kind и не обещает отсутствие
+external effects через container reconcile. Watchdog сохраняет unknown usage
+для нового kind; его container-absence proof не является provider-outcome proof.
+Новых schema/mount/egress/runtime/deployment transitions нет; live планировщик
+требует отдельной реализации и проверки всех interlocks.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

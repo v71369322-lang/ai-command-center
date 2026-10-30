@@ -361,7 +361,8 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.post("/api/tasks/{task_id}/approve")
     def approve(task_id: str, approval: ApprovalRequest, role=Depends(identity)):
-        if store.get(task_id)['payload'].get('coding', {}).get('provider') == 'openai':
+        task_payload = store.get(task_id)['payload']
+        if task_payload['kind'] == 'saved_request_plan' or task_payload.get('coding', {}).get('provider') == 'openai':
             raise Denied('external_scope_approval_required')
         return store.approve(role, task_id, approval.version, approval.seconds)
 

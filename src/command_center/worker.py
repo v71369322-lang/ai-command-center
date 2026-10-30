@@ -106,6 +106,8 @@ class Runner:
                 and not any(value.startswith("F1_") for value in c["Env"]))
 
     def execute(self, task):
+        if task['payload']['kind'] not in {'render', 'approved_render'}:
+            raise Denied('synthetic_runner_task_scope')
         name = self.name(task)
         if shutil.disk_usage(".").free < (self.limits.min_free_mib if self.limits else 256) * 1024 * 1024:
             self.store.abort(task["id"], task["fence"], "host_disk_low", True)
@@ -220,6 +222,8 @@ class Runner:
 Stop and verify absence before permitting a new separately admitted attempt.
 No such claim is valid for a future real provider.
 """
+        if task['payload']['kind'] not in {'render', 'approved_render'}:
+            raise Denied('synthetic_reconciliation_task_scope')
         if not self.stop(self.name(task)):
             return False
         with self.store.transaction() as s:

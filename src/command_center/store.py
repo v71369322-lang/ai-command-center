@@ -15,7 +15,7 @@ TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED", "SECURITY_BLOCKED"}
 
 
 def requires_approval(payload):
-    return payload['kind'] == 'approved_render' or (
+    return payload['kind'] in {'approved_render', 'saved_request_plan'} or (
         payload['kind'] == 'coding_synthetic' and payload['coding']['provider'] == 'openai')
 
 
@@ -87,7 +87,7 @@ class Store:
     def create(self, actor, key, payload, *, _scope_installer=None):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
-        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic'}:
+        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic', 'saved_request_plan'}:
             raise Denied("unknown_action")
         if payload['kind'] == 'coding_synthetic':
             if actor != 'owner':
@@ -97,6 +97,11 @@ class Store:
                 validate_payload(payload)
             except ValueError:
                 raise Denied('invalid_coding_scope') from None
+        if payload['kind'] == 'saved_request_plan':
+            if actor != 'owner':
+                raise Denied('owner_required_for_planning')
+            from .planning_task import validate_payload
+            validate_payload(payload)
         known_secrets = [*self.settings.identities.values(), self.settings.redis_password,
                          self.settings.database_url.password]
         encoded = canonical(payload) + key
@@ -106,6 +111,9 @@ class Store:
         fingerprint = digest(payload)
         with self.transaction() as s:
             control = s.get(Control, 1)
+            if payload['kind'] == 'saved_request_plan':
+                from .planning_task import check_context
+                check_context(self, s, payload)
             previous = s.execute(select(Task).where(Task.request_key == scoped_key)).scalar_one_or_none()
             if previous:
                 if previous.payload_hash != fingerprint:
@@ -266,7 +274,7 @@ class Store:
             task.lease_until = self.now(s) + timedelta(seconds=self.settings.lease_seconds)
             return True
 
-    def finish(self, task_id, fence, artifact, artifact_hash, actual_cost=None):
+    def finish(self, task_id, fence, artifact, artifact_hash, actual_cost=None, *, _scope_installer=None):
         with self.transaction() as s:
             self.check_audit(s)
             task, control = self.task(s, task_id), s.get(Control, 1)
@@ -281,6 +289,8 @@ class Store:
             charge = task.reserved if actual_cost is None else actual_cost
             if type(charge) is not int or not 0 <= charge <= task.reserved:
                 raise Denied('invalid_actual_cost')
+            if _scope_installer:
+                _scope_installer(s, task)
             task.state = "SUCCEEDED"
             control.reserved -= task.reserved
             control.actual += charge
