@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 import json
+import sys
 
 from sqlalchemy import select
 
@@ -24,12 +25,18 @@ ROOT = Path(__file__).resolve().parents[1]
 def module(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / ('infra/vps/' + name + '.py'))
     value = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(value)
+    previous = list(sys.path)
+    try:
+        sys.path.insert(0, str(ROOT / 'infra/vps'))
+        spec.loader.exec_module(value)
+    finally:
+        sys.path[:] = previous
     return value
 
 
 inspector = module('inspect_first_recovery')
 creator = module('prepare_first_recovery_profile')
+offline = module('prepare_recovery_offline')
 
 
 class Docker:
@@ -90,7 +97,8 @@ def test_database_inspection_produces_a_valid_disabled_draft_without_changing_ol
         old_audit = [a.digest for a in session.scalars(select(Audit).order_by(Audit.sequence))]
     observed = inspector.inspect(store, ledger_path=path, backend=Docker(), config_loader=lambda: config)
     assert observed['status'] == 'LOCAL_OBSERVATIONS_COMPLETE', observed['blockers']
-    prepared, summary = creator.build_draft(config, observed, datetime.now(timezone.utc))
+    minimized = offline.minimal_report(observed)
+    prepared, summary = creator.build_draft(config, minimized, datetime.now(timezone.utc))
     assert prepared.mode == 'disabled' and not prepared.connected()
     assert prepared.first_experiment.original_grant_digest == grant_digest
     assert prepared.first_experiment.original_task_id == task['id']

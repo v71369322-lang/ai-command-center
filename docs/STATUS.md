@@ -1,5 +1,13 @@
 # Текущий контекст и облачный handoff
 
+Продолжение **30 октября 2026, после PR #60**:
+[один локальный offline-запуск](infrastructure/FIRST_RECOVERY_OFFLINE_SESSION.md)
+связывает проверенный существующий broker, protected inspection и disabled draft.
+Он снимает ручное копирование hashes/JSON; старые source/runtime/release pins
+сохраняются. Сам запуск на VPS не выполнялся, новых расходов или tokens нет.
+PR #60 проверен заново: HEAD7fb08e7, full CI1318 Python /1 прежнее предупреждение
+и923 infrastructure SUCCESS; offline923 повторяет тот же набор.
+
 Следующий облачный шаг **30 октября 2026**:
 [автоматическая подготовка отключённого recovery-профиля](infrastructure/FIRST_RECOVERY_DISABLED_PROFILE.md).
 Из защищённого исходного config и свежего локального отчёта создаётся только

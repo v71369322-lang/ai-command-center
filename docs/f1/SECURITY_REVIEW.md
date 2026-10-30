@@ -8,6 +8,27 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Совместный локальный запуск inspection и disabled draft
+
+Это review выполняющего агента. Новый wrapper не расширяет authority предыдущих
+инструментов: фиксированный brain1/control UID, чистый exact operator и bounded
+operator-asserted window; VERIFIED322186d/ac6462b predecessor и private config pin.
+Shared lock существующего deployment.lock блокирует конкурирующий apply без
+создания/изменения lock file. Rootless Engine и immutable broker image/ID,
+compose labels, critical env, read-only root и mounts проверяются перед exec.
+Диагностический stdin-код берётся только из checked operator source; новые
+команды не принимаются из модели, отчёта или CLI. Нет shell exec или provider API.
+
+Единственный child exec — старый read-only inspector. Его exit2 не маскируется:
+принимается только schema/scope, допускаемая предыдущим disabled builder.
+До сохранения report повторно валидируется и минимизируется; unknown nested
+fields и stderr не попадают в artifacts. Проверки journal/container повторяются
+после I/O и после записи draft. Source/receipt/plan pins и финансовый cap прежние.
+Любая неопределённость сохраняет intent/partial disabled result и блокирует replay;
+нет cleanup, token refresh, task retry или apply. Low B110 относится только к
+невозможности дополнительно записать BLOCKED journal: исходная ошибка всё равно
+передаётся вверх, а существующий каталог/intent запрещает повтор.
+
 ## Отключённый черновик recovery-профиля
 
 Это review выполняющего агента. Новый operator-only helper не создаёт F1 tasks,
