@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator, SecretStr
@@ -19,6 +19,7 @@ from .store import Denied, Store
 from .worker import broker
 from .owner_auth import OwnerAuth
 from .coding.contract import CodingRequest, payload as coding_payload, template as coding_template
+from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreRequest, EVENT as PROJECT_SETUP_EVENT
 
 
 class Command(BaseModel):
@@ -245,6 +246,12 @@ def create_app(settings=None, gateway_factory=None):
     @app.get("/api/state")
     def state(role=Depends(human)):
         result = store.snapshot()
+        # Keep the protected audit unchanged. Generic timelines are projections;
+        # draft values are read only through the screened owner setup endpoints.
+        for item in result['events']:
+            event = item['event']
+            if event.get('kind') == PROJECT_SETUP_EVENT:
+                item['event'] = {'kind': PROJECT_SETUP_EVENT, 'details_redacted': True}
         from .coding.integration_config import IntegrationConfig
         if gateway_factory:
             gateway = external_gateway()
@@ -436,6 +443,33 @@ def create_app(settings=None, gateway_factory=None):
                                 role=Depends(identity)):
         from .project_connections import connection_plan
         return connection_plan(role, project_id)
+
+    @app.get('/api/project-setup')
+    def project_setup_catalog(role=Depends(identity)):
+        from .project_setup import catalog
+        return catalog(store, role)
+
+    @app.get('/api/projects/{project_id}/setup')
+    def project_setup_read(project_id: ProjectId, version: int | None = Query(default=None, ge=0, le=500),
+                           role=Depends(identity)):
+        from .project_setup import read
+        return read(store, role, project_id, selected=version)
+
+    @app.post('/api/projects/{project_id}/setup/preview')
+    def project_setup_preview(project_id: ProjectId, body: PreviewRequest, role=Depends(identity)):
+        from .project_setup import preview
+        return preview(store, role, project_id, body.expected_version, body.draft)
+
+    @app.post('/api/projects/{project_id}/setup')
+    def project_setup_save(project_id: ProjectId, body: SaveRequest, role=Depends(identity)):
+        from .project_setup import save
+        return save(store, role, project_id, body.expected_version, body.draft, body.operation_id)
+
+    @app.post('/api/projects/{project_id}/setup/restore')
+    def project_setup_restore(project_id: ProjectId, body: RestoreRequest, role=Depends(identity)):
+        from .project_setup import restore
+        return restore(store, role, project_id, body.expected_version, body.target_version,
+                       body.target_digest, body.operation_id)
 
     @app.get('/api/telegram/requests')
     def telegram_requests(role=Depends(identity)):

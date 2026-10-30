@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ProjectConnection} from './ProjectConnection';
+import {ProjectSetupOverview} from './ProjectSetup';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 const ids=['command-center','vanilla-sugar','lnauto','capital-lab'] as const;
@@ -50,6 +51,7 @@ function SavedRow({row,projects,disabled,save}:{row:Row;projects:View['projects'
 }
 
 export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Promise<void>}){
+ const [setupRevision,setSetupRevision]=useState(0);
  const [filter,setFilter]=useState<Filter>('all');
  const [view,setView]=useState<View|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -87,8 +89,11 @@ export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Prom
  return <section className="project-inbox" aria-labelledby="projects-heading" aria-busy={loading||saving}>
   <h2 id="projects-heading">Проекты и запросы</h2>
   <p>Выбор проекта упорядочивает запросы. Он не разрешает запуск AI или доступ к CRM.</p>
+  {view&&<ProjectSetupOverview request={request} revision={setupRevision}/>}
   {view&&<ul>{view.projects.map(item=><li key={item.id}>{item.label}: {view.counts[item.id]} · AI-разработка не подключена
-   <ProjectConnection projectId={item.id} label={item.label} request={request}/></li>)}</ul>}
+   <ProjectConnection projectId={item.id} label={item.label} request={request} onSaved={async()=>{
+    await onSaved();setSetupRevision(v=>v+1);
+   }}/></li>)}</ul>}
   <label htmlFor="project-filter">Показать запросы</label><select id="project-filter" value={filter} disabled={loading||saving} onChange={event=>setFilter(event.target.value as Filter)}>
    <option value="all">Все проекты</option><option value="unassigned">Не распределены</option>
    {(view?.projects??ids.map(id=>({id,label:id}))).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}

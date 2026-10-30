@@ -200,6 +200,9 @@ class TelegramBridge:
             if len(parts) > 2 or len(parts) == 2 and parts[1] not in IDS:
                 raise Denied('telegram_project_connection_invalid')
             return str(uid), {'kind': 'project_connection', 'project_id': parts[1] if len(parts) == 2 else None}
+        from .telegram_project_setup import COMMANDS as setup_commands, parse as parse_setup
+        if value.split()[:1] and value.split()[0] in setup_commands:
+            return str(uid), parse_setup(value)
         if value == '/plan':
             return str(uid), {'kind': 'help'}
         if value.split()[:1] == ['/plan']:
@@ -402,6 +405,9 @@ class TelegramBridge:
                     issue(self, session, iid)
                 else:
                     confirm(self, session, iid, intent)
+        elif kind == 'project_setup_change':
+            from .telegram_project_setup import apply as apply_setup
+            apply_setup(self, iid, intent)
         elif kind == 'assign':
             from .project_inbox import classify, PROJECTS
             from .telegram_project_picker import verify
@@ -437,7 +443,7 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection',
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection', 'project_setup', 'project_setup_history',
                       'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
@@ -469,6 +475,9 @@ class TelegramBridge:
                 elif kind == 'project_connection':
                     from .telegram_project_connection import reply as connection_reply
                     reply = connection_reply(intent['project_id'])
+                elif kind in {'project_setup', 'project_setup_history'}:
+                    from .telegram_project_setup import reply as setup_reply
+                    reply = setup_reply(self, session, intent, suffix)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -535,6 +544,7 @@ class TelegramBridge:
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '
                         '/connection project-id — план подключения проекта; '
+                        '/setup project-id — черновик подключения, история и редактирование; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
@@ -653,6 +663,8 @@ class TelegramBridge:
                     or not isinstance(body.get('text'), str) or not 1 <= len(body['text']) <= 4096
                     or set(body) - {'chat_id', 'text', 'reply_markup'}):
                 raise Denied('telegram_delivery_scope_or_integrity_invalid')
+            from .project_inbox import check_content
+            check_content(self.store, body['text'])  # Recheck known credentials after a queued reply/rotation.
             self.store.audit(session, 'telegram_delivery_intent', 'system', delivery_id=oid)
         try:
             result = self.client.call('sendMessage', body)

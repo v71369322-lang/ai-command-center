@@ -20,6 +20,7 @@ from command_center.telegram_transport import ConfiguredTelegramHTTP, connection
 from command_center.telegram_menu import BUTTONS, keyboard
 from command_center.telegram_project_picker import keyboard as picker_keyboard
 from command_center.project_inbox import PROJECTS
+from command_center.project_setup import read as read_setup
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
@@ -41,7 +42,16 @@ def handle(request):
                 '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1',
                 '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all',
                 '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS],'/readiness',
-                '/connection',*[f'/connection {key}' for key,_ in PROJECTS]]
+                '/connection',*[f'/connection {key}' for key,_ in PROJECTS],
+                '/setup', '/setup lnauto',
+                f'/setup_set lnauto {setup_start} revision '+ 'a'*40,
+                f'/setup_set lnauto {setup_start+1} verification python_node',
+                f'/setup_set lnauto {setup_start+2} delivery pipeline_review',
+                f'/setup_set lnauto {setup_start+3} target lnauto-staging',
+                f'/setup_set lnauto {setup_start+4} acceptance Public synthetic acceptance',
+                '/setup lnauto','/setup_history lnauto',
+                f'/setup_clear lnauto {setup_start+5} target',
+                f'/setup_restore lnauto {setup_start+6} {setup_start+5}', '/setup lnauto']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -82,6 +92,7 @@ def handle(request):
     else: raise AssertionError('unexpected method')
     return httpx.Response(200,json={'ok':True,'result':result})
 store=Store(service_settings())
+setup_start=read_setup(store,'owner','lnauto')['latest_version']
 from command_center.store import digest
 client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.model_dump()),
     store.settings.source_revision,transport=httpx.MockTransport(handle))
@@ -89,7 +100,7 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==27
+    assert calls.count('sendMessage')==39
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -133,7 +144,14 @@ try:
     assert all(any('План подключения: '+label+'.' in value and 'Репозиторий — не проверено.' in value
                    for value in sent) for _,label in PROJECTS)
     assert any('Планы подключения проектов.' in value for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':23,'project_assignments':1,
+    setup=read_setup(store,'owner','lnauto')
+    assert setup['latest_version']==setup_start+7 and setup['review']['filled']==5
+    assert setup['execution_connected'] is False and setup['review']['execution_ready'] is False
+    assert setup['draft']['acceptance']==['Public synthetic acceptance']
+    assert sum('Черновик lnauto сохранён:' in value for value in sent)==7
+    assert any('Заполнено 5 из 5.' in value for value in sent)
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':28,'project_assignments':1,
+        'project_setup_versions_added':7,'project_setup_external_checks_performed':False,
         'project_connection_plan_replies':len(PROJECTS)+1,'project_connections_activated':False,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
