@@ -40,7 +40,7 @@ RELEASES = {
     'first-experiment-authorize': ('d932baafce53c0748396abfc019cf81b931ebfec',
                                    '2822320569ca442ff5579140875ec074e1058898'),
     'first-experiment-github-capability': ('d932baafce53c0748396abfc019cf81b931ebfec',
-                                          '645dac5b04fea581250040f352c082b62dafb0fc'),
+                                          '322186dc180257c618d8b159c78faa6e5bbf0b43'),
 }
 
 

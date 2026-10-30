@@ -40,7 +40,7 @@ def test_git_capability_profile_adds_one_transition_without_retargeting_existing
     assert {key: staging.RELEASES[key] for key in previous} == previous
     assert set(staging.RELEASES) - set(previous) == {'first-experiment-github-capability'}
     assert staging.release_pair('first-experiment-github-capability') == (
-        previous['telegram-mobile'][1], '645dac5b04fea581250040f352c082b62dafb0fc')
+        previous['telegram-mobile'][1], '322186dc180257c618d8b159c78faa6e5bbf0b43')
 
 
 @pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare", "first-experiment-authorize", "first-experiment-github-capability"])

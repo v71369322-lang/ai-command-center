@@ -75,7 +75,7 @@ final token, не снимает NO_RETRY и не выдаёт deployment/paid �
 pairs. Уже собранный2822320 не исправляется сменой label или файла на месте.
 Одиннадцатый profile `first-experiment-github-capability` закрепляет переход
 `d932baafce53c0748396abfc019cf81b931ebfec` →
-runtime checkpoint `645dac5b04fea581250040f352c082b62dafb0fc`. В нём есть прежние
+runtime checkpoint `322186dc180257c618d8b159c78faa6e5bbf0b43`. В нём есть прежние
 Telegram authorization/preparation/status/watch/cancel/latency функции и это
 исправление; новые planning helpers остаются закрытыми и не активируют обычный AI.
 Operator revision закрепляется отдельно. Integration/readiness flags и все
@@ -86,9 +86,12 @@ prepare/inspect/apply и первый paid consent остаются отдель
 
 ## Проверки и источники
 
-Локально150 PG/strict-mock cases passed /6 source execution cases deselected /
-1 прежний Starlette warning; включает41 новых parser/gateway cases. Отдельно96
-operator cases passed, включая7 новых. Новая app-token full container scenario
+Первый scope150 PG/strict-mock /96operator пересекается с итоговым. После
+дополнительной проверки HTTP201 и capability control bytes: **153 PG/strict-mock
+passed /6 source execution cases deselected /1 прежний Starlette warning**,
+включая44 новых parser/gateway cases. Отдельно **97 operator passed**, включая8
+новых. Полный local infrastructure scope **801passed**, включает97operator.
+Наборы не складываются. Новая app-token full container scenario
 остаётся обязательной в fresh-source CI. Ранние исправленные fixture failures
 не считаются положительным evidence. Final HEAD/полные counts — в Draft PR.
 
