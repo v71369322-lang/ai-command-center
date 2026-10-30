@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -41,8 +42,8 @@ def test_read_only_runtime_uses_existing_verifier_without_constructor_or_mutatio
     assert result['unresolved_runs'] == 0
     assert files(path.parent) == before
     with probe.read_only_ledger(path) as view:
-        with pytest.raises(Exception):
-            view.phase(probe.TASK_ID, 1, 'ACTIVE')
+        with pytest.raises(sqlite3.OperationalError, match='readonly'):
+            view.phase(probe.TASK_ID, 1, 'UNCERTAIN')
     assert files(path.parent) == before
 
 
@@ -92,7 +93,6 @@ def test_unknown_or_unsafe_runtime_is_blocked_without_file_repairs(ledger, tmp_p
         with view.tx() as db:
             db.execute("UPDATE evidence SET digest='corrupt'")
     elif change == 'wal':
-        import sqlite3
         with sqlite3.connect(path) as db:
             db.execute('PRAGMA journal_mode=WAL')
     before = files(tmp_path)
