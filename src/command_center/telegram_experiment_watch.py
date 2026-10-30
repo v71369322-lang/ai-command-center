@@ -8,6 +8,7 @@ from .coding.first_experiment import task_payload
 from .models import Audit, TelegramDelivery, TelegramInbox
 from .store import Denied, digest
 from .telegram_experiment import snapshot
+from .telegram_experiment_scope import experiment_id, key as scope_key
 
 WATCH = 'telegram_experiment_watch_changed'
 NOTICE = 'telegram_experiment_notice_queued'
@@ -15,7 +16,7 @@ TERMINAL = {'SUCCEEDED', 'FAILED', 'CANCELLED', 'RECONCILING', 'SECURITY_BLOCKED
 
 
 def receipt(bridge, session, inbox_id, enabled, revision):
-    intent = {'kind': 'watch_experiment' if enabled else 'unwatch_experiment'}
+    intent = {'kind': scope_key(bridge, 'watch_experiment' if enabled else 'unwatch_experiment')}
     row = session.get(TelegramInbox, inbox_id)
     received = session.scalar(select(Audit).where(
         Audit.event['kind'].as_string() == 'telegram_update_received',
@@ -30,7 +31,7 @@ def receipt(bridge, session, inbox_id, enabled, revision):
 
 
 def current(bridge, session):
-    anchor = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == WATCH,
+    anchor = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == scope_key(bridge, WATCH),
         Audit.event['actor'].as_string() == 'owner', Audit.event['profile'].as_string() == bridge.profile)
         .order_by(Audit.sequence.desc()).limit(1))
     if not anchor:
@@ -58,7 +59,7 @@ def notice_key(task_id, fingerprint):
 def suppress_pending(bridge, session, task_id):
     # Revoke only known, unsent experiment notices. Replies and uncertain sends
     # retain their own durable records and are never converted into a retry.
-    anchors = session.scalars(select(Audit).where(Audit.event['kind'].as_string() == NOTICE,
+    anchors = session.scalars(select(Audit).where(Audit.event['kind'].as_string() == scope_key(bridge, NOTICE),
         Audit.event['profile'].as_string() == bridge.profile, Audit.event['task_id'].as_string() == task_id)).all()
     for anchor in anchors:
         event = anchor.event
@@ -86,8 +87,8 @@ def change(bridge, session, inbox_id, enabled):
         if previous:
             task_id = previous.event['task_id']
             suppress_pending(bridge, session, task_id)
-            bridge.store.audit(session, WATCH, 'owner', task_id, profile=bridge.profile,
-                               inbox_id=inbox_id, enabled=False, payload_hash=digest(task_payload()))
+            bridge.store.audit(session, scope_key(bridge, WATCH), 'owner', task_id, profile=bridge.profile,
+                               inbox_id=inbox_id, enabled=False, payload_hash=digest(task_payload(experiment_id(bridge))))
         return 'Будущие уведомления первого AI-эксперимента отключены. Текущий снимок: /experiment.'
     task, _ = snapshot(bridge, session, include_time=False)
     if task is None:
@@ -95,7 +96,7 @@ def change(bridge, session, inbox_id, enabled):
     bridge.store.check_task_revision(session, task)
     if (not previous or not previous.event['enabled'] or previous.event['task_id'] != task.id
             or previous.event['revision'] != revision):
-        bridge.store.audit(session, WATCH, 'owner', task.id, profile=bridge.profile,
+        bridge.store.audit(session, scope_key(bridge, WATCH), 'owner', task.id, profile=bridge.profile,
                            inbox_id=inbox_id, enabled=True, payload_hash=task.payload_hash)
     return ('Уведомления первого AI-эксперимента включены для этого чата. '
             'Уже отправленные, отменённые и неопределённые отправки не повторяются.\n'
@@ -122,5 +123,5 @@ def collect(bridge, session):
     text = ('Уведомление первого AI-эксперимента\nСнимок UTC: '
             + bridge.store.now(session).isoformat() + '\n\n' + body + '\n\nПодробнее: /experiment.')
     delivery_id = bridge.enqueue(session, key, text)
-    bridge.store.audit(session, NOTICE, 'system', task.id, profile=bridge.profile,
+    bridge.store.audit(session, scope_key(bridge, NOTICE), 'system', task.id, profile=bridge.profile,
                        delivery_id=delivery_id, fingerprint=fingerprint, watch_sequence=watch.sequence)

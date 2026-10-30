@@ -4,12 +4,13 @@ import re
 
 from sqlalchemy import select
 
-from .coding.first_experiment import CAP, EXPERIMENT_ID, REQUEST_KEY, task_payload
+from .coding.first_experiment import CAP, RECOVERY_ID, request_key, task_payload
 from .coding.gateway import Gateway, UNRESOLVED_ACTION_STATES
 from .coding.financial_types import NANO_RUB
 from .coding.spec import BASE_SHA, branch_name
 from .models import Audit, ExternalAction, ExternalGrant, Task
 from .store import Denied, digest
+from .telegram_experiment_scope import experiment_id, title
 
 
 STATES = {
@@ -31,10 +32,11 @@ def rub(value):
 
 def task_record(bridge, session):
     """Immutable task identity, deliberately independent of external accounting."""
-    task = session.scalar(select(Task).where(Task.request_key == 'owner:' + REQUEST_KEY))
+    scope_id = experiment_id(bridge)
+    task = session.scalar(select(Task).where(Task.request_key == 'owner:' + request_key(scope_id)))
     if task is None:
         return None, None
-    fixed = task_payload()
+    fixed = task_payload(scope_id)
     created = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'task_created',
         Audit.event['task_id'].as_string() == task.id).order_by(Audit.sequence).limit(1))
     if (task.owner_role != 'owner' or task.payload != fixed or task.payload_hash != digest(fixed)
@@ -60,7 +62,7 @@ def snapshot(bridge, session, *, include_time=True):
         doc = grant.document
         if (digest(doc) != grant.digest or doc.get('payload_hash') != task.payload_hash
                 or doc.get('revision') != bridge.store.settings.source_revision
-                or doc.get('experiment_id') != EXPERIMENT_ID or doc.get('base_sha') != BASE_SHA
+                or doc.get('experiment_id') != experiment_id(bridge) or doc.get('base_sha') != BASE_SHA
                 or doc.get('mode') not in {'live', 'http_mock'}
                 or type(doc.get('budget')) is not int or not 0 < doc['budget'] <= CAP
                 or doc['mode'] == 'live' and doc.get('final_confirmation') is not True
@@ -73,7 +75,7 @@ def snapshot(bridge, session, *, include_time=True):
     if actions and not grant:
         raise Denied('first_experiment_grant_integrity')
     uncertain = any(a.state in UNRESOLVED_ACTION_STATES for a in actions)
-    lines = ['Первый AI-эксперимент', f'Снимок UTC: {bridge.store.now(session).isoformat()}', f'Задача: {task.id}',
+    lines = [title(bridge), f'Снимок UTC: {bridge.store.now(session).isoformat()}', f'Задача: {task.id}',
              {'live': 'Режим по разрешению: live.', 'http_mock': 'Режим по разрешению: HTTP-моки; настоящего AI нет.'}
              .get(mode, 'Отдельное разрешение AI-вызовов не зафиксировано.'),
              STATES.get(task.state, 'Успех пока не подтверждён; нужна сверка.')]
@@ -85,6 +87,11 @@ def snapshot(bridge, session, *, include_time=True):
               f'Потолок первого эксперимента: {rub(CAP)}.']
     if grant:
         lines += ['Лимит задачи по разрешению: ' + rub(doc['budget']) + '.']
+        if experiment_id(bridge) == RECOVERY_ID:
+            parent = doc.get('recovery_parent', {})
+            lines += ['Исходная завершённая задача: ' + str(parent.get('task_id', 'не подтверждена')) + '.',
+                      'Расход исходной задачи по закреплённому журналу: '
+                      + rub(parent.get('actual_nano_rub', 0)) + '.']
     if uncertain:
         lines += ['Внешняя операция не сверена; повтор, списание резерва и успех не подтверждаются этой командой.']
     elif task.state == 'SUCCEEDED':

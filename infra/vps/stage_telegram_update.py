@@ -22,6 +22,8 @@ from command_center.telegram_transport import TelegramConnection, connection, pr
 BASE_REVISION = '316dc1615dea224bcf4bd595d87048d19820bd21'
 TARGET_REVISION = 'b2e71fe073f3109e639dac43496884905ce86d9f'
 RELEASES = {
+    'first-experiment-recovery': ('322186dc180257c618d8b159c78faa6e5bbf0b43',
+                                  'bf91c05c754ad41e7f89223ec8d05c02c9007de1'),
     'f34': (BASE_REVISION, TARGET_REVISION),
     'telegram-resume': (TARGET_REVISION, 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
     'telegram-mobile': (TARGET_REVISION, 'd932baafce53c0748396abfc019cf81b931ebfec'),
@@ -51,10 +53,17 @@ def release_pair(release):
 
 
 def integration_transition(old, new, release):
-    if release in {'first-experiment', 'first-experiment-readiness', 'first-experiment-status',
+    if release == 'first-experiment-recovery':
+        before, after = old.get('first_experiment', {}), new.get('first_experiment', {})
+        if (not before or not after or before.get('telegram_readiness') is not True
+                or 'recovery' in before or after.get('telegram_readiness') is not True
+                or after.get('recovery') != 'f2.2-recovery-1'):
+            raise ValueError('explicit_one_call_recovery_transition_required')
+    elif release in {'first-experiment', 'first-experiment-readiness', 'first-experiment-status',
                    'first-experiment-notifications', 'first-experiment-cancel', 'first-experiment-prepare', 'first-experiment-authorize',
                    'first-experiment-github-capability'}:
-        if 'first_experiment' in old or 'first_experiment' not in new:
+        if ('first_experiment' in old or 'first_experiment' not in new
+                or 'recovery' in new['first_experiment']):
             raise ValueError('explicit_first_experiment_binding_required')
         if bool(new['first_experiment'].get('telegram_readiness')) != (release != 'first-experiment'):
             raise ValueError('exact_readiness_profile_required')

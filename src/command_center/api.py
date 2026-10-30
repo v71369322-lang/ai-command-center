@@ -92,6 +92,12 @@ class FinalExperimentApproval(ExternalApprovalRequest):
     profile_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
 
 
+class FinalRecoveryApproval(ExternalApprovalRequest):
+    budget_nano_rub: int = Field(gt=0, le=34_786_800_000, strict=True)
+    confirmation: Literal['AUTHORIZE_ONE_PAID_RECOVERY']
+    profile_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
 def create_app(settings=None, gateway_factory=None):
     settings = settings or Settings.load()
     store = Store(settings)
@@ -273,7 +279,8 @@ def create_app(settings=None, gateway_factory=None):
             result.update(mode=config.mode, connected=config.connected(), repository=config.synthetic_repository or None,
                           profile_hash=digest(config.model_dump()),
                           credential_refs_configured=bool(config.credential_files))
-            task = next((t for t in store.snapshot()['tasks'] if t['payload'].get('coding', {}).get('experiment_id') == EXPERIMENT_ID), None)
+            active_id = config.first_experiment.id if config.first_experiment else EXPERIMENT_ID
+            task = next((t for t in store.snapshot()['tasks'] if t['payload'].get('coding', {}).get('experiment_id') == active_id), None)
             result['task_state'] = task
             if task:
                 result['integration'] = gateway.status(task['id'])
@@ -292,6 +299,24 @@ def create_app(settings=None, gateway_factory=None):
         from .coding.first_experiment import EXPERIMENT_ID
         if store.get(task_id)['payload'].get('coding', {}).get('experiment_id') != EXPERIMENT_ID:
             raise Denied('not_first_experiment_task')
+        gateway = external_gateway()
+        try:
+            return gateway.authorize(role, task_id, command.version, budget_nano_rub=command.budget_nano_rub,
+                                     seconds=command.seconds, final_confirmation=True,
+                                     expected_config_hash=command.profile_hash)
+        finally:
+            gateway.close()
+
+    @app.post('/api/experiments/recovery/task', status_code=201)
+    def create_recovery_experiment(role=Depends(identity)):
+        from .coding.first_experiment import RECOVERY_ID, create_task
+        return create_task(store, role, experiment_id=RECOVERY_ID)
+
+    @app.post('/api/experiments/recovery/{task_id}/authorize')
+    def authorize_recovery_experiment(task_id: str, command: FinalRecoveryApproval, role=Depends(identity)):
+        from .coding.first_experiment import RECOVERY_ID
+        if store.get(task_id)['payload'].get('coding', {}).get('experiment_id') != RECOVERY_ID:
+            raise Denied('not_recovery_experiment_task')
         gateway = external_gateway()
         try:
             return gateway.authorize(role, task_id, command.version, budget_nano_rub=command.budget_nano_rub,

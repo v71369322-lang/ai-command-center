@@ -51,6 +51,20 @@ def no_authority_or_external_access(monkeypatch):
     monkeypatch.setattr(httpx, 'Client', forbidden)
 
 
+def test_recovery_local_declarations_use_one_call_without_claiming_parent_verification():
+    from command_center.coding.recovery import RECOVERY_CAP, RecoveryExperiment
+    config = profile()
+    config.first_experiment = RecoveryExperiment.model_validate({**config.first_experiment.model_dump(),
+        'id': 'f2.2-recovery-1', 'original_task_id': '11111111-2222-4333-8444-555555555555',
+        'original_grant_digest': 'c' * 64})
+    report = preflight.inspect_config(config, NOW)
+    assert report['status'] == 'LOCAL_CHECKS_PASSED'
+    assert report['max_calls'] == 1 and report['max_budget_nano_rub'] == RECOVERY_CAP
+    assert report['configured_reservation_nano_rub'] == config.tariff.maximum()
+    assert report['live_call_allowed'] is False and report['remote_state_verified'] is False
+    assert config.first_experiment.report(NOW)['parent_state_verified'] is False
+
+
 def test_valid_local_declarations_never_grant_live_permission_or_claim_remote_verification():
     config = profile()
     original = config.model_dump(), dict(config.credential_files)

@@ -5,8 +5,9 @@ from pathlib import Path
 import re
 import stat
 
-from .coding.first_experiment import CALLS, CAP, CONTEXT_TOKENS, MODEL, OUTPUT_TOKENS
+from .coding.first_experiment import CAP, CONTEXT_TOKENS, MODEL, OUTPUT_TOKENS, RECOVERY_ID
 from .coding.integration_config import IntegrationConfig
+from .coding.recovery import RecoveryExperiment
 from .store import digest
 
 CONFIG_TARGET = '/run/f2/config.json'
@@ -17,7 +18,10 @@ BINDING_KEYS = {'config_file', 'config_sha256', 'profile_hash', *CREDENTIAL_TARG
 
 def validate_binding(manifest):
     binding = manifest.get('first_experiment')
-    if (not isinstance(binding, dict) or set(binding) not in (BINDING_KEYS, BINDING_KEYS | {'telegram_readiness'})
+    if (not isinstance(binding, dict) or set(binding) not in (
+            BINDING_KEYS, BINDING_KEYS | {'telegram_readiness'}, BINDING_KEYS | {'recovery'},
+            BINDING_KEYS | {'telegram_readiness', 'recovery'})
+            or 'recovery' in binding and binding['recovery'] != RECOVERY_ID
             or 'telegram_readiness' in binding and binding['telegram_readiness'] is not True):
         raise ValueError('first_experiment_binding_invalid')
     if any(not isinstance(binding[k], str) or not re.fullmatch('[a-f0-9]{64}', binding[k])
@@ -72,7 +76,8 @@ def _configuration(path, uid):
             or config.tariff.model != MODEL or config.tariff.context_tokens != CONTEXT_TOKENS
             or config.tariff.max_output_tokens != OUTPUT_TOKENS
             or not config.tariff.input_nano_rub or not config.tariff.output_nano_rub
-            or not 0 < config.tariff.maximum() * CALLS <= min(config.daily_nano_rub, config.monthly_nano_rub, CAP)
+            or not 0 < config.tariff.maximum() * config.first_experiment.call_limit <= min(
+                config.daily_nano_rub, config.monthly_nano_rub, config.first_experiment.budget_cap)
             or max(config.daily_nano_rub, config.monthly_nano_rub) > CAP):
         raise ValueError('first_experiment_deployment_scope_invalid')
     if (config.openai_secret_ref == config.github_secret_ref
@@ -87,6 +92,8 @@ def check_binding(manifest):
     validate_binding(manifest)
     binding, uid = manifest['first_experiment'], manifest['control_uid']
     raw, config = _configuration(binding['config_file'], uid)
+    if ('recovery' in binding) != isinstance(config.first_experiment, RecoveryExperiment):
+        raise ValueError('recovery_binding_required')
     if (hashlib.sha256(raw).hexdigest() != binding['config_sha256']
             or digest(config.model_dump()) != binding['profile_hash']):
         raise ValueError('first_experiment_config_pin_changed')
@@ -109,6 +116,8 @@ def prepare_binding(manifest, config_file, openai_key_file, github_token_file, *
     candidate = {**manifest, 'first_experiment': binding}
     validate_binding(candidate)
     raw, config = _configuration(config_file, manifest['control_uid'])
+    if isinstance(config.first_experiment, RecoveryExperiment):
+        binding['recovery'] = RECOVERY_ID
     binding.update(config_sha256=hashlib.sha256(raw).hexdigest(), profile_hash=digest(config.model_dump()))
     check_binding(candidate)
     return binding

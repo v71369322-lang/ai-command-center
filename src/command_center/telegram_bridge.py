@@ -15,6 +15,7 @@ from .store import Denied, canonical, digest
 from .telegram_requests import capture_receipt, request_reply
 from .telegram_menu import BUTTONS, keyboard
 from .telegram_transport import ConfiguredTelegramHTTP, token_fingerprint
+from .telegram_experiment_scope import RecoveryBridge, key as experiment_key
 
 
 class MockTelegramHTTP:
@@ -109,7 +110,7 @@ class TelegramBridge:
             elif token.startswith('rs:'):
                 from .telegram_control import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
-            elif token.startswith('fx:'):
+            elif token.startswith(('fx:', 'rx:')):
                 from .telegram_experiment_authorize import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
             else:
@@ -149,6 +150,14 @@ class TelegramBridge:
             return str(uid), {'kind': 'tasks'}
         if value == '/readiness':
             return str(uid), {'kind': 'readiness'}
+        recovery_commands = {'/recovery': 'recovery', '/prepare_recovery': 'prepare_recovery',
+                             '/authorize_recovery': 'recovery_authorize_request',
+                             '/cancel_recovery': 'cancel_recovery', '/watch_recovery': 'watch_recovery',
+                             '/unwatch_recovery': 'unwatch_recovery'}
+        if value in recovery_commands:
+            return str(uid), {'kind': recovery_commands[value]}
+        if value.split()[:1] and value.split()[0] in recovery_commands:
+            raise Denied('telegram_recovery_arguments_forbidden')
         if value == '/experiment':
             return str(uid), {'kind': 'experiment'}
         if value == '/prepare_experiment':
@@ -266,13 +275,14 @@ class TelegramBridge:
                         raise Denied('control_blocked')
                     admission = {'admission_epoch': control.epoch,
                                  'expires_at': (self.store.now(session) + timedelta(seconds=120)).isoformat()}
-                if intent['kind'] == 'cancel_experiment':
+                scope = RecoveryBridge(self) if 'recovery' in intent['kind'] else self
+                if intent['kind'] in {'cancel_experiment', 'cancel_recovery'}:
                     from .telegram_experiment_cancel import bind
-                    admission['experiment_cancel_binding'] = bind(self, session)
-                if intent['kind'] == 'prepare_experiment':
+                    admission[experiment_key(scope, 'experiment_cancel_binding')] = bind(scope, session)
+                if intent['kind'] in {'prepare_experiment', 'prepare_recovery'}:
                     from .telegram_experiment_prepare import bind
                     admission = {'admission_epoch': session.get(Control, 1).epoch,
-                                 'experiment_prepare_binding': bind(self, session)}
+                                 experiment_key(scope, 'experiment_prepare_binding'): bind(scope, session)}
                 if session.scalar(select(func.count()).select_from(TelegramInbox)) >= 1000:
                     raise Denied('telegram_inbox_capacity')
                 session.add(TelegramInbox(id=iid, profile=self.profile, fingerprint=digest(intent), intent=intent,
@@ -284,19 +294,20 @@ class TelegramBridge:
     def _apply_pending(self, iid, intent):
         self.guard()
         kind = intent['kind']
-        if kind == 'experiment_authorize_request':
+        scope = RecoveryBridge(self) if 'recovery' in kind else self
+        if kind in {'experiment_authorize_request', 'recovery_authorize_request'}:
             from .telegram_experiment_authorize import issue
             with self.store.transaction() as session:
                 self.guard()
                 self.store.check_audit(session)
                 if session.get(TelegramInbox, iid).state != 'DONE':
-                    issue(self, session, iid)
-        elif kind == 'experiment_authorize_confirm':
+                    issue(scope, session, iid)
+        elif kind in {'experiment_authorize_confirm', 'recovery_authorize_confirm'}:
             from .telegram_experiment_authorize import confirm
-            confirm(self, iid, intent)
-        elif kind == 'prepare_experiment':
+            confirm(scope, iid, intent)
+        elif kind in {'prepare_experiment', 'prepare_recovery'}:
             from .telegram_experiment_prepare import apply
-            apply(self, iid)
+            apply(scope, iid)
         elif kind == 'coding_demo':
             from .telegram_coding import accepted, exercise
             self.store.create('owner', 'tg:' + iid, exercise(),
@@ -356,9 +367,9 @@ class TelegramBridge:
                 self.finish(session, iid, 'Синтетический тест подтверждён. Ожидаем проверяемый результат.')
                 self.store.audit(session, 'telegram_card_consumed', 'owner', task.id, version=task.version)
             self.store.approve('owner', task_id, version, _scope_installer=consume, _deadline=expires)
-        elif kind == 'cancel_experiment':
+        elif kind in {'cancel_experiment', 'cancel_recovery'}:
             from .telegram_experiment_cancel import apply
-            apply(self, iid)
+            apply(scope, iid)
         elif kind == 'cancel':
             self.store.cancel('owner', intent['task_id'], _scope_installer=lambda session, task:
                               self.finish(session, iid, 'Намерение отмены сохранено; фактическая остановка проверяется.'))
@@ -421,7 +432,7 @@ class TelegramBridge:
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'plan_review', 'coding_plan', 'readiness', 'experiment',
-                      'watch_experiment', 'unwatch_experiment'}:
+                      'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 row = session.get(TelegramInbox, iid)
@@ -436,12 +447,12 @@ class TelegramBridge:
                 if kind == 'readiness':
                     from .telegram_readiness import reply as readiness_reply
                     reply = readiness_reply(self, session)
-                elif kind == 'experiment':
+                elif kind in {'experiment', 'recovery'}:
                     from .telegram_experiment import reply as experiment_reply
-                    reply = experiment_reply(self, session)
-                elif kind in {'watch_experiment', 'unwatch_experiment'}:
+                    reply = experiment_reply(scope, session)
+                elif kind in {'watch_experiment', 'unwatch_experiment', 'watch_recovery', 'unwatch_recovery'}:
                     from .telegram_experiment_watch import change
-                    reply = change(self, session, iid, kind == 'watch_experiment')
+                    reply = change(scope, session, iid, kind in {'watch_experiment', 'watch_recovery'})
                 elif kind == 'coding_plan':
                     from .telegram_coding import plan
                     reply = plan()
@@ -479,7 +490,7 @@ class TelegramBridge:
                     delivery = self.enqueue(session, iid + ':picker',
                         f'Выберите проект запроса №{intent["number"]}. Выполнение не запускалось.', markup)
                 else:
-                    delivery = self.finish(session, iid, reply + suffix, markup)
+                    delivery = scope.finish(session, iid, reply + suffix, markup)
                 if markup:
                     issue(self, session, delivery, intent['number'], version)
         else:
@@ -519,6 +530,9 @@ class TelegramBridge:
                         '/authorize_experiment — показать условия отдельного платного разрешения; '
                         '/cancel_experiment — запросить отмену этой задачи; '
                         '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
+                        '/recovery — отдельный восстановительный тест; /prepare_recovery — подготовить; '
+                        '/authorize_recovery — условия платного разрешения; /cancel_recovery — отмена; '
+                        '/watch_recovery, /unwatch_recovery — уведомления; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
@@ -606,6 +620,7 @@ class TelegramBridge:
                     self.enqueue(session, f'task:{task.id}:{task.version}:{task.state}', text)
             from .telegram_experiment_watch import collect
             collect(self, session)
+            collect(RecoveryBridge(self), session)
 
     def deliver_one(self):
         self.guard()

@@ -24,7 +24,7 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-def test_git_capability_profile_adds_one_transition_without_retargeting_existing_releases():
+def test_recovery_adds_one_transition_without_retargeting_existing_eleven_releases():
     previous = {
         'f34': ('316dc1615dea224bcf4bd595d87048d19820bd21', 'b2e71fe073f3109e639dac43496884905ce86d9f'),
         'telegram-resume': ('b2e71fe073f3109e639dac43496884905ce86d9f', 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
@@ -37,13 +37,17 @@ def test_git_capability_profile_adds_one_transition_without_retargeting_existing
         'first-experiment-prepare': ('d932baafce53c0748396abfc019cf81b931ebfec', '7467df292cf990e1b86496a88ed8818d9ada4a28'),
         'first-experiment-authorize': ('d932baafce53c0748396abfc019cf81b931ebfec', '2822320569ca442ff5579140875ec074e1058898'),
     }
+    previous['first-experiment-github-capability'] = (
+        'd932baafce53c0748396abfc019cf81b931ebfec', '322186dc180257c618d8b159c78faa6e5bbf0b43')
     assert {key: staging.RELEASES[key] for key in previous} == previous
-    assert set(staging.RELEASES) - set(previous) == {'first-experiment-github-capability'}
+    assert set(staging.RELEASES) - set(previous) == {'first-experiment-recovery'}
+    assert staging.release_pair('first-experiment-recovery') == (
+        previous['first-experiment-github-capability'][1], 'bf91c05c754ad41e7f89223ec8d05c02c9007de1')
     assert staging.release_pair('first-experiment-github-capability') == (
         previous['telegram-mobile'][1], '322186dc180257c618d8b159c78faa6e5bbf0b43')
 
 
-@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare", "first-experiment-authorize", "first-experiment-github-capability"])
+@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare", "first-experiment-authorize", "first-experiment-github-capability", "first-experiment-recovery"])
 def prepared(tmp_path, monkeypatch, request):
     base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
@@ -103,7 +107,7 @@ def prepared(tmp_path, monkeypatch, request):
     target.pop("telegram")
     target["revision"] = target_revision
     target["source_root"] = str(tmp_path / "new-source")
-    if request.param in {"first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare", "first-experiment-authorize", "first-experiment-github-capability"}:
+    if request.param in {"first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare", "first-experiment-authorize", "first-experiment-github-capability", "first-experiment-recovery"}:
         from command_center.coding.first_experiment import CAP, FirstExperiment, MODEL
         from command_center.coding.integration_config import IntegrationConfig, Tariff
         from command_center.deployment_integrations import prepare_binding
@@ -125,6 +129,16 @@ def prepared(tmp_path, monkeypatch, request):
             key_files.append(path)
         target["first_experiment"] = prepare_binding(target, config_file, *key_files,
             telegram_readiness=request.param != "first-experiment")
+    if request.param == 'first-experiment-recovery':
+        from command_center.coding.recovery import RecoveryExperiment
+        # The installed predecessor already has its own immutable first profile.
+        m['first_experiment'] = copy.deepcopy(target['first_experiment'])
+        previous = {'manifest': m, 'compose': render(base, m)}
+        recovery_file = private / 'recovery.json'
+        external.first_experiment = RecoveryExperiment(repository_id=725000001,
+            original_task_id='938e838d-54d4-470d-ad71-5c6a49a42c7d', original_grant_digest='c' * 64)
+        atomic_json(recovery_file, {**external.model_dump(), 'credential_files': external.credential_files})
+        target['first_experiment'] = prepare_binding(target, recovery_file, *key_files, telegram_readiness=True)
     disabled = {"manifest": target, "compose": render(base, target)}
     old_dir, new_dir = tmp_path / "active", tmp_path / "disabled"
     for folder, bundle in [(old_dir, previous), (new_dir, disabled)]:
@@ -657,3 +671,26 @@ def test_prepare_overlong_approval_does_not_gain_host_access():
                             env=env, capture_output=True, text=True, timeout=5)
     assert result.returncode and result.stderr.strip() == "PREPARATION_APPROVAL_MISSING_OR_EXPIRED"
     assert not result.stdout
+
+
+@pytest.mark.parametrize('prepared', ['first-experiment-recovery'], indirect=True)
+@pytest.mark.parametrize('change', ['missing_old', 'old_recovery', 'old_no_readiness',
+                                    'missing_new', 'new_no_marker', 'wrong_marker', 'new_no_readiness'])
+def test_recovery_requires_explicit_first_to_recovery_transition(prepared, change):
+    old, new = copy.deepcopy(prepared[0]['manifest']), copy.deepcopy(prepared[1]['manifest'])
+    if change == 'missing_old':
+        old.pop('first_experiment')
+    elif change == 'old_recovery':
+        old['first_experiment']['recovery'] = 'f2.2-recovery-1'
+    elif change == 'old_no_readiness':
+        old['first_experiment'].pop('telegram_readiness')
+    elif change == 'missing_new':
+        new.pop('first_experiment')
+    elif change == 'new_no_marker':
+        new['first_experiment'].pop('recovery')
+    elif change == 'wrong_marker':
+        new['first_experiment']['recovery'] = 'arbitrary-retry'
+    else:
+        new['first_experiment'].pop('telegram_readiness')
+    with pytest.raises(ValueError, match='explicit_one_call_recovery_transition_required'):
+        staging.integration_transition(old, new, 'first-experiment-recovery')

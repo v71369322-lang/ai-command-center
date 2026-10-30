@@ -87,7 +87,10 @@
           "experiment_id": {
             "anyOf": [
               {
-                "const": "f2.2-first-live",
+                "enum": [
+                  "f2.2-first-live",
+                  "f2.2-recovery-1"
+                ],
                 "type": "string"
               },
               {
@@ -290,6 +293,47 @@
           "profile_hash"
         ],
         "title": "FinalExperimentApproval",
+        "type": "object"
+      },
+      "FinalRecoveryApproval": {
+        "additionalProperties": false,
+        "properties": {
+          "budget_nano_rub": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 34786800000.0,
+            "title": "Budget Nano Rub",
+            "type": "integer"
+          },
+          "confirmation": {
+            "const": "AUTHORIZE_ONE_PAID_RECOVERY",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "profile_hash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Profile Hash",
+            "type": "string"
+          },
+          "seconds": {
+            "default": 120,
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "budget_nano_rub",
+          "confirmation",
+          "profile_hash"
+        ],
+        "title": "FinalRecoveryApproval",
         "type": "object"
       },
       "PasswordLogin": {
@@ -1115,6 +1159,121 @@
           }
         },
         "summary": "Authorize First Experiment"
+      }
+    },
+    "/api/experiments/recovery/task": {
+      "post": {
+        "operationId": "create_recovery_experiment_api_experiments_recovery_task_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Create Recovery Experiment"
+      }
+    },
+    "/api/experiments/recovery/{task_id}/authorize": {
+      "post": {
+        "operationId": "authorize_recovery_experiment_api_experiments_recovery__task_id__authorize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalRecoveryApproval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Authorize Recovery Experiment"
       }
     },
     "/api/health": {
