@@ -374,6 +374,16 @@ live/verified/connected, не выводит raw errors. Logout/закрытие
 ошибка плана не блокирует прежнюю очередь или назначение. Состояние grants,
 бюджета, admission, source pins и deployment transitions не меняется.
 
+## Telegram readback плана подключения
+
+`/connection` — прежний owner-private query path с фиксированными project IDs.
+Shared catalog остаётся PLAN_ONLY. Query пишет только durable inbox/audit/reply,
+не выдаёт Task/Approval/grant или финансовых полномочий. Никаких новых
+callbacks/markup/transport методов. Source/integrity проверки pending и
+UNCERTAIN no-resend сохраняются; disabled connection блокирует queued send.
+Ни модель, ни репозиторий/сервер не опрашиваются ради текста плана. Обычная
+остановка сохраняется; AI configuration не требуется для просмотра.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,
