@@ -222,3 +222,13 @@ def test_stored_text_is_rechecked_after_current_credential_rotation(snapshot, st
             read(rotated, 'owner', snapshot.request_id)
     finally:
         rotated.engine.dispose()
+
+
+@pytest.mark.parametrize('value', ['Public text\x00invalid', 'Public text\ud800invalid'])
+def test_json_text_unrepresentable_in_postgresql_is_rejected_before_writing(snapshot, store, value):
+    data = response(snapshot)
+    change_plan(data, lambda p: p.update(summary=value))
+    before = state(store)
+    with pytest.raises(Denied):
+        persist(store, snapshot, data)
+    assert state(store) == before and events(store) == []

@@ -77,6 +77,12 @@ def _screen(store, document):
     plan = document.proposal
     for value in [document.model, document.response_id, plan.summary, *plan.questions,
                   *[value for step in plan.steps for value in [step.description, *step.acceptance]]]:
+        try:
+            if '\x00' in value:
+                raise ValueError()
+            value.encode('utf-8')
+        except ValueError:
+            raise Denied('planning_draft_text_invalid') from None
         check_content(store, value)
 
 

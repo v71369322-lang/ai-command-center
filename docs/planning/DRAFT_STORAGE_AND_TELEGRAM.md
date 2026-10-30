@@ -34,7 +34,9 @@ Hook не предоставляется модели или публичном�
 перезаписи старых записей нет. Plans сохраняются в приватной PG/audit и её backup
 с теми же правами/retention. Известные loaded credentials/key patterns проверяются
 во всех текстовых полях и metadata перед записью и чтением; screen не универсален.
-OpenAI/GitHub credential files и integration config не открываются.
+OpenAI/GitHub credential files и integration config не открываются. NUL и
+непредставимый UTF-8 текст отвергаются до ORM write, фиксированной ошибкой без
+включения model body; корректный JSON сам по себе не гарантирует PG text compatibility.
 
 ## Просмотр после будущей доставки версии
 
@@ -90,6 +92,9 @@ atomic rollback, stale contexts, typed flags/source/hash/version tampering,
 capacity/size, credential rotation, private owner/profile и полная bounded
 Unicode pagination с привязкой версии. Configured Bot API transport проверен
 через строгий mock; реальные API/VPS/rootless/phone не использованы.
+После отдельной проверки PG text compatibility: **119targeted passed /1 прежний
+warning**, включая58новых cases (36storage/22Telegram) и61 прежний contract case.
+Это последующий пересекающийся прогон, не добавка к314.
 Общие Telegram/service/menu/health проверки: **129passed /3execution cases deselected
 /1 прежний warning**. Три source/image execution cases остаются обязательными в
 итоговом fresh-source CI. Ruff/OpenAPI/tracked-secret/diff checks PASS; locked
