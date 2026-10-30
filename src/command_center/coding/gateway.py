@@ -49,9 +49,16 @@ class Gateway:
 
     def authorize(self, actor, task_id, version, *, budget_nano_rub, seconds=120, final_confirmation=False,
                   expected_config_hash=None):
+        return self.authorize_configured(self.store, self.config, actor, task_id, version,
+            budget_nano_rub=budget_nano_rub, seconds=seconds, final_confirmation=final_confirmation,
+            expected_config_hash=expected_config_hash)
+
+    @staticmethod
+    def authorize_configured(store, c, actor, task_id, version, *, budget_nano_rub, seconds=120,
+                             final_confirmation=False, expected_config_hash=None, _scope_installer=None):
+        """The same local F1 grant composition, without constructing HTTP or credentials."""
         if actor != 'owner':
             raise Denied('owner_required')
-        c = self.config
         if expected_config_hash is not None and expected_config_hash != digest(c.model_dump()):
             raise Denied('first_experiment_profile_changed')
         if not c.connected() or not c.synthetic_repository:
@@ -60,7 +67,7 @@ class Gateway:
             raise Denied('budget_unconfirmed')
         if type(budget_nano_rub) is not int or not 0 < budget_nano_rub <= c.monthly_nano_rub:
             raise Denied('invalid_task_budget')
-        view = self.store.get(task_id)
+        view = store.get(task_id)
         if view['payload'].get('coding', {}).get('provider') != 'openai':
             raise Denied('not_external_coding_task')
         tagged = view['payload']['coding'].get('experiment_id')
@@ -69,12 +76,12 @@ class Gateway:
         # The F1 approval remains the sole grant of task execution authority.
         # ExternalGrant only narrows it with immutable financial/endpoint scope.
         def install_scope(s, task):
-            self.store.check_audit(s)
-            self.store.check_task_revision(s, task)
+            store.check_audit(s)
+            store.check_task_revision(s, task)
             if task.version != version or task.state != 'READY' or s.get(ExternalGrant, task_id):
                 raise Denied('external_grant_conflict')
             if c.first_experiment:
-                c.first_experiment.validate_scope(c, task.payload['coding'], budget_nano_rub, self.store.now(s),
+                c.first_experiment.validate_scope(c, task.payload['coding'], budget_nano_rub, store.now(s),
                                                   final_confirmation=final_confirmation)
                 existing = s.execute(select(ExternalGrant).where(
                     ExternalGrant.document['experiment_id'].astext == c.first_experiment.id,
@@ -82,7 +89,7 @@ class Gateway:
                 if existing:
                     raise Denied('first_experiment_already_bound')
             document = {'task_version': version, 'payload_hash': task.payload_hash,
-                        'revision': self.store.settings.source_revision, 'base_sha': BASE_SHA,
+                        'revision': store.settings.source_revision, 'base_sha': BASE_SHA,
                         'config_hash': digest(c.model_dump()), 'budget': budget_nano_rub,
                         'repository': c.synthetic_repository, 'model': c.tariff.model,
                         'max_calls': min(task.payload['coding']['max_iterations'], task.payload['coding']['max_units']),
@@ -93,8 +100,10 @@ class Gateway:
                                 repository_id=c.first_experiment.repository_id)
             seal = digest(document)
             s.add(ExternalGrant(task_id=task_id, document=document, digest=seal))
-            self.store.audit(s, 'external_scope_approved', actor, task_id, grant_digest=seal)
-        self.store.approve(actor, task_id, version, seconds, _scope_installer=install_scope)
+            store.audit(s, 'external_scope_approved', actor, task_id, grant_digest=seal)
+            if _scope_installer:
+                _scope_installer(s, task)
+        store.approve(actor, task_id, version, seconds, _scope_installer=install_scope)
         return {'authorized': True, 'task_id': task_id, 'budget_nano_rub': budget_nano_rub,
                 'mode': c.mode, 'repository': c.synthetic_repository}
 

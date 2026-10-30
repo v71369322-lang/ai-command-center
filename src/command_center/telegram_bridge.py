@@ -109,6 +109,9 @@ class TelegramBridge:
             elif token.startswith('rs:'):
                 from .telegram_control import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('fx:'):
+                from .telegram_experiment_authorize import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             else:
                 if not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token):
                     raise Denied('telegram_callback_invalid')
@@ -150,6 +153,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'experiment'}
         if value == '/prepare_experiment':
             return str(uid), {'kind': 'prepare_experiment'}
+        if value == '/authorize_experiment':
+            return str(uid), {'kind': 'experiment_authorize_request'}
+        if value.split()[:1] == ['/authorize_experiment']:
+            raise Denied('telegram_experiment_authorize_arguments_forbidden')
         if value.split()[:1] == ['/prepare_experiment']:
             raise Denied('telegram_experiment_prepare_arguments_forbidden')
         if value == '/cancel_experiment':
@@ -263,7 +270,17 @@ class TelegramBridge:
     def _apply_pending(self, iid, intent):
         self.guard()
         kind = intent['kind']
-        if kind == 'prepare_experiment':
+        if kind == 'experiment_authorize_request':
+            from .telegram_experiment_authorize import issue
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state != 'DONE':
+                    issue(self, session, iid)
+        elif kind == 'experiment_authorize_confirm':
+            from .telegram_experiment_authorize import confirm
+            confirm(self, iid, intent)
+        elif kind == 'prepare_experiment':
             from .telegram_experiment_prepare import apply
             apply(self, iid)
         elif kind == 'coding_demo':
@@ -481,6 +498,7 @@ class TelegramBridge:
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
+                        '/authorize_experiment — показать условия отдельного платного разрешения; '
                         '/cancel_experiment — запросить отмену этой задачи; '
                         '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '

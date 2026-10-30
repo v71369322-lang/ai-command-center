@@ -182,6 +182,24 @@ Strict runtime validate_repository и прежние source/approval/custody gua
 сохранены. Новый retained LOW B105 относится к boolean token_issued_by_inspection,
 не secret value; всего99 reviewed LOW, без расширения allowlist или suppression.
 
+## Явное платное подтверждение Telegram
+
+Двухшаговый authorize не дублирует F1 grants: общая локальная Gateway composition
+вызывает прежний Store.approve, затем сужающий ExternalGrant. API typed consent
+сохраняется; Telegram предоставляет отдельный private-owner observed-card consent.
+Pure scope validation при показе карточки не записывает разрешение. Нет нового
+HTTP/credential capability, schema, scheduler, автоматического resume или renew.
+
+Source/profile/connection, immutable task/version/epoch, price/budget/config и
+credential references привязаны к карточке. SENT с observed message ID и queued
+body digest исключают применение неизвестной/подменённой отправки. Повторная
+проверка под Control lock и срок120секунд ограничивают delayed clicks. Scope
+installer коммитит grant/READY/outbox/consumed/reply атомарно; failure до commit
+откатывает всё, потеря результата после commit не повторяет grant. Изменение
+runtime config между review и commit, stop/resume и recovery блокируют карточку.
+Существующие runtime gates/ledger/no-repeat сохраняются. Публичные live-shaped
+fixtures не подтверждают реальные credentials/финансы/публикацию или VPS readiness.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,
