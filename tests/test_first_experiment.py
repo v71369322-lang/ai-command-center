@@ -249,7 +249,7 @@ def test_first_experiment_dry_run_real_sandboxes(store, settings, headers, tmp_p
                 assert len(delivered) == 1 and delivered[0]['state'] == 'SENT'
                 notice = bot.sent[-1]['text']
                 assert notice.startswith('Уведомление первого AI-эксперимента') and task['id'] in notice
-                assert ('Результат независимо проверен в HTTP-моках' in notice) == (scenario == 'normal')
+                assert ('Результат независимо проверен в HTTP-моках' in notice) == (scenario in {'normal', 'app_token'})
                 assert bridge.poll_once(timeout=0) == [] and len(fake.calls) == calls_before
             finally:
                 telegram_client.close()
