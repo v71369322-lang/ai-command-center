@@ -29,7 +29,7 @@ def service_settings():
 
 
 class TelegramService:
-    def __init__(self, store, client, *, poll_seconds=10, max_failures=3):
+    def __init__(self, store, client, *, poll_seconds=2, max_failures=3):
         if not isinstance(client, ConfiguredTelegramHTTP) or not 0 <= poll_seconds <= 20 or not 1 <= max_failures <= 3:
             raise ValueError('telegram_service_limits_invalid')
         self.store, self.client = store, client

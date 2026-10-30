@@ -314,6 +314,224 @@ def test_pending_intent_resumes_without_remote_redelivery(configured, store, mon
         client.close()
 
 
+@pytest.mark.parametrize('recovered', [False, True])
+def test_durable_reply_disables_long_poll_without_delaying_inbound_stop(configured, store, monkeypatch, recovered):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        if recovered:
+            with monkeypatch.context() as patch:
+                patch.setattr(bridge, '_apply_pending', lambda *args: (_ for _ in ()).throw(RuntimeError('crash')))
+                with pytest.raises(RuntimeError):
+                    bridge.receive(update(1, 'Saved before reconnect'))
+        else:
+            bridge.receive(update(1, 'Saved before reconnect'))
+        fake.updates = [update(2, '/stop')]
+
+        def observe(method):
+            if method == 'getUpdates':
+                assert not fake.sent, 'inbound controls must precede potentially slow sends'
+            if method == 'sendMessage':
+                assert store.snapshot()['halted'] is True
+
+        fake.after = observe
+        service = TelegramService(store, client, poll_seconds=20)
+        service.run(max_cycles=1)
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0]
+        methods = [method for method, _ in fake.calls]
+        assert methods.index('getUpdates') < methods.index('sendMessage')
+        fake.after = None
+        service.run(max_cycles=1)
+        assert len(fake.sent) == 2 and store.snapshot()['tasks'] == []
+    finally:
+        client.close()
+
+
+def test_inbound_batch_controls_precede_potentially_slow_replies(configured, store, monkeypatch):
+    fake, order = FakeBot(), []
+    fake.updates = [update(1, '/menu'), update(2, '/readiness'), update(3, '/stop')]
+    fake.after = lambda method: order.append('reply') if method == 'sendMessage' else None
+    client = client_for(configured, fake)
+    service = TelegramService(store, client)
+    receive = service.bridge.receive
+
+    def apply(row):
+        order.append(row['update_id'])
+        return receive(row)
+
+    monkeypatch.setattr(service.bridge, 'receive', apply)
+    try:
+        service.run(max_cycles=1)
+        assert order == [1, 2, 3, 'reply', 'reply', 'reply']
+        assert store.snapshot()['halted'] is True
+        assert store.snapshot()['tasks'] == []
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('saved', [0, 19, 20, 21])
+def test_recovered_and_new_replies_share_one_bounded_cycle_budget(configured, store, saved):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        for uid in range(1, saved + 1):
+            bridge.receive(update(uid, f'Saved public request {uid}'))
+        fake.updates = [update(uid, f'New public request {uid}') for uid in range(saved + 1, saved + 21)]
+        service = TelegramService(store, client)
+        service.run(max_cycles=1)
+        assert len(fake.sent) == 20
+        with store.transaction() as session:
+            assert len(session.scalars(select(TelegramInbox)).all()) == saved + 20
+            assert len(session.scalars(select(TelegramDelivery).where(TelegramDelivery.state == 'NEW')).all()) == saved
+        service.run(max_cycles=1)
+        assert len(fake.sent) == min(40, saved + 20)
+        service.run(max_cycles=1)
+        assert len(fake.sent) == saved + 20
+        assert len({body['text'] for body in fake.sent}) == saved + 20
+        assert store.snapshot()['tasks'] == []
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('interruption', ['stop', 'leadership', 'revocation'])
+def test_nonblocking_poll_delivery_does_not_bypass_stop_leadership_or_revocation(configured, store, interruption):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    service, stop = TelegramService(store, client), threading.Event()
+    path, config = configured
+
+    def interrupt(method):
+        if method != 'sendMessage':
+            return
+        if interruption == 'stop':
+            stop.set()
+        elif interruption == 'leadership':
+            service._leader.invalidate()
+        else:
+            path.write_text(config.model_copy(update={'mode': 'disabled'}).model_dump_json())
+
+    try:
+        service.bridge.receive(update(1, 'First durable reply'))
+        service.bridge.receive(update(2, 'Second durable reply'))
+        fake.after = interrupt
+        if interruption == 'stop':
+            assert service.run(stop, max_cycles=1)['completed_cycles'] == 0
+        else:
+            with pytest.raises(Denied, match='leadership_lost|revoked'):
+                service.run(stop, max_cycles=1)
+        assert len(fake.sent) == 1
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0]
+        with store.transaction() as session:
+            assert len(session.scalars(select(TelegramDelivery).where(TelegramDelivery.state == 'NEW')).all()) == 1
+    finally:
+        client.close()
+
+
+def test_uncertain_reply_is_not_resent_by_nonblocking_or_later_cycle(configured, store):
+    fake = FakeBot()
+
+    def lose(request):
+        result = fake(request)
+        if request.url.path.endswith('/sendMessage'):
+            raise httpx.ReadTimeout('public fixture response loss')
+        return result
+
+    client = client_for(configured, lose)
+    try:
+        TelegramBridge(store, client, OWNER).receive(update(1, 'Durable reply with lost receipt'))
+        for _ in range(2):
+            TelegramService(store, client).run(max_cycles=1)
+        assert len(fake.sent) == 1
+        with store.transaction() as session:
+            assert session.scalar(select(TelegramDelivery)).state == 'UNCERTAIN'
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0, 2]
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('case', ['NEW', 'SENT', 'UNCERTAIN', 'SENDING', 'CANCELLED', 'other_profile'])
+def test_only_current_profile_new_replies_disable_long_poll(configured, store, case):
+    from datetime import timedelta
+
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    try:
+        TelegramBridge(store, client, OWNER).receive(update(1, 'Public delivery state fixture'))
+        with store.transaction() as session:
+            row = session.scalar(select(TelegramDelivery))
+            if case == 'other_profile':
+                row.profile = 'f' * 64
+            else:
+                row.state = case
+                if case == 'SENDING':
+                    row.deadline = store.now(session) + timedelta(seconds=300)
+        TelegramService(store, client, poll_seconds=20).run(max_cycles=1)
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0 if case == 'NEW' else 20]
+        assert len(fake.sent) == (1 if case == 'NEW' else 0)
+    finally:
+        client.close()
+
+
+def test_poll_failure_preserves_durable_reply_for_later_delivery_once(configured, store):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    try:
+        TelegramBridge(store, client, OWNER).receive(update(1, 'Public durable reply before poll failure'))
+        fake.failure = 503
+        with pytest.raises(Denied, match='retry_limit'):
+            TelegramService(store, client, max_failures=1).run(max_cycles=1)
+        assert not fake.sent
+        with store.transaction() as session:
+            assert session.scalar(select(TelegramDelivery)).state == 'NEW'
+        fake.failure = None
+        for _ in range(2):
+            TelegramService(store, client).run(max_cycles=1)
+        assert len(fake.sent) == 1
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0, 0, 2]
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('poll_seconds', [None, 0, 10, 20])
+def test_default_poll_wait_is_two_seconds_and_explicit_limits_are_preserved(configured, store, poll_seconds):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    try:
+        arguments = {} if poll_seconds is None else {'poll_seconds': poll_seconds}
+        TelegramService(store, client, **arguments).run(max_cycles=1)
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [
+            2 if poll_seconds is None else poll_seconds]
+    finally:
+        client.close()
+
+
+def test_result_observed_during_idle_poll_is_sent_in_same_cycle(configured, store):
+    fake = FakeBot()
+    client = client_for(configured, fake)
+    try:
+        bridge = TelegramBridge(store, client, OWNER)
+        bridge.receive(update(1, '/demo public pending test'))
+        service = TelegramService(store, client)
+        service.run(max_cycles=1)  # Deliver the initial approval card.
+        task = store.snapshot()['tasks'][0]
+
+        def finish(method):
+            if method == 'getUpdates':
+                store.cancel('owner', task['id'])
+
+        fake.after = finish
+        service.run(max_cycles=1)
+        assert 'CANCELLED' in fake.sent[-1]['text']
+        assert [body['timeout'] for method, body in fake.calls if method == 'getUpdates'] == [0, 2]
+        fake.after = None
+        service.run(max_cycles=1)
+        assert len(fake.sent) == 2
+    finally:
+        client.close()
+
+
 def test_profile_is_stable_across_revision_and_old_pending_fails_closed(configured, store, monkeypatch):
     fake = FakeBot()
     client = client_for(configured, fake)
