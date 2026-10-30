@@ -10,6 +10,7 @@ from .financial_types import NANO_RUB, Strict
 from .spec import BASE_SHA
 
 EXPERIMENT_ID = 'f2.2-first-live'
+RECOVERY_ID = 'f2.2-recovery-1'
 MODEL = 'gpt-5.4-mini-2026-03-17'
 MODEL_SOURCE = 'https://developers.openai.com/api/docs/models/gpt-5.4-mini'
 PRICE_SOURCE = 'https://developers.openai.com/api/docs/pricing'
@@ -24,12 +25,14 @@ REQUIRED = ('model_access', 'current_price', 'payment_bound', 'openai_credential
             'github_app', 'repository', 'runtime', 'dry_run', 'existing_funding')
 
 
-def quote(rub_per_usd=CBR_RUB_PER_USD, extra_rub=Decimal(0)):
+def quote(rub_per_usd=CBR_RUB_PER_USD, extra_rub=Decimal(0), *, calls=CALLS):
+    if type(calls) is not int or calls not in {1, CALLS}:
+        raise ValueError('invalid_call_bound')
     rate, extra = Decimal(rub_per_usd), Decimal(extra_rub)
     if not rate.is_finite() or not extra.is_finite() or rate <= 0 or extra < 0:
         raise ValueError('invalid_payment_bound')
     per_call = (CONTEXT_TOKENS * USD_INPUT_PER_MILLION + OUTPUT_TOKENS * USD_OUTPUT_PER_MILLION) / 1_000_000
-    usd = per_call * CALLS
+    usd = per_call * calls
     rub = usd * rate + extra
     return {'max_usd': str(usd), 'max_rub': str(rub),
             'max_nano_rub': int((rub * NANO_RUB).to_integral_value(rounding=ROUND_CEILING)),
@@ -39,20 +42,40 @@ def quote(rub_per_usd=CBR_RUB_PER_USD, extra_rub=Decimal(0)):
 
 
 REQUEST_KEY = 'first-experiment-f2-2'
+RECOVERY_REQUEST_KEY = 'first-experiment-f2-2-recovery'
 
 
-def task_payload():
+def request_key(experiment_id=EXPERIMENT_ID):
+    if experiment_id not in {EXPERIMENT_ID, RECOVERY_ID}:
+        raise Denied('unknown_experiment_scope')
+    return REQUEST_KEY if experiment_id == EXPERIMENT_ID else RECOVERY_REQUEST_KEY
+
+
+def task_payload(experiment_id=EXPERIMENT_ID):
     """One immutable request shared by the API and read-only owner views."""
     from .contract import CodingRequest, payload
-    return payload(CodingRequest(provider='openai', experiment_id=EXPERIMENT_ID, max_iterations=2,
-                                 max_units=2, max_tokens=4096, max_seconds=30))
+    request_key(experiment_id)
+    calls = 1 if experiment_id == RECOVERY_ID else CALLS
+    return payload(CodingRequest(provider='openai', experiment_id=experiment_id, max_iterations=calls,
+                                 max_units=calls, max_tokens=4096, max_seconds=30))
 
 
-def create_task(store, actor, *, _scope_installer=None):
+def create_task(store, actor, *, _scope_installer=None, experiment_id=EXPERIMENT_ID):
     """The same fixed, waiting F1 request for API and Telegram; no provider grant."""
     if actor != 'owner':
         raise Denied('owner_required')
-    return store.create(actor, REQUEST_KEY, task_payload(), _scope_installer=_scope_installer)
+    if experiment_id == RECOVERY_ID:
+        from .integration_config import IntegrationConfig
+        from .recovery import RecoveryExperiment
+        config = IntegrationConfig.load()
+        if not isinstance(config.first_experiment, RecoveryExperiment):
+            raise Denied('recovery_profile_required')
+        def install(session, task):
+            config.first_experiment.verify_parent(store, session, config)
+            if _scope_installer:
+                _scope_installer(session, task)
+        return store.create(actor, request_key(experiment_id), task_payload(experiment_id), _scope_installer=install)
+    return store.create(actor, request_key(experiment_id), task_payload(experiment_id), _scope_installer=_scope_installer)
 
 
 class Evidence(Strict):
@@ -77,12 +100,20 @@ class FirstExperiment(Strict):
     repository_id: int | None = Field(default=None, gt=0, strict=True)
     evidence: dict[str, Evidence] = Field(default_factory=dict)
 
+    @property
+    def call_limit(self):
+        return CALLS
+
+    @property
+    def budget_cap(self):
+        return CAP
+
     def report(self, now=None):
         now = now or datetime.now(timezone.utc)
         terms = None
         if self.payment_rub_per_usd_upper is not None and self.extra_rub_upper is not None:
             try:
-                terms = quote(self.payment_rub_per_usd_upper, self.extra_rub_upper)
+                terms = quote(self.payment_rub_per_usd_upper, self.extra_rub_upper, calls=self.call_limit)
             except (ValueError, InvalidOperation):
                 pass
         gates = {key: key in self.evidence and self.evidence[key].current(now) for key in REQUIRED}
@@ -90,24 +121,24 @@ class FirstExperiment(Strict):
         gates['repository'] = gates['repository'] and self.repository_id is not None
         try:
             funding = Decimal(self.existing_credit_usd) if self.existing_credit_usd is not None else Decimal('-1')
-            gates['existing_funding'] = gates['existing_funding'] and funding.is_finite() and funding >= Decimal(quote()['max_usd'])
+            gates['existing_funding'] = gates['existing_funding'] and funding.is_finite() and funding >= Decimal(quote(calls=self.call_limit)['max_usd'])
         except (ValueError, InvalidOperation):
             gates['existing_funding'] = False
         return {'id': self.id, 'task': 'Реализовать сумму положительных чисел в calculator.py',
-                'model': self.model, 'base_sha': BASE_SHA, 'max_calls': CALLS, 'max_repairs': 1,
-                'max_output_tokens_per_call': OUTPUT_TOKENS, 'max_budget_nano_rub': CAP,
+                'model': self.model, 'base_sha': BASE_SHA, 'max_calls': self.call_limit, 'max_repairs': self.call_limit - 1,
+                'max_output_tokens_per_call': OUTPUT_TOKENS, 'max_budget_nano_rub': self.budget_cap,
                 'service_tier': 'default', 'checked_on': CHECKED_ON,
                 'price': {'input_usd_per_million': str(USD_INPUT_PER_MILLION),
                           'output_usd_per_million': str(USD_OUTPUT_PER_MILLION)},
                 'sources': {'model': MODEL_SOURCE, 'price': PRICE_SOURCE, 'fx': FX_SOURCE},
-                'reference_quote': quote(), 'payment_quote': terms, 'gates': gates,
+                'reference_quote': quote(calls=self.call_limit), 'payment_quote': terms, 'gates': gates,
                 'final_owner_confirmation': False, 'ready_for_final_confirmation': all(gates.values()),
                 'live_started': False, 'repository_id': self.repository_id}
 
     def validate_scope(self, config, coding, budget, now, *, final_confirmation=False):
         if (coding.get('experiment_id') != self.id or coding.get('provider') != 'openai'
-                or coding['base_sha'] != BASE_SHA or coding['max_iterations'] > CALLS
-                or coding['max_units'] > CALLS or budget > CAP):
+                or coding['base_sha'] != BASE_SHA or coding['max_iterations'] > self.call_limit
+                or coding['max_units'] > self.call_limit or budget > self.budget_cap):
             raise Denied('first_experiment_scope_or_budget')
         if not config.tariff or config.tariff.model != self.model or config.tariff.max_output_tokens > OUTPUT_TOKENS:
             raise Denied('first_experiment_tariff_mismatch')
@@ -127,8 +158,8 @@ class FirstExperiment(Strict):
             if config.tariff.input_nano_rub < need_input or config.tariff.output_nano_rub < need_output:
                 raise Denied('first_experiment_underpriced_profile')
             # Fixed extra costs must be conservatively included, once per allowed call.
-            extra = int((Decimal(self.extra_rub_upper) * NANO_RUB / CALLS).to_integral_value(rounding=ROUND_CEILING))
-            if config.tariff.fixed_nano_rub < extra or config.tariff.maximum() * CALLS > CAP:
+            extra = int((Decimal(self.extra_rub_upper) * NANO_RUB / self.call_limit).to_integral_value(rounding=ROUND_CEILING))
+            if config.tariff.fixed_nano_rub < extra or config.tariff.maximum() * self.call_limit > self.budget_cap:
                 raise Denied('first_experiment_total_cost_bound')
 
 

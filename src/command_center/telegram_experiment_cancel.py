@@ -6,6 +6,7 @@ from sqlalchemy import select
 from .models import Audit, TelegramInbox
 from .store import Denied, TERMINAL, digest
 from .telegram_experiment import task_record
+from .telegram_experiment_scope import key
 
 INTENT = {'kind': 'cancel_experiment'}
 
@@ -25,16 +26,17 @@ def apply(bridge, inbox_id):
         row = session.get(TelegramInbox, inbox_id)
         if row and row.state == 'DONE':
             return
+        intent = {'kind': key(bridge, INTENT['kind'])}
         received = session.scalar(select(Audit).where(
             Audit.event['kind'].as_string() == 'telegram_update_received',
             Audit.event['actor'].as_string() == 'owner', Audit.event['profile'].as_string() == bridge.profile,
             Audit.event['update_id'].as_string() == inbox_id.removeprefix(bridge.profile + ':'),
-            Audit.event['intent_hash'].as_string() == digest(INTENT),
+            Audit.event['intent_hash'].as_string() == digest(intent),
             Audit.event['revision'].as_string() == bridge.store.settings.source_revision)
             .order_by(Audit.sequence).limit(1))
-        if (not row or row.profile != bridge.profile or row.state != 'RECEIVED' or row.intent != INTENT
-                or row.task_id is not None or row.fingerprint != digest(INTENT) or not received
-                or 'experiment_cancel_binding' not in received.event):
+        if (not row or row.profile != bridge.profile or row.state != 'RECEIVED' or row.intent != intent
+                or row.task_id is not None or row.fingerprint != digest(intent) or not received
+                or key(bridge, 'experiment_cancel_binding') not in received.event):
             raise Denied('experiment_cancel_receipt_invalid')
         try:
             issued = datetime.fromisoformat(received.event['time'])
@@ -43,7 +45,7 @@ def apply(bridge, inbox_id):
                 raise ValueError()
         except (KeyError, ValueError, TypeError):
             raise Denied('experiment_cancel_expired') from None
-        binding = received.event['experiment_cancel_binding']
+        binding = received.event[key(bridge, 'experiment_cancel_binding')]
         if binding is None:
             bridge.finish(session, inbox_id, 'При получении команды первый AI-эксперимент ещё не был создан. '
                           'Ничего не отменено; команда не переносится на будущую задачу.')
@@ -59,7 +61,7 @@ def apply(bridge, inbox_id):
                           'Текущий снимок: /experiment.')
             return
         bridge.store._cancel_locked(session, 'owner', task.id)
-        bridge.store.audit(session, 'telegram_experiment_cancel_applied', 'owner', task.id,
+        bridge.store.audit(session, key(bridge, 'telegram_experiment_cancel_applied'), 'owner', task.id,
                            profile=bridge.profile, inbox_id=inbox_id, payload_hash=task.payload_hash)
         bridge.finish(session, inbox_id, 'Намерение отмены первого AI-эксперимента сохранено. '
                       'Новые действия задачи блокируются; фактическая остановка ещё проверяется. '

@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from decimal import DecimalException
 import json
 
-from command_center.coding.contract import CodingRequest
-from command_center.coding.first_experiment import CAP, CALLS, EXPERIMENT_ID, FirstExperiment
+from command_center.coding.first_experiment import CAP, FirstExperiment, task_payload
 from command_center.coding.integration_config import IntegrationConfig
 from command_center.store import Denied, digest
 
@@ -33,7 +32,7 @@ def inspect_config(config, now=None):
         blockers.append('connection_settings_incomplete')
     if not config.tariff or not config.tariff.confirmed or not config.daily_nano_rub or not config.monthly_nano_rub:
         blockers.append('budget_unconfirmed')
-    maximum = config.tariff.maximum() * CALLS if config.tariff else None
+    maximum = config.tariff.maximum() * experiment.call_limit if config.tariff else None
     budget = maximum if maximum is not None else CAP
     if not 0 < budget <= config.monthly_nano_rub:
         blockers.append('invalid_task_budget')
@@ -44,16 +43,16 @@ def inspect_config(config, now=None):
         # PURE validation only. True exercises the price/rounding checks after
         # the validator's consent guard. No Gateway/F1 action is instantiated,
         # and no approval is stored or inferred from this inspection.
-        experiment.validate_scope(config, CodingRequest(provider='openai', experiment_id=EXPERIMENT_ID,
-            max_iterations=2, max_units=2, max_tokens=4096, max_seconds=30).model_dump(),
+        experiment.validate_scope(config, task_payload(experiment.id)['coding'],
             budget, now, final_confirmation=True)
     except Denied as error:
         blockers.append(str(error))  # Existing validator returns fixed codes only.
     return {'status': 'BLOCKED' if blockers else 'LOCAL_CHECKS_PASSED',
             'checked_at_utc': now.astimezone(timezone.utc).isoformat(),
-            'experiment_id': EXPERIMENT_ID, 'model': experiment.model,
-            'synthetic_base_sha': evidence['base_sha'], 'max_calls': CALLS,
-            'max_budget_nano_rub': CAP, 'configured_two_call_reservation_nano_rub': maximum,
+            'experiment_id': experiment.id, 'model': experiment.model,
+            'synthetic_base_sha': evidence['base_sha'], 'max_calls': experiment.call_limit,
+            'max_budget_nano_rub': experiment.budget_cap, 'configured_two_call_reservation_nano_rub': maximum,
+            'configured_reservation_nano_rub': maximum,
             'proposed_task_budget_nano_rub': maximum if maximum is not None and 0 < maximum <= CAP else None,
             'profile_hash': digest(config.model_dump()), 'blockers': sorted(set(blockers)),
             'live_call_allowed': False, 'final_owner_approval_verified': False,

@@ -273,6 +273,36 @@ def test_partial_external_prepare_flags_fail_before_daemon_access(monkeypatch):
         prepare('/unused', '/unused/new', 1000, 1001, '/unused/state', first_experiment_config='/unused/config')
 
 
+@pytest.mark.parametrize('attack', [None, 'missing_marker', 'wrong_marker', 'first_profile_marker'])
+def test_recovery_binding_is_explicit_and_matches_protected_configuration(external_release, attack):
+    from command_center.coding.first_experiment import RECOVERY_ID
+    from command_center.coding.recovery import RecoveryExperiment
+    from command_center.deployment_integrations import check_binding, prepare_binding
+    manifest, _, paths = external_release
+    current = check_binding(manifest)
+    if attack == 'first_profile_marker':
+        manifest['first_experiment']['recovery'] = RECOVERY_ID
+        with pytest.raises(ValueError, match='recovery_binding_required'):
+            check_binding(manifest)
+        return
+    raw = current.model_dump()
+    raw['credential_files'] = current.credential_files
+    raw['first_experiment'] = RecoveryExperiment(repository_id=725000001,
+        original_task_id='11111111-2222-4333-8444-555555555555', original_grant_digest='c' * 64).model_dump()
+    paths['config_file'].write_text(json.dumps(raw))
+    manifest['first_experiment'] = prepare_binding(manifest, **paths)
+    assert manifest['first_experiment']['recovery'] == RECOVERY_ID
+    if attack == 'missing_marker':
+        manifest['first_experiment'].pop('recovery')
+    elif attack == 'wrong_marker':
+        manifest['first_experiment']['recovery'] = 'different'
+    if attack:
+        with pytest.raises(ValueError):
+            check_binding(manifest)
+    else:
+        assert isinstance(check_binding(manifest).first_experiment, RecoveryExperiment)
+
+
 def test_external_preflight_rechecks_pin_before_images_database_or_start(external_release, monkeypatch):
     import command_center.deployment as module
     manifest, profile, paths = external_release

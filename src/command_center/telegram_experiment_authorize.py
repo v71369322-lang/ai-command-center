@@ -6,12 +6,14 @@ import secrets
 
 from sqlalchemy import select
 
-from .coding.first_experiment import CAP, CALLS, EXPERIMENT_ID
+from .coding.first_experiment import CAP, RECOVERY_ID
+from .coding.recovery import RecoveryExperiment
 from .coding.gateway import Gateway
 from .coding.integration_config import IntegrationConfig
 from .models import Audit, Control, ExternalGrant, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
 from .telegram_experiment import rub, snapshot, task_record
+from .telegram_experiment_scope import experiment_id, key
 
 ISSUED = 'telegram_experiment_approval_issued'
 CONSUMED = 'telegram_experiment_approval_consumed'
@@ -20,20 +22,22 @@ TERM_KEYS = {'task_id', 'version', 'payload_hash', 'epoch', 'budget', 'seconds',
 
 
 def parse_callback(value):
-    if not isinstance(value, str) or not re.fullmatch(r'fx:[A-Za-z0-9_-]{32}', value):
+    if not isinstance(value, str) or not re.fullmatch(r'(?:fx|rx):[A-Za-z0-9_-]{32}', value):
         raise Denied('experiment_approval_callback_invalid')
-    return {'kind': 'experiment_authorize_confirm', 'card': hashlib.sha256(value[3:].encode()).hexdigest()}
+    return {'kind': 'recovery_authorize_confirm' if value.startswith('rx:') else 'experiment_authorize_confirm',
+            'card': hashlib.sha256(value[3:].encode()).hexdigest()}
 
 
-def keyboard(token):
-    return {'inline_keyboard': [[{'text': LABEL, 'callback_data': 'fx:' + token}]]}
+def keyboard(token, *, recovery=False):
+    return {'inline_keyboard': [[{'text': 'Разрешить платный восстановительный тест' if recovery else LABEL,
+                                 'callback_data': ('rx:' if recovery else 'fx:') + token}]]}
 
 
 def allowed_markup(value):
     try:
         data = value['inline_keyboard'][0][0]['callback_data']
         parse_callback(data)
-        return canonical(value) == canonical(keyboard(data[3:]))
+        return canonical(value) == canonical(keyboard(data[3:], recovery=data.startswith('rx:')))
     except (Denied, KeyError, IndexError, TypeError):
         return False
 
@@ -54,17 +58,20 @@ def terms(bridge, session, config, *, state='WAITING_APPROVAL', check_grants=Tru
     if control.halted or control.recovery or task.epoch != control.epoch or task.state != state:
         raise Denied('experiment_approval_task_ineligible')
     if (config.mode != 'live' or not config.first_experiment or not config.connected()
+            or config.first_experiment.id != experiment_id(bridge)
             or not 1 <= len(config.synthetic_repository) <= 140):
         raise Denied('experiment_approval_live_profile_required')
     if not config.tariff or not config.tariff.confirmed or not config.budget_evidence:
         raise Denied('budget_unconfirmed')
-    budget = config.tariff.maximum() * CALLS
+    budget = config.tariff.maximum() * config.first_experiment.call_limit
     if not 0 < budget <= min(CAP, config.daily_nano_rub, config.monthly_nano_rub):
         raise Denied('experiment_approval_capacity')
     config.first_experiment.validate_scope(config, task.payload['coding'], budget, bridge.store.now(session),
                                            final_confirmation=True)  # Validation only, no grant or consent inferred.
+    if isinstance(config.first_experiment, RecoveryExperiment):
+        config.first_experiment.verify_parent(bridge.store, session, config)
     if check_grants and session.scalar(select(ExternalGrant).where(
-            ExternalGrant.document['experiment_id'].as_string() == EXPERIMENT_ID,
+            ExternalGrant.document['experiment_id'].as_string() == experiment_id(bridge),
             ExternalGrant.document['mode'].as_string() == 'live').limit(1)):
         raise Denied('first_experiment_already_bound')
     return task, {'task_id': task.id, 'version': task.version, 'payload_hash': task.payload_hash,
@@ -90,8 +97,8 @@ def receipt(bridge, session, iid, kind):
 
 
 def issue(bridge, session, iid):
-    row, received = receipt(bridge, session, iid, 'experiment_authorize_request')
-    if row.intent != {'kind': 'experiment_authorize_request'} or row.task_id is not None:
+    row, received = receipt(bridge, session, iid, key(bridge, 'experiment_authorize_request'))
+    if row.intent != {'kind': key(bridge, 'experiment_authorize_request')} or row.task_id is not None:
         raise Denied('experiment_approval_receipt_invalid')
     expires = datetime.fromisoformat(received.event['time']) + timedelta(seconds=120)
     if not expires - timedelta(seconds=120) <= bridge.store.now(session) < expires:
@@ -116,18 +123,30 @@ def issue(bridge, session, iid):
             'Разрешение на запуск действует до 120 секунд после подтверждения; условия перепроверяются перед действиями.\n'
             f'Подтвердить до {expires.astimezone(timezone.utc).isoformat()} (UTC). '
             'Кнопка ниже разрешает реальные AI-вызовы и публикацию Draft PR в указанном тестовом репозитории.')
-    delivery = bridge.finish(session, iid, body, keyboard(token))
-    bridge.store.audit(session, ISSUED, 'owner', task.id, profile=bridge.profile, delivery_id=delivery,
+    if experiment_id(bridge) == RECOVERY_ID:
+        parent = config.first_experiment.verify_parent(bridge.store, session, config)
+        body = (f'Разрешить отдельный платный восстановительный тест?\nЗадача: {task.id}.\n'
+                f'Исходная задача: {parent["task_id"]}; её ошибка и расход сохранены.\n'
+                f'Учтённый расход исходной задачи: {rub(parent["actual_nano_rub"])}.\n'
+                f'Модель: {config.first_experiment.model}. Репозиторий: {config.synthetic_repository}.\n'
+                f'Один AI-вызов, без исправлений и повторов. Лимит новой задачи: {rub(document["budget"])}.\n'
+                f'Сумма прежнего расхода и нового резерва: {rub(parent["actual_nano_rub"] + document["budget"])}.\n'
+                'Только calculator.py, независимая проверка и Draft PR; без merge и CRM.\n'
+                'Это расчётный лимит, а не гарантия отсечения провайдером. Разрешение запуска — 120 секунд.\n'
+                f'Подтвердить до {expires.astimezone(timezone.utc).isoformat()} (UTC).\n'
+                'Кнопка ниже разрешает реальные AI-вызовы и публикацию Draft PR в указанном тестовом репозитории.')
+    delivery = bridge.finish(session, iid, body, keyboard(token, recovery=experiment_id(bridge) == RECOVERY_ID))
+    bridge.store.audit(session, key(bridge, ISSUED), 'owner', task.id, profile=bridge.profile, delivery_id=delivery,
                        card=hashlib.sha256(token.encode()).hexdigest(), terms=document,
                        terms_hash=digest(document), expires_at=expires.isoformat(),
                        connection_digest=getattr(bridge.client, 'approved', bridge.profile))
 
 
 def card(bridge, session, iid, intent):
-    row, _ = receipt(bridge, session, iid, 'experiment_authorize_confirm')
+    row, _ = receipt(bridge, session, iid, key(bridge, 'experiment_authorize_confirm'))
     if row.intent != intent or row.task_id is not None:
         raise Denied('experiment_approval_receipt_invalid')
-    issued = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == ISSUED,
+    issued = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == key(bridge, ISSUED),
         Audit.event['actor'].as_string() == 'owner', Audit.event['profile'].as_string() == bridge.profile,
         Audit.event['card'].as_string() == intent['card']).limit(1))
     if not issued:
@@ -144,6 +163,8 @@ def card(bridge, session, iid, intent):
     if (not delivery or delivery.profile != bridge.profile or delivery.state != 'SENT'
             or delivery.message_id != intent['message_id'] or delivery.body.get('chat_id') != bridge.owner
             or not allowed_markup(delivery.body.get('reply_markup'))
+            or parse_callback(delivery.body['reply_markup']['inline_keyboard'][0][0]['callback_data'])['kind']
+            != key(bridge, 'experiment_authorize_confirm')
             or parse_callback(delivery.body['reply_markup']['inline_keyboard'][0][0]['callback_data'])['card'] != intent['card']
             or not session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_delivery_queued',
                 Audit.event['delivery_id'].as_string() == delivery.id,
@@ -153,7 +174,7 @@ def card(bridge, session, iid, intent):
                 Audit.event['message_id'].as_integer() == intent['message_id'],
                 Audit.event['state'].as_string() == 'SENT').limit(1))):
         raise Denied('experiment_approval_card_not_observed')
-    consumed = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == CONSUMED,
+    consumed = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == key(bridge, CONSUMED),
         Audit.event['profile'].as_string() == bridge.profile, Audit.event['card'].as_string() == intent['card']).limit(1))
     return event, consumed
 
@@ -194,7 +215,7 @@ def confirm(bridge, iid, intent):
             raise Denied('experiment_approval_card_used_or_changed')
         snapshot(bridge, session)
         expires = current(bridge, session, actual, configuration(), state='READY', check_grants=False)
-        bridge.store.audit(session, CONSUMED, 'owner', task.id, profile=bridge.profile, inbox_id=iid,
+        bridge.store.audit(session, key(bridge, CONSUMED), 'owner', task.id, profile=bridge.profile, inbox_id=iid,
                            card=intent['card'], terms_hash=event['terms_hash'])
         bridge.finish(session, iid, 'Разрешение первого платного AI-теста сохранено. '
                       f'Лимит: {rub(document["budget"])}. Результат пока не получен. '

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from ..models import Approval, Audit, Control, ExternalAction, ExternalGrant
 from ..store import Denied, digest
 from .integration_config import FileCredentials, IntegrationConfig
+from .recovery import RecoveryExperiment
 from .spec import BASE_SHA
 
 UNRESOLVED_ACTION_STATES = frozenset({'INTENT', 'UNCERTAIN', 'SETTLED'})
@@ -84,6 +85,8 @@ class Gateway:
             if c.first_experiment:
                 c.first_experiment.validate_scope(c, task.payload['coding'], budget_nano_rub, store.now(s),
                                                   final_confirmation=final_confirmation)
+                parent = (c.first_experiment.verify_parent(store, s, c)
+                          if isinstance(c.first_experiment, RecoveryExperiment) else None)
                 existing = s.execute(select(ExternalGrant).where(
                     ExternalGrant.document['experiment_id'].astext == c.first_experiment.id,
                     ExternalGrant.document['mode'].astext == c.mode)).first()
@@ -99,6 +102,8 @@ class Gateway:
                 document.update(experiment_id=c.first_experiment.id, mode=c.mode,
                                 final_confirmation=bool(final_confirmation),
                                 repository_id=c.first_experiment.repository_id)
+                if parent is not None:
+                    document['recovery_parent'] = parent
             seal = digest(document)
             s.add(ExternalGrant(task_id=task_id, document=document, digest=seal))
             store.audit(s, 'external_scope_approved', actor, task_id, grant_digest=seal)
@@ -145,6 +150,9 @@ class Gateway:
                                               final_confirmation=doc.get('final_confirmation') is True)
             if doc.get('experiment_id') != c.first_experiment.id or doc.get('repository_id') != c.first_experiment.repository_id:
                 raise Denied('first_experiment_binding_changed')
+            if (isinstance(c.first_experiment, RecoveryExperiment)
+                    and doc.get('recovery_parent') != c.first_experiment.verify_parent(self.store, s, c)):
+                raise Denied('recovery_parent_changed')
         return task, doc
 
     def admit_provider_request(self, task, doc, body, count):

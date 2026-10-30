@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 from .financial_types import NANO_RUB as NANO_RUB, Strict
 from .first_experiment import FirstExperiment
+from .recovery import RecoveryExperiment
 
 
 class Tariff(Strict):
@@ -44,7 +45,7 @@ class IntegrationConfig(Strict):
     github_secret_ref: str = 'github-installation-token'
     credential_files: dict[str, str] = Field(default_factory=dict, repr=False, exclude=True)
     budget_evidence: str = Field(default='', max_length=300)
-    first_experiment: FirstExperiment | None = None
+    first_experiment: RecoveryExperiment | FirstExperiment | None = None
 
     @model_validator(mode='after')
     def scope(self):
