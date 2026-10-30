@@ -60,7 +60,7 @@ def project_queue(bridge, session, project='all'):
 def projects_reply(bridge, session):
     from .project_inbox import PROJECTS
     _, counts = project_queue(bridge, session)
-    parts = [f'{label}: {counts[key]}\n/requests {key}' for key, label in PROJECTS]
+    parts = [f'{label}: {counts[key]}\n/requests {key}\n/connection {key}' for key, label in PROJECTS]
     parts.append(f'Не распределены: {counts["unassigned"]}\n/requests unassigned')
     return (f'Сохранённые запросы этого Telegram-подключения: {sum(counts.values())}.\n'
             'Ожидают планирования; выполнение не запускалось.\n\n' + '\n\n'.join(parts))

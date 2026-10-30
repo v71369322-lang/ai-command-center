@@ -19,6 +19,7 @@ from command_center.telegram_service import TelegramService, service_settings
 from command_center.telegram_transport import ConfiguredTelegramHTTP, connection
 from command_center.telegram_menu import BUTTONS, keyboard
 from command_center.telegram_project_picker import keyboard as picker_keyboard
+from command_center.project_inbox import PROJECTS
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
@@ -39,11 +40,12 @@ def handle(request):
         values=['Synthetic container service request','/tasks','/status 00000000-0000-0000-0000-000000000001',
                 '/requests','/request 1','/projects','/assign 1 lnauto 0','/request 1',
                 '/projects','/requests lnauto','/requests vanilla-sugar','/requests unassigned','/requests all',
-                '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS],'/readiness']
+                '/coding_plan','/coding_demo','/menu',*[label for label,_ in BUTTONS],'/readiness',
+                '/connection',*[f'/connection {key}' for key,_ in PROJECTS]]
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
-            for i,value in enumerate(values,1) if i>=body['offset']]
+            for i,value in enumerate(values,1) if i>=body['offset']][:body['limit']]
         if body['offset']==0:
             result=result[:1]  # The picker must be observed SENT before its callback.
         else:
@@ -87,7 +89,7 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==22
+    assert calls.count('sendMessage')==27
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -127,7 +129,12 @@ try:
     assert after['budget']==before['budget'] and after['tasks']==before['tasks']
     assert any('Обычная остановка снята для новых разрешённых задач' in value for value in sent)
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':18,'project_assignments':1,
+    assert sum('План подключения:' in value for value in sent)==len(PROJECTS)
+    assert all(any('План подключения: '+label+'.' in value and 'Репозиторий — не проверено.' in value
+                   for value in sent) for _,label in PROJECTS)
+    assert any('Планы подключения проектов.' in value for value in sent)
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':23,'project_assignments':1,
+        'project_connection_plan_replies':len(PROJECTS)+1,'project_connections_activated':False,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,

@@ -194,6 +194,12 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value.split()[:1] == ['/connection']:
+            from .project_inbox import IDS
+            parts = value.split()
+            if len(parts) > 2 or len(parts) == 2 and parts[1] not in IDS:
+                raise Denied('telegram_project_connection_invalid')
+            return str(uid), {'kind': 'project_connection', 'project_id': parts[1] if len(parts) == 2 else None}
         if value == '/plan':
             return str(uid), {'kind': 'help'}
         if value.split()[:1] == ['/plan']:
@@ -431,7 +437,8 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'plan_review', 'coding_plan', 'readiness', 'experiment',
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection',
+                      'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -459,6 +466,9 @@ class TelegramBridge:
                 elif kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
+                elif kind == 'project_connection':
+                    from .telegram_project_connection import reply as connection_reply
+                    reply = connection_reply(intent['project_id'])
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -524,6 +534,7 @@ class TelegramBridge:
                         '/request номер — открыть запрос; '
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '
+                        '/connection project-id — план подключения проекта; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
