@@ -61,8 +61,16 @@ live config. Учтённые расходы и спорные резервы с
 
 Функция и прежнее сокращение Telegram polling требуют новых exact-source images.
 Существующие восемь release targets и собранный владельцем a5d867c не содержат
-новую команду. Operator profile для единой доставки закрепляется отдельно после
-runtime checkpoint; прежние source pairs не переназначаются. Новый профиль не
+новую команду. Добавлен девятый profile `--release first-experiment-prepare`:
+`d932baafce53c0748396abfc019cf81b931ebfec` →
+`7467df292cf990e1b86496a88ed8818d9ada4a28`. Target — runtime checkpoint до
+operator-only изменения карты релизов. Один переход включает предыдущие
+gateway/readiness/status/watch/cancel функции, latency fix и prepare command.
+Операторский checkout закрепляется полным SHA отдельно; source/image pins
+должны соответствовать target, а не operator revision. Требуются прежние три
+private integration bindings и readiness opt-in. Default f34 и все восемь прежних
+source pairs сохранены; имеется отдельный regression guard этих historical pins.
+Новый профиль не
 создаёт host bundle и не заменяет prepare/inspect/exact approval/apply/postcheck.
 Выдача GitHub token делается после длительных prerequisites, а не до сборки.
 
@@ -80,6 +88,10 @@ fresh-source images и остаются обязательными в CI. Target
 Ruff/OpenAPI/current-runtime-secret guard/diff check PASS; locked audit:
 64Python dependencies,0Python/npm advisories,0Bandit MED/HIGH,99reviewed LOW.
 Это working-tree evidence до commit, не результат финального source CI.
+После добавления девятого named transition: **703 infrastructure tests passed**,
+включая staging matrix нового профиля и regression guard восьми прежних pins.
+Это отдельный infrastructure scope, не добавочный счётчик к пересекающимся
+PG/mock прогонам. Runtime/image input files после checkpoint7467df2 не менялись.
 Полный итог final source/image CI фиксируется в Draft PR; старые local images
 не переименовываются ради source guards. VPS/rootless/phone acceptance остаются
 отдельными от cloud PG/mock/container evidence.

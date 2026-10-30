@@ -19,6 +19,10 @@ F1 transaction; source/owner/private-profile/epoch/120sec/binding guards защ�
 digest проверяется дополнительно к равенству JSON. Existing ledger/reserves не
 меняются, UNCERTAIN reply не пересылается. Это review выполняющего агента;
 независимый внешний reviewer и реальные host/phone acceptance не заявляются.
+Отдельный девятый named transition d932baaf→7467df2 сохраняет прежние восемь
+source pairs/default и требует прежний explicit integration/readiness binding.
+Scope/byte-pin/custody/source/images/previous-bundle/deadline/journal checks не
+ослаблены; новый target нельзя применить под прежним именем пакета.
 
 ## Telegram polling latency, 30 октября 2026
 

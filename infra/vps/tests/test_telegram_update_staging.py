@@ -24,7 +24,24 @@ staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
 
 
-@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel"])
+def test_prepare_profile_adds_one_transition_without_retargeting_existing_releases():
+    previous = {
+        'f34': ('316dc1615dea224bcf4bd595d87048d19820bd21', 'b2e71fe073f3109e639dac43496884905ce86d9f'),
+        'telegram-resume': ('b2e71fe073f3109e639dac43496884905ce86d9f', 'bdc8cbcdcf3fe2377fa6cc08250c331d35f99f82'),
+        'telegram-mobile': ('b2e71fe073f3109e639dac43496884905ce86d9f', 'd932baafce53c0748396abfc019cf81b931ebfec'),
+        'first-experiment': ('d932baafce53c0748396abfc019cf81b931ebfec', '0d44f31fe9e37045ed410751cbac7020c59b669a'),
+        'first-experiment-readiness': ('d932baafce53c0748396abfc019cf81b931ebfec', '5a70a48e57d75eceac0526fe8abcf70d57489b8b'),
+        'first-experiment-status': ('d932baafce53c0748396abfc019cf81b931ebfec', '185e6e32a60f8b5d62ed7046648560844a6eb19d'),
+        'first-experiment-notifications': ('d932baafce53c0748396abfc019cf81b931ebfec', '8bab523f6f6e50a8a63e13a094f7fccf59ca889f'),
+        'first-experiment-cancel': ('d932baafce53c0748396abfc019cf81b931ebfec', 'a5d867cb734a4954926a4e77c71e6f5be217057c'),
+    }
+    assert {key: staging.RELEASES[key] for key in previous} == previous
+    assert set(staging.RELEASES) - set(previous) == {'first-experiment-prepare'}
+    assert staging.release_pair('first-experiment-prepare') == (
+        previous['telegram-mobile'][1], '7467df292cf990e1b86496a88ed8818d9ada4a28')
+
+
+@pytest.fixture(params=["f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare"])
 def prepared(tmp_path, monkeypatch, request):
     base_revision, target_revision = staging.release_pair(request.param)
     root = tmp_path / "state"
@@ -84,7 +101,7 @@ def prepared(tmp_path, monkeypatch, request):
     target.pop("telegram")
     target["revision"] = target_revision
     target["source_root"] = str(tmp_path / "new-source")
-    if request.param in {"first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel"}:
+    if request.param in {"first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare"}:
         from command_center.coding.first_experiment import CAP, FirstExperiment, MODEL
         from command_center.coding.integration_config import IntegrationConfig, Tariff
         from command_center.deployment_integrations import prepare_binding
@@ -146,7 +163,7 @@ def closed_source(previous):
     return base
 
 
-@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel"], indirect=True)
+@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare"], indirect=True)
 def test_first_experiment_requires_explicit_new_binding(prepared):
     previous, disabled, config, *_ = prepared
     unbound = copy.deepcopy(disabled)
@@ -156,7 +173,7 @@ def test_first_experiment_requires_explicit_new_binding(prepared):
         staging.candidate(previous, unbound, config, checksum(previous), release=release_for(prepared))
 
 
-@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel"], indirect=True)
+@pytest.mark.parametrize("prepared", ["first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare"], indirect=True)
 def test_readiness_flag_cannot_be_added_or_removed_under_another_release(prepared):
     previous, disabled, config, *_ = prepared
     changed = copy.deepcopy(disabled)
@@ -541,7 +558,7 @@ def test_unknown_profile_is_rejected_before_loading_any_path(value):
         staging.stage("/not-loaded", "/not-loaded", "/not-created", "a" * 64, release=value)
 
 
-@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel"])
+@pytest.mark.parametrize("profile", [None, "f34", "telegram-resume", "telegram-mobile", "first-experiment", "first-experiment-readiness", "first-experiment-status", "first-experiment-notifications", "first-experiment-cancel", "first-experiment-prepare"])
 @pytest.mark.parametrize("action", ["stage", "apply"])
 def test_cli_uses_explicit_profile_and_preserves_legacy_default(monkeypatch, profile, action, capsys):
     argv = ["tool", action, "--active-bundle", "/active", "--disabled-bundle", "/disabled",
