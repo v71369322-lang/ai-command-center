@@ -104,6 +104,8 @@ push:true. Отдельный readonly Git discovery дал200; expiry09:41:31UT
 сохраняя identity/main/admin/F1 checks и старый strict default. Это ещё cloud
 исправление; NO_RETRY/отсутствие final token и actual VPS d932baaf сохраняются.
 Нужен новый source package; старые10 pins не переназначаются. Final CI — в Draft PR.
+Новый11-й named transition first-experiment-github-capability: d932baaf→645dac5;
+runtime checkpoint645dac5, последующие изменения только operator/tests/docs.
 
 Следующее cloud-продолжение: [закрытый F1 planning gateway](planning/F1_HTTP_MOCK_GATEWAY.md).
 Owner-only waiting task, отдельный узкий ExternalGrant и прежние F1 Approval/

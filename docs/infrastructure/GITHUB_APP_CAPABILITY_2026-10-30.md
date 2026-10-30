@@ -73,6 +73,13 @@ final token, не снимает NO_RETRY и не выдаёт deployment/paid �
 
 Нужны новые exact-source images и новый named release, сохраняя все10 старых
 pairs. Уже собранный2822320 не исправляется сменой label или файла на месте.
+Одиннадцатый profile `first-experiment-github-capability` закрепляет переход
+`d932baafce53c0748396abfc019cf81b931ebfec` →
+runtime checkpoint `645dac5b04fea581250040f352c082b62dafb0fc`. В нём есть прежние
+Telegram authorization/preparation/status/watch/cancel/latency функции и это
+исправление; новые planning helpers остаются закрытыми и не активируют обычный AI.
+Operator revision закрепляется отдельно. Integration/readiness flags и все
+прежние custody/source/images/predecessor/backup/deadline/journal checks сохранены.
 Старые candidate/receipt не копируются вручную в final credential. Последующие
 credential reconciliation, owner decision, financial/runtime evidence, candidate
 prepare/inspect/apply и первый paid consent остаются отдельными действиями.
