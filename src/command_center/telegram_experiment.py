@@ -48,7 +48,7 @@ def task_record(bridge, session):
 def snapshot(bridge, session, *, include_time=True):
     task, created = task_record(bridge, session)
     if task is None:
-        return None, ('Первый AI-эксперимент ещё не создан. Условия: /readiness.\n'
+        return None, ('Первый AI-эксперимент ещё не создан. Подготовить: /prepare_experiment. Условия: /readiness.\n'
                       'Просмотр не создаёт задачу и не разрешает расходы.')
     if created.event.get('revision') != bridge.store.settings.source_revision:
         return task, 'Первый AI-эксперимент создан другой версией приложения. Нужна сверка; повтор не выполняется.'

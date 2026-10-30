@@ -8,6 +8,22 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Telegram preparation: единственная waiting AI-задача
+
+Новая `/prepare_experiment` вызывает общий с API fixed owner-only creator, а не
+Gateway.authorize. Никаких provider calls, финансового approval, ExternalGrant,
+executor outbox или automatic resume. Task/link/receipt/reply атомарны в прежней
+F1 transaction; source/owner/private-profile/epoch/120sec/binding guards защищают
+от отложенного создания и замены существующей задачи. Plain text не передаётся
+в first-experiment payload; клиентские CRM-данные не используются. Actual payload
+digest проверяется дополнительно к равенству JSON. Existing ledger/reserves не
+меняются, UNCERTAIN reply не пересылается. Это review выполняющего агента;
+независимый внешний reviewer и реальные host/phone acceptance не заявляются.
+Отдельный девятый named transition d932baaf→7467df2 сохраняет прежние восемь
+source pairs/default и требует прежний explicit integration/readiness binding.
+Scope/byte-pin/custody/source/images/previous-bundle/deadline/journal checks не
+ослаблены; новый target нельзя применить под прежним именем пакета.
+
 ## Telegram polling latency, 30 октября 2026
 
 Проверка наличия NEW delivery текущего profile влияет только на getUpdates

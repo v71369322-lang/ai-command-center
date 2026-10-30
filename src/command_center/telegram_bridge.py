@@ -148,6 +148,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'readiness'}
         if value == '/experiment':
             return str(uid), {'kind': 'experiment'}
+        if value == '/prepare_experiment':
+            return str(uid), {'kind': 'prepare_experiment'}
+        if value.split()[:1] == ['/prepare_experiment']:
+            raise Denied('telegram_experiment_prepare_arguments_forbidden')
         if value == '/cancel_experiment':
             return str(uid), {'kind': 'cancel_experiment'}
         if value.split()[:1] == ['/cancel_experiment']:
@@ -244,6 +248,10 @@ class TelegramBridge:
                 if intent['kind'] == 'cancel_experiment':
                     from .telegram_experiment_cancel import bind
                     admission['experiment_cancel_binding'] = bind(self, session)
+                if intent['kind'] == 'prepare_experiment':
+                    from .telegram_experiment_prepare import bind
+                    admission = {'admission_epoch': session.get(Control, 1).epoch,
+                                 'experiment_prepare_binding': bind(self, session)}
                 if session.scalar(select(func.count()).select_from(TelegramInbox)) >= 1000:
                     raise Denied('telegram_inbox_capacity')
                 session.add(TelegramInbox(id=iid, profile=self.profile, fingerprint=digest(intent), intent=intent,
@@ -255,7 +263,10 @@ class TelegramBridge:
     def _apply_pending(self, iid, intent):
         self.guard()
         kind = intent['kind']
-        if kind == 'coding_demo':
+        if kind == 'prepare_experiment':
+            from .telegram_experiment_prepare import apply
+            apply(self, iid)
+        elif kind == 'coding_demo':
             from .telegram_coding import accepted, exercise
             self.store.create('owner', 'tg:' + iid, exercise(),
                               _scope_installer=lambda session, task: accepted(self, session, iid, task))
@@ -469,6 +480,7 @@ class TelegramBridge:
                         '/projects — проекты и назначение; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
+                        '/prepare_experiment — подготовить этот тест без запуска и расходов; '
                         '/cancel_experiment — запросить отмену этой задачи; '
                         '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '

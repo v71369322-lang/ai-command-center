@@ -48,6 +48,13 @@ def task_payload():
                                  max_units=2, max_tokens=4096, max_seconds=30))
 
 
+def create_task(store, actor, *, _scope_installer=None):
+    """The same fixed, waiting F1 request for API and Telegram; no provider grant."""
+    if actor != 'owner':
+        raise Denied('owner_required')
+    return store.create(actor, REQUEST_KEY, task_payload(), _scope_installer=_scope_installer)
+
+
 class Evidence(Strict):
     reference: str = Field(min_length=1, max_length=300)
     expires_at: str = Field(min_length=20, max_length=40)
