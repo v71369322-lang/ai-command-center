@@ -1,5 +1,14 @@
 # Текущий контекст и облачный handoff
 
+Продолжение **30 октября 2026, после PR #64**: [единая карточка запроса](projects/REQUEST_REVIEW.md)
+соединяет owner request, назначение, setup и предложение плана в одном checked
+PG snapshot. Мобильная очередь и `/review N` показывают версии, блокеры и следующий
+шаг. План не получает подтверждённой связи с setup; execution/provider/probe flags
+остаются false. Новых writers/таблиц/authority нет. VPS/проекты/расходы не менялись;
+recovery/release pins сохранены. PR #64 подтверждён: HEAD 63b6eb6, full CI SUCCESS
+1434 Python /1 warning и 962 infrastructure, все container smokes. Финальная
+проверка нового этапа — в отдельном Draft PR поверх этой базы.
+
 Крупный cloud-этап **30 октября 2026, после PR #63**: владелец попросил большой
 рывок вместо отдельных маленьких доработок. [Единый процесс подготовки проекта](projects/SETUP_WORKBENCH.md)
 объединяет сводку, редактируемый draft, preview/save, историю/restore и запись

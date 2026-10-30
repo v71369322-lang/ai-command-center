@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ProjectConnection} from './ProjectConnection';
 import {ProjectSetupOverview} from './ProjectSetup';
+import {RequestReview} from './RequestReview';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 const ids=['command-center','vanilla-sugar','lnauto','capital-lab'] as const;
@@ -35,7 +36,7 @@ function parse(value:unknown,filter:Filter):View{
  return {projects,requests:rows,counts:counts as Record<string,number>,total_pending:Number(value.total_pending),filter};
 }
 
-function SavedRow({row,projects,disabled,save}:{row:Row;projects:View['projects'];disabled:boolean;save:(row:Row,project:Project|null)=>void}){
+function SavedRow({row,projects,disabled,save,request}:{row:Row;projects:View['projects'];disabled:boolean;save:(row:Row,project:Project|null)=>void;request:Request}){
  const [chosen,setChosen]=useState<Project|null>(row.project_id);
  const number=row.id.split(':')[1];
  return <li className="project-request">
@@ -47,6 +48,7 @@ function SavedRow({row,projects,disabled,save}:{row:Row;projects:View['projects'
    <option value="">Не распределён</option>{projects.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
   </select>
   <button disabled={disabled||chosen===row.project_id} onClick={()=>save(row,chosen)}>Сохранить проект</button>
+  <RequestReview row={row} request={request}/>
  </li>
 }
 
@@ -104,7 +106,7 @@ export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Prom
   {view&&<><p>Ожидают планирования: {view.total_pending}. Не распределены: {view.counts.unassigned}.</p>
    {view.requests.length===0?<p>В этом разделе запросов пока нет.</p>:<ul className="project-requests">
     {view.requests.map(row=><SavedRow key={row.id+':'+row.assignment_version} row={row} projects={view.projects}
-     disabled={loading||saving||Boolean(error)} save={(item,chosen)=>void save(item,chosen)}/>)}</ul>}
+     disabled={loading||saving||Boolean(error)} request={request} save={(item,chosen)=>void save(item,chosen)}/>)}</ul>}
    {view.requests.length===50&&<p>Показаны последние 50 запросов выбранного раздела.</p>}</>}
   <button disabled={loading||saving} onClick={()=>{setNotice('');void reload()}}>Обновить очередь проектов</button>
  </section>

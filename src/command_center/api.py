@@ -438,6 +438,12 @@ def create_app(settings=None, gateway_factory=None):
         from .project_inbox import classify
         return classify(store, role, **body.model_dump())
 
+    @app.get('/api/project-inbox/review')
+    def request_review(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
+                       role=Depends(identity)):
+        from .request_review import read
+        return read(store, role, request_id)
+
     @app.get('/api/projects/{project_id}/connection-plan')
     def project_connection_plan(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],
                                 role=Depends(identity)):

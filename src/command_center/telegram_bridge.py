@@ -194,6 +194,12 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value.split()[:1] == ['/review']:
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53):
+                raise Denied('telegram_review_reference_invalid')
+            return str(uid), {'kind': 'request_review', 'number': parts[1]}
         if value.split()[:1] == ['/connection']:
             from .project_inbox import IDS
             parts = value.split()
@@ -444,7 +450,7 @@ class TelegramBridge:
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection', 'project_setup', 'project_setup_history',
-                      'plan_review', 'coding_plan', 'readiness', 'experiment',
+                      'plan_review', 'request_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -475,6 +481,9 @@ class TelegramBridge:
                 elif kind == 'project_connection':
                     from .telegram_project_connection import reply as connection_reply
                     reply = connection_reply(intent['project_id'])
+                elif kind == 'request_review':
+                    from .request_review import telegram_reply
+                    reply = telegram_reply(self, session, intent, suffix)
                 elif kind in {'project_setup', 'project_setup_history'}:
                     from .telegram_project_setup import reply as setup_reply
                     reply = setup_reply(self, session, intent, suffix)
@@ -545,6 +554,7 @@ class TelegramBridge:
                         '/projects — проекты и назначение; '
                         '/connection project-id — план подключения проекта; '
                         '/setup project-id — черновик подключения, история и редактирование; '
+                        '/review номер — запрос, настройки проекта, план и следующий шаг; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
