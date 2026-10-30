@@ -95,6 +95,19 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующая cloud-доработка: [явное платное разрешение из Telegram](telegram/EXPERIMENT_AUTHORIZATION.md).
+`/authorize_experiment` показывает точные условия; только отдельная observed
+private-owner кнопка использует прежний F1 authorize/approve с финансовым scope.
+Запрос карточки/prepare/resume не разрешают оплату. Task/source/profile/epoch/
+delivery/expiry и девять gates проверяются повторно под Control lock; grant и
+reply атомарны, повтор/lost acknowledgement не создают новый запуск. Локально
+654PG/mock passed /9 execution deselected; поздний targeted84passed /3deselected
+включает65 новых cases и пересекается с654. Итоговые SHA/CI — в Draft PR.
+Новая команда ещё не доставлена на VPS; реальных provider calls не было.
+Runtime checkpoint2822320; отдельный десятый profile first-experiment-authorize
+закрепляет один переход d932baaf→2822320. Прежние девять source pairs/default f34
+сохранены; integration/readiness binding и новый exact host build остаются обязательны.
+
 Следующий шаг к первому AI-запуску: [подготовка фиксированной задачи из Telegram](telegram/EXPERIMENT_PREPARATION.md).
 `/prepare_experiment` использует общий с API owner-only creator и единственный
 request key. Новая задача WAITING_APPROVAL, без grants/расходов/executor outbox;

@@ -75,8 +75,10 @@ Evidence expires; task/model/source/config changes invalidate permission.
 Current defaults: live disabled, no evidence, no numeric repository ID, no payment
 terms, no credentials, no final consent. Public facts and a 100 RUB ceiling do
 not turn any gate on. The preparation API creates only a waiting task; repeated
-phone taps return that same task. A separately typed final confirmation binds
-the current profile hash and task version. The generic F2.1 approval endpoint
+phone taps return that same task. The API's separately typed final confirmation,
+or the [explicit observed private-owner Telegram card](../telegram/EXPERIMENT_AUTHORIZATION.md),
+binds the current profile hash, task version and financial scope through the same
+F1 authorize path. Preparing or requesting that card is not consent. The generic F2.1 approval endpoint
 cannot substitute for it in live experiment mode.
 
 Only one task can receive the experiment grant in each mode, atomically under
