@@ -185,6 +185,20 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value == '/plan':
+            return str(uid), {'kind': 'help'}
+        if value.split()[:1] == ['/plan']:
+            from .telegram_plan_review import MAX_PAGES
+            from .request_plan_store import MAX_PROPOSALS
+            parts = value.split()
+            version, page = (parts[2], parts[3]) if len(parts) == 4 else ('1', '1')
+            if (len(parts) not in {2, 4} or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53 or not re.fullmatch(r'[1-9][0-9]?', page)
+                    or int(page) > MAX_PAGES or not re.fullmatch(r'[1-9][0-9]{0,2}', version)
+                    or int(version) > MAX_PROPOSALS):
+                raise Denied('telegram_plan_reference_invalid')
+            return str(uid), {'kind': 'plan_review', 'number': parts[1], 'page': int(page),
+                             'version': int(version) if len(parts) == 4 else None}
         if value.startswith('/assign '):
             from .project_inbox import IDS
             parts = value.split()
@@ -406,7 +420,7 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'coding_plan', 'readiness', 'experiment',
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -434,6 +448,9 @@ class TelegramBridge:
                 elif kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
+                elif kind == 'plan_review':
+                    from .telegram_plan_review import reply as plan_reply
+                    reply = plan_reply(self, session, intent, suffix)
                     reply += '\n/assign номер project-id версия — выбрать проект; none — снять назначение. '
                     reply += 'Номер и текущая версия: /request номер. AI-разработка проектов не подключена.'
                 elif kind in {'requests', 'request'}:
@@ -494,6 +511,7 @@ class TelegramBridge:
                         '/menu — показать меню; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
+                        '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
