@@ -123,3 +123,6 @@ connection до commit. Existing service-container smoke расширен пол
 Telegram-путём до полного draft и восстановления, сохраняя coding task 15,
 callback 100/101, batch limit 20 и 40 циклов. Это synthetic cloud proof.
 Точные HEAD, merge-ref, counts и окончательный CI фиксируются в одном Draft PR.
+
+Следующий этап — [единая карточка запроса](REQUEST_REVIEW.md): setup, назначение
+и предложение плана читаются вместе, без нового хранилища или grant.

@@ -9,7 +9,7 @@ type View={version:number;latest_version:number;draft:Draft;draft_digest:string;
 type Form={revision:string;verification:Draft['verification_kind'];delivery:Draft['delivery_kind'];target:string;acceptance:string};
 type Preview={draft:Draft;proposed_digest:string;review:Review;changed_fields:string[]};
 const fields=['repository_revision','verification_kind','delivery_kind','deployment_target','acceptance'] as const;
-const names:Record<string,string>={repository_revision:'Версия кода',verification_kind:'Тип среды проверки',
+export const names:Record<string,string>={repository_revision:'Версия кода',verification_kind:'Тип среды проверки',
  delivery_kind:'Способ проверки доставки',deployment_target:'Метка сервера',acceptance:'Критерии результата'};
 const checks=['repository_binding','isolated_verification','deployment_binding','separate_task_authorization'];
 const ids=['command-center','vanilla-sugar','lnauto','capital-lab'];
@@ -21,7 +21,7 @@ function flags(x:Record<string,unknown>){
  if(x.schema!==1||x.scope!=='SETUP_DRAFT_ONLY'||x.execution_connected!==false||x.external_checks_performed!==false
   ||!Array.isArray(x.actions_enabled)||x.actions_enabled.length!==0)throw new Error();
 }
-function parseDraft(x:unknown):Draft{
+export function parseDraft(x:unknown):Draft{
  if(!record(x)||Object.keys(x).length!==5||!fields.every(k=>k in x)
   ||x.repository_revision!==null&&(typeof x.repository_revision!=='string'||!/^[a-f0-9]{40}$/.test(x.repository_revision))
   ||typeof x.verification_kind!=='string'||!['not_selected','python','node','python_node'].includes(x.verification_kind)
@@ -32,7 +32,7 @@ function parseDraft(x:unknown):Draft{
  return {repository_revision:x.repository_revision as string|null,verification_kind:x.verification_kind as Draft['verification_kind'],
   delivery_kind:x.delivery_kind as Draft['delivery_kind'],deployment_target:x.deployment_target as string|null,acceptance:x.acceptance as string[]};
 }
-function parseReview(x:unknown,draft?:Draft):Review{
+export function parseReview(x:unknown,draft?:Draft):Review{
  if(!record(x)||x.total!==5||!Array.isArray(x.missing_fields)||x.execution_ready!==false||!same(x.blocking_checks,checks))throw new Error();
  const missing=x.missing_fields;
  if(missing.length>5||!fields.filter(k=>missing.includes(k)).every((k,i)=>missing[i]===k)

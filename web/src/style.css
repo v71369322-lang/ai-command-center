@@ -4,3 +4,4 @@
 .project-connection{margin:8px 0 16px}.project-connection summary{min-height:44px;padding:10px 0;cursor:pointer}.project-connection ol{padding-left:20px}.project-connection li{margin:12px 0}
 .project-setup{padding:10px;margin:16px 0;min-width:0}.project-setup fieldset{border:0;padding:0;margin:0;min-width:0}.project-setup input,.project-setup textarea{box-sizing:border-box;width:100%;min-width:0;margin:8px 0 16px}.project-setup textarea{display:block;min-height:110px;font:inherit;padding:10px;border-radius:8px}.setup-history{display:flex;flex-wrap:wrap}
 .project-setup button:disabled{opacity:.55;cursor:default}
+.request-review{margin-top:1rem;overflow-wrap:anywhere}.request-review summary{min-height:44px;cursor:pointer;padding:.5rem 0}.request-review section{padding:.5rem;border-left:3px solid #737f90}.request-review ul,.request-review ol{padding-left:1.25rem}

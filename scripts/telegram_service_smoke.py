@@ -51,7 +51,7 @@ def handle(request):
                 f'/setup_set lnauto {setup_start+4} acceptance Public synthetic acceptance',
                 '/setup lnauto','/setup_history lnauto',
                 f'/setup_clear lnauto {setup_start+5} target',
-                f'/setup_restore lnauto {setup_start+6} {setup_start+5}', '/setup lnauto']
+                f'/setup_restore lnauto {setup_start+6} {setup_start+5}', '/setup lnauto', '/review 1']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -98,9 +98,9 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
     service=TelegramService(store,client,poll_seconds=0)
-    result=service.run(max_cycles=40)
-    assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==39
+    result=service.run(max_cycles=42)
+    assert result['completed_cycles']==42 and result['live_verified'] is False
+    assert calls.count('sendMessage')==40
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -150,7 +150,11 @@ try:
     assert setup['draft']['acceptance']==['Public synthetic acceptance']
     assert sum('Черновик lnauto сохранён:' in value for value in sent)==7
     assert any('Заполнено 5 из 5.' in value for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':28,'project_assignments':1,
+    assert sum('Подготовка запроса №1' in value and 'Проект: LNAuto' in value
+               and 'План: не сохранён' in value and 'Разрешение на выполнение и расходы не выдано' in value
+               and f'(версия {setup_start+7})' in value for value in sent)==1
+    print(json.dumps({'mode':'http_mock','cycles':42,'read_only_queries':29,'project_assignments':1,
+        'request_reviews':1,
         'project_setup_versions_added':7,'project_setup_external_checks_performed':False,
         'project_connection_plan_replies':len(PROJECTS)+1,'project_connections_activated':False,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',

@@ -409,6 +409,24 @@ screened owner readers. Legacy raw-audit API readers не являются бе�
 границей privacy при downgrade; host migration/apply сюда не входят. Новых
 schema/roles/mounts/egress и изменений старых F1 grants/финансового ledger нет.
 
+## Единая карточка запроса после PR #64
+
+request_review — owner-only read composition, без новых таблиц, journal events,
+writer endpoints или полномочий. Существующий F1 Control lock охватывает intake,
+assignment, setup и plan readers; их integrity/credential/size guards сохранены.
+Неизвестный, повреждённый или sensitive record не даёт частичного/пустого ответа.
+snapshot_digest — content binding наблюдения, не grant или future execution key.
+GET сохраняет no-store и прежние session/revocation boundaries.
+
+CURRENT proposal не включает setup в исходный PlanningContext. Review явно
+оставляет setup_binding_verified=false и plan_setup_binding=NOT_CHECKED, скрывает
+stale content и не выдаёт заполненный draft за подключённый проект. Все внешние
+проверки и execution/provider flags остаются false. Нет provider config/secret
+reads или egress. Telegram ограничен текущим private-owner profile и прежним
+durable delivery; web проверяет assignment binding, отменяет late requests и
+не интерпретирует произвольный текст как HTML, URLs или commands. Mutation controls
+в карточке отсутствуют. Rootful cloud proof не заменяет host acceptance.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

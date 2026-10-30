@@ -113,7 +113,7 @@ def request_reply(bridge, session, intent, *, suffix=''):
                 value = preview[:width] + ('…' if len(preview) > width else '')
             parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
                          f'Проект: {project_label}. Версия назначения: {version}.\n'
-                         f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')
+                         f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}\nПодготовка: /review {number}')
         reply = header + '\n\n'.join(parts)
         full = reply + suffix
         if len(full) <= 4096 and len(canonical({'chat_id': bridge.owner, 'text': full}).encode()) <= 8192:

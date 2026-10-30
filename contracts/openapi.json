@@ -1697,6 +1697,65 @@
         "summary": "Project Assignment"
       }
     },
+    "/api/project-inbox/review": {
+      "get": {
+        "operationId": "request_review_api_project_inbox_review_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 81,
+              "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Request Review"
+      }
+    },
     "/api/project-setup": {
       "get": {
         "operationId": "project_setup_catalog_api_project_setup_get",
