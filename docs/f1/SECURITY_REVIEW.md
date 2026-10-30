@@ -200,6 +200,24 @@ runtime config между review и commit, stop/resume и recovery блокир
 Существующие runtime gates/ledger/no-repeat сохраняются. Публичные live-shaped
 fixtures не подтверждают реальные credentials/финансы/публикацию или VPS readiness.
 
+## Офлайн-граница планирования saved requests
+
+Новый context formatter/response parser не является scheduler/authority/provider
+client. Owner-only snapshots используют прежние immutable intake/project/audit
+проверки и current source/control binding; review повторяет read-only проверку
+под Control lock. Project label не даёт repository access. Existing sensitive
+content screen переиспользован перед context export и во всех plan strings;
+credential files/config не открываются, screen не объявляется универсальным.
+
+Developer rules отделены от untrusted request data. Strict extra-forbid schema,
+size/list/string/usage/model/context checks и запрет tool/refusal/multiple outputs
+ограничивают структуру предложения. Duplicate JSON keys не принимаются, ошибки
+не включают provider body или Pydantic inputs. Естественный язык не проверяется
+как безопасная executable программа: даже shell/URL/permissions в text остаются
+текстом, без запуска/перехода/гранта. Ответ не подтверждает provider provenance,
+usage/billing evidence или качество плана. Никаких DB writes, task/grant/outbox
+созданий, live I/O, нового API/Telegram route, schema или deployment transition.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

@@ -50,11 +50,16 @@ def history(session):
 
 def checked_text(store, session, row):
     value = captured_text(session, row)
+    check_content(store, value)
+    return value
+
+
+def check_content(store, value):
+    """Shared saved-request/proposal screen, not a universal secret detector."""
     known = [*store.settings.identities.values(), store.settings.redis_password, store.settings.database_url.password]
     if (any(secret and secret in value for secret in known)
             or re.search(r'PRIVATE KEY|\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b[0-9]{6,20}:[A-Za-z0-9_-]{30,128}', value)):
         raise Denied('project_request_sensitive_content')
-    return value
 
 
 def inbox(store, role, project='all'):
