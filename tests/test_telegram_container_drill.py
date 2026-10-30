@@ -3,6 +3,7 @@ import importlib
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
 from test_deployment import release as release
@@ -58,3 +59,44 @@ def test_reply_loss_is_injected_after_job_returns_and_verify_has_no_extra_group(
     assert '-c' in calls[0] and drill.RUNTIME_HOOK in calls[0]
     assert engine.run(*args, 'verify') == b'{}'
     assert engine.apply_count == 1 and '--group-add' not in calls[1]
+
+
+def test_api_readiness_retries_only_safe_get_transport_and_preserves_old_cookie(drill, monkeypatch):
+    requests = []
+    def server(request):
+        requests.append(request)
+        if len(requests) == 1:
+            raise httpx.ReadError('public startup reset fixture', request=request)
+        return httpx.Response(401)
+    monkeypatch.setattr(drill.time, 'sleep', lambda _:None)
+    with httpx.Client(base_url='http://127.0.0.1', cookies={'owner_session':'public-old-session-fixture'},
+                      transport=httpx.MockTransport(server)) as client:
+        assert drill.state_response(client, 401).status_code == 401
+    assert len(requests) == 2
+    assert all(r.method == 'GET' and r.url.path == '/api/state' for r in requests)
+    assert all(r.headers['cookie'] == 'owner_session=public-old-session-fixture' for r in requests)
+
+
+@pytest.mark.parametrize('status', [200, 403, 500, 503])
+def test_api_readiness_never_retries_or_accepts_a_wrong_http_verdict(drill, status):
+    requests = []
+    def server(request):
+        requests.append(request)
+        return httpx.Response(status)
+    with httpx.Client(base_url='http://127.0.0.1', transport=httpx.MockTransport(server)) as client:
+        with pytest.raises(ValueError, match='transition_api_state_http_status'):
+            drill.state_response(client, 401)
+    assert len(requests) == 1
+
+
+def test_api_readiness_transport_wait_has_a_fixed_deadline(drill, monkeypatch):
+    clock = iter([0, 0, 1])
+    requests = []
+    monkeypatch.setattr(drill.time, 'monotonic', lambda:next(clock))
+    def server(request):
+        requests.append(request)
+        raise httpx.ReadError('public persistent reset fixture', request=request)
+    with httpx.Client(base_url='http://127.0.0.1', transport=httpx.MockTransport(server)) as client:
+        with pytest.raises(RuntimeError, match='transition_api_transport_not_ready'):
+            drill.state_response(client, 401, seconds=.5)
+    assert len(requests) == 1
