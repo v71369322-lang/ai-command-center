@@ -283,11 +283,9 @@ def create_app(settings=None, gateway_factory=None):
 
     @app.post('/api/experiments/first/task', status_code=201)
     def create_first_experiment(role=Depends(identity)):
-        from .coding.first_experiment import REQUEST_KEY, task_payload
-        if role != 'owner':
-            raise Denied('owner_required')
+        from .coding.first_experiment import create_task
         # Stable request identity makes repeated phone taps return the same task.
-        return store.create(role, REQUEST_KEY, task_payload())
+        return create_task(store, role)
 
     @app.post('/api/experiments/first/{task_id}/authorize')
     def authorize_first_experiment(task_id: str, command: FinalExperimentApproval, role=Depends(identity)):

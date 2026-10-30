@@ -95,6 +95,14 @@ pure F2.2 tests; поднаборы не складываются. Src/runtime/�
 
 ## Command Center: исходники и проверки
 
+Следующий шаг к первому AI-запуску: [подготовка фиксированной задачи из Telegram](telegram/EXPERIMENT_PREPARATION.md).
+`/prepare_experiment` использует общий с API owner-only creator и единственный
+request key. Новая задача WAITING_APPROVAL, без grants/расходов/executor outbox;
+повтор возвращает ту же задачу. Ordinary saved requests остаются NEEDS_PLANNING.
+Receipt/source/epoch/120sec/immutable-task guards и atomic reply composition
+сохраняются. VPS пока недоступен из текущей cloud-среды; финальное подключение
+и первый paid вызов не объявляются выполненными. Source/operator/CI — в Draft PR.
+
 Следующая cloud-доработка: [Telegram response latency](telegram/RESPONSE_LATENCY.md).
 Известный NEW ответ текущего profile переводит getUpdates в timeout0; idle default
 уменьшен10→2секунды. Inbound controls остаются перед sends, batch/delivery bounds
