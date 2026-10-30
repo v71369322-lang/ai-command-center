@@ -1,5 +1,14 @@
 # Текущий контекст и облачный handoff
 
+Продолжение **30 октября 2026, после PR #58**: владелец снова без компьютера и
+попросил продолжить облачную подготовку. [Один read-only recovery отчёт](infrastructure/FIRST_RECOVERY_READ_ONLY_INSPECTION.md)
+объединяет PG/SQLite/локальный Docker/profile expiry перед следующим owner SSH
+заходом. Это operator-only дополнение; runtime bf91c05, старые release pairs и
+сборочный пакет сохранены. PR #58 проверен заново: HEAD cf05dd1, full CI SUCCESS
+1313 Python /1 прежнее предупреждение и850 infrastructure; offline CI повторяет
+тот же набор850, а не добавляется к нему. Новый reader на VPS не запускался;
+host build/update/token/paid approvals не считаются продлёнными из cloud-просьбы.
+
 Следующий cloud-этап, **30 октября 2026**: владелец отдельно разрешил разработку
 [одноразового восстановления](f2-2/ONE_CALL_RECOVERY.md). Новый профиль/задача
 ограничены одним вызовом и 34.7868 ₽; исходные FAILED/grant/расход сохраняются.

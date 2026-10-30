@@ -8,6 +8,24 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Операторский read-only отчёт перед восстановлением
+
+Это review выполняющего агента. Reader принимает только фиксированный task ID
+и существующий локальный broker environment. В PG применяются READ ONLY и
+REPEATABLE READ; RuntimeLedger constructor, Store.transaction, mutating methods,
+heartbeat, grants, provider HTTP и token issuance не вызываются. SQLite использует
+mode=ro/query_only и старый verifier; неподдерживаемый WAL отклоняется до открытия.
+Docker ограничен прежним Unix/rootless preflight и точным ps -a. Ошибка daemon
+или отсутствие runtime evidence не подтверждают очистку.
+
+Ответ содержит только fixed flags, числовой учёт и hashes. Model response,
+config references, credentials и exception text не выводятся. Provider key values
+не читаются; DB settings остаются в trusted broker. Диагностика не является
+RecoveryExperiment.verify_parent и всегда оставляет authority/consent false.
+Проверки с настоящим PG и SQLite подтверждают запрет записи; это не новое host
+acceptance. Low B110 используется только для редактирования ошибок декодирования;
+внешние ошибки не становятся положительным результатом.
+
 ## Однократный восстановительный тест, 30 октября 2026
 
 Это review выполняющего агента. Новый фиксированный recovery scope использует
