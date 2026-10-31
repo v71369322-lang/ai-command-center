@@ -55,6 +55,22 @@ def current(session):
     return {'version': latest['version'], 'configured': True, **document}
 
 
+def telegram_reply(session):
+    """Return schedule status without exposing an update or authority path."""
+    schedule = current(session)
+    if not schedule['configured']:
+        return ('Напоминания центра внимания ещё не настроены.\n\n'
+                'Настройка доступна владельцу в веб-интерфейсе Commander. '
+                'Просмотр ничего не меняет; выполнение не запускалось.')
+    state = 'включены' if schedule['enabled'] else 'выключены'
+    return (f'Напоминания центра внимания: {state}.\n'
+            f"Часовой пояс: {schedule['timezone']}.\n"
+            f"Время сводок: {', '.join(schedule['report_times'])}.\n"
+            f"Тихие часы: {schedule['quiet_start']}–{schedule['quiet_end']}.\n"
+            f"Версия настройки: {schedule['version']}.\n\n"
+            'Просмотр ничего не меняет; выполнение не запускалось.')
+
+
 def configure(store, role, document, expected_version, operation_id):
     if role != 'owner':
         raise Denied('owner_required')

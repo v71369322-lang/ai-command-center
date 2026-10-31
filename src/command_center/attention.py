@@ -59,3 +59,24 @@ def summary(store, role):
         from .attention_schedule import current
         result['reminders_connected'] = bool(current(session).get('enabled'))
         return result
+
+
+def telegram_reply(store, session):
+    """Format the same bounded owner snapshot used by the web attention center."""
+    result = build(store, session)
+    from .attention_schedule import current
+    schedule = current(session)
+    lines = ['Центр внимания AI Commander']
+    if result['items']:
+        lines.extend(f"{item['count']} · {item['label']}" for item in result['items'])
+    else:
+        lines.append('Пунктов, требующих внимания, нет.')
+    lines.extend((
+        '',
+        f"Запросов без проекта: {result['project_counts']['unassigned']}.",
+        f"Запросов, ожидающих планирования: {result['total_pending_requests']}.",
+        'Напоминания: ' + ('включены.' if schedule.get('enabled') else 'выключены.'),
+        '',
+        'Просмотр ничего не меняет: выполнение не запускалось, остановка не снималась.',
+    ))
+    return '\n'.join(lines)

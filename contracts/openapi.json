@@ -39,6 +39,62 @@
         "title": "AssertionRequest",
         "type": "object"
       },
+      "AttentionScheduleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "operation_id": {
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "quiet_end": {
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "title": "Quiet End",
+            "type": "string"
+          },
+          "quiet_start": {
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "title": "Quiet Start",
+            "type": "string"
+          },
+          "report_times": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Report Times",
+            "type": "array"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "timezone",
+          "report_times",
+          "quiet_start",
+          "quiet_end",
+          "expected_version",
+          "operation_id"
+        ],
+        "title": "AttentionScheduleRequest",
+        "type": "object"
+      },
       "BillingReconciliation": {
         "additionalProperties": false,
         "properties": {
@@ -436,6 +492,158 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/attention": {
+      "get": {
+        "operationId": "attention_api_attention_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Attention"
+      }
+    },
+    "/api/attention/schedule": {
+      "get": {
+        "operationId": "attention_schedule_api_attention_schedule_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Attention Schedule"
+      },
+      "post": {
+        "operationId": "update_attention_schedule_api_attention_schedule_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttentionScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Update Attention Schedule"
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "session_csrf_api_auth_csrf_get",
