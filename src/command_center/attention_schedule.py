@@ -69,7 +69,7 @@ def telegram_reply(session):
         outcome = ('отправлена' if item['outcome'] == 'queued' else
                    'критическое изменение отправлено' if item['outcome'] == 'critical' else
                    'подавлена как неизменная')
-        if item['delivery_state'] == 'UNCERTAIN':
+        if item['delivery_state'] in {'UNCERTAIN', 'CANCELLED'}:
             outcome = 'результат доставки неизвестен'
         last = f"\nПоследняя сводка ({item['slot']}): {outcome}."
     if not schedule['configured']:
@@ -119,6 +119,25 @@ def activity(session, limit=5):
                        'delivery_state': delivery_state, 'schedule_version': version,
                        'critical_quiet_bypass': critical_bypass})
     return result
+
+
+def delivery_health(session):
+    """Summarize the latest durable delivery receipt without probing Telegram."""
+    recent = activity(session, 1)
+    if not recent:
+        return {'state': 'never', 'action_required': False, 'last_slot': None}
+    latest = recent[0]
+    delivery_state = latest['delivery_state']
+    if latest['outcome'] == 'suppressed':
+        state = 'suppressed'
+    elif delivery_state == 'SENT':
+        state = 'confirmed'
+    elif delivery_state in {'NEW', 'SENDING'}:
+        state = 'pending'
+    else:
+        state = 'uncertain'
+    return {'state': state, 'action_required': state == 'uncertain',
+            'last_slot': latest['slot']}
 
 
 def _observe(bridge, session, snapshot, now, schedule):

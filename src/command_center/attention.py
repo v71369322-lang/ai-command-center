@@ -63,17 +63,19 @@ def summary(store, role):
     with store.transaction() as session:
         store.check_audit(session)
         result = build(store, session)
-        from .attention_schedule import activity, current
+        from .attention_schedule import activity, current, delivery_health
         result['reminders_connected'] = bool(current(session).get('enabled'))
         result['reminder_activity'] = activity(session)
+        result['reminder_delivery_health'] = delivery_health(session)
         return result
 
 
 def telegram_reply(store, session):
     """Format the same bounded owner snapshot used by the web attention center."""
     result = build(store, session)
-    from .attention_schedule import current
+    from .attention_schedule import current, delivery_health
     schedule = current(session)
+    health = delivery_health(session)
     lines = ['Центр внимания AI Commander']
     if result['items']:
         lines.extend(f"{item['count']} · {item['label']}" for item in result['items'])
@@ -84,6 +86,11 @@ def telegram_reply(store, session):
         f"Запросов без проекта: {result['project_counts']['unassigned']}.",
         f"Запросов, ожидающих планирования: {result['total_pending_requests']}.",
         'Напоминания: ' + ('включены.' if schedule.get('enabled') else 'выключены.'),
+        ('Доставка напоминаний требует проверки.' if health['action_required'] else
+         'Доставка напоминаний: подтверждена.' if health['state'] == 'confirmed' else
+         'Доставка напоминаний: ожидает подтверждения.' if health['state'] == 'pending' else
+         'Доставка напоминаний: повтор не требовался.' if health['state'] == 'suppressed' else
+         'Доставка напоминаний ещё не выполнялась.'),
         '',
         'Просмотр ничего не меняет: выполнение не запускалось, остановка не снималась.',
     ))

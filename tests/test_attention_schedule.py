@@ -5,7 +5,8 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from command_center.attention_schedule import activity, collect, configure, current, telegram_reply
+from command_center.attention_schedule import (activity, collect, configure, current,
+                                                delivery_health, telegram_reply)
 from command_center.models import Audit, Control, TelegramDelivery
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
@@ -118,6 +119,9 @@ def test_activity_reports_uncertain_delivery_without_message_body(store, monkeyp
                               'schedule_version': 1, 'critical_quiet_bypass': False}]
             assert 'результат доставки неизвестен' in telegram_reply(session)
             assert 'text' not in value[0] and 'profile' not in value[0] and 'delivery_id' not in value[0]
+            assert delivery_health(session) == {
+                'state': 'uncertain', 'action_required': True,
+                'last_slot': value[0]['slot']}
         with pytest.raises(Denied, match='activity_limit_invalid'):
             with store.transaction() as session:
                 activity(session, 21)
