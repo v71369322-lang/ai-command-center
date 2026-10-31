@@ -82,7 +82,7 @@ def telegram_service(m):
         'volumes': [{'type': 'bind', 'source': str(Path(m['data_root']) / 'telegram'),
                      'target': '/run/telegram', 'read_only': True}],
         'networks': {'control': None, 'telegram-access': None},
-        'mem_limit': '128m', 'cpus': .25, 'pids_limit': 32,
+        'mem_limit': '256m', 'cpus': .25, 'pids_limit': 32,
         # Compose syntax for a private bounded tmpfs, not a host tempfile operation.
         'tmpfs': ['/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777'], 'stop_grace_period': '30s',  # nosec B108
         'depends_on': {'db': {'condition': 'service_healthy'}},

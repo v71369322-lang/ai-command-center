@@ -415,6 +415,39 @@ class Deployment:
         return {'state': 'CLOSED_SYNTHETIC_SERVICES_RUNNING', 'owner_mfa_verified': False,
                 'rootless_execution_smoke_verified': False, 'offsite_verified': False, 'go_live': False}
 
+    def reconcile_intent(self, approval):
+        """Close one exact deployment intent after independently proving runtime health.
+
+        This is deliberately narrower than apply: it never starts, stops or replaces a
+        service and never changes a protected binding.  An uncertain apply remains
+        blocked unless the exact intended bundle is still present and its full
+        preflight and postcheck both succeed under the deployment lock.
+        """
+        approved = checksum(self.bundle)
+        if approval != approved:
+            raise ValueError('exact_release_authorization_required')
+        self.preflight()
+        lock = os.open(self.root / 'deployment.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            state_file = self.root / 'deployment.json'
+            state = json.loads(state_file.read_text())
+            if (state.get('phase') != 'INTENT' or state.get('bundle') != approved
+                    or state.get('revision') != self.m['revision']
+                    or Path(state.get('directory', '')).resolve() != self.directory.resolve()
+                    or state.get('migration_hash') != self.m['migration_hash']
+                    or state.get('database_image') != self.m['database_image']):
+                raise ValueError('exact_deployment_intent_changed')
+            result = self.postcheck()
+            # Re-read under the same lock so a manually replaced journal is never
+            # overwritten by evidence collected for a different intent.
+            if json.loads(state_file.read_text()) != state:
+                raise ValueError('deployment_intent_changed_during_reconciliation')
+            atomic_json(state_file, {**state, 'phase': 'VERIFIED', 'checks': result})
+            return result
+        finally:
+            os.close(lock)
+
     def apply(self, action, approval, *, expected_previous=None):
         if action not in {'install', 'update', 'rollback'} or approval != checksum(self.bundle):
             raise ValueError('exact_release_authorization_required')
