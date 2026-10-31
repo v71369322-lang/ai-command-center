@@ -88,10 +88,11 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    # Fixed updates, every menu button, and the coding-result notification. Keep
-    # the assertion coupled to the canonical menu instead of
-    # silently pinning the smoke test to an obsolete button count.
-    assert calls.count('sendMessage')==17+len(BUTTONS)
+    # Fixed message updates, every menu button, and the coding-result
+    # notification. The project-choice callback is acknowledged separately and
+    # therefore is not a sendMessage call. Keep this coupled to the canonical
+    # menu instead of silently pinning the smoke to an obsolete button count.
+    assert calls.count('sendMessage')==16+len(BUTTONS)
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
