@@ -48,13 +48,14 @@ def test_mobile_request_project_setup_and_plan_review_without_execution(settings
         review.get_by_role('button', name='Обновить обзор запроса', exact=True).click()
         expect(review.get_by_text('Уточните вопросы предложения перед дальнейшей подготовкой.', exact=True)).to_be_visible()
         expect(review.get_by_text(injection, exact=True)).to_be_visible()
-        expect(review.get_by_text('Which public fields should change?', exact=True)).to_be_visible()
+        expect(review.get_by_role('listitem').filter(has_text='Which public fields should change?')).to_be_visible()
         assert review.locator('img').count() == 0 and page.evaluate('window.reviewInjected === undefined')
         expect(review.get_by_text('Соответствие плана настройкам: не проверено.', exact=True)).to_be_visible()
         expect(review.get_by_text('Разрешение задачи и расходов: не выдано.', exact=True)).to_be_visible()
-        assert review.get_by_role('button').count() == 1
+        expect(review.get_by_role('button', name='Сохранить ручной план', exact=True)).to_be_disabled()
+        assert review.get_by_role('button', name='Запустить задачу', exact=True).count() == 0
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-        box = review.get_by_role('button').bounding_box()
+        box = review.get_by_role('button', name='Обновить обзор запроса', exact=True).bounding_box()
         assert box and box['height'] >= 44
         if width == 390:
             review.screenshot(path='.runtime/request-review-mobile.png')

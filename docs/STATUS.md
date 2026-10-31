@@ -1,5 +1,19 @@
 # Текущий контекст и облачный handoff
 
+Продолжение **31 октября 2026, после PR #65**: [ручные планы запроса](projects/MANUAL_REQUEST_PLANS.md)
+добавляют редактирование цели, шагов, критериев и вопросов в мобильной карточке
+и private-owner Telegram. Это owner-authored schema 2 в прежнем audit journal:
+общие версии с прежними планами, exact request/assignment/setup/source binding,
+preview/save и защита от stale/повторной записи. Изменение настроек делает такой
+план STALE; DECLARED_MATCH означает только совпадение сохранённых деклараций.
+AI, задача, grant и расходы не возникают. Generic API timeline теперь скрывает
+содержимое обоих типов плана для всех ролей. Новых таблиц/migrations нет;
+legacy schema 1 читается с прежним неподтверждённым происхождением.
+PR #65 проверен заново: HEAD 33d10d4, full CI SUCCESS — 1492 Python /1 прежнее
+предупреждение и 962 infrastructure, все container smokes. HEAD/merge-ref/CI
+нового этапа фиксируются в отдельном Draft PR поверх #65. VPS/проекты/расходы
+не менялись; frozen recovery/release pairs и отдельная host acceptance сохранены.
+
 Продолжение **30 октября 2026, после PR #64**: [единая карточка запроса](projects/REQUEST_REVIEW.md)
 соединяет owner request, назначение, setup и предложение плана в одном checked
 PG snapshot. Мобильная очередь и `/review N` показывают версии, блокеры и следующий
