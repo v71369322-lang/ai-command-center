@@ -52,6 +52,7 @@ def handle(request):
                     result[index]={'update_id':7,'callback_query':{'id':'public-project-choice',
                         'from':{'id':owner,'is_bot':False},'data':'pj:1:0:lnauto',
                         'message':{'message_id':1,'chat':{'id':owner,'type':'private'}}}}
+            result=result[:20]  # Match the bridge and Bot API batch ceiling.
         if resume_mode:
             result=[]
             if body['offset']<=100:
@@ -87,10 +88,10 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    # Sixteen fixed updates, every menu button, readiness, and one coding-result
-    # notification. Keep the assertion coupled to the canonical menu instead of
+    # Fixed updates, every menu button, and the coding-result notification. Keep
+    # the assertion coupled to the canonical menu instead of
     # silently pinning the smoke test to an obsolete button count.
-    assert calls.count('sendMessage')==18+len(BUTTONS)
+    assert calls.count('sendMessage')==17+len(BUTTONS)
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
