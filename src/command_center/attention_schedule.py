@@ -5,13 +5,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import select
 
 from .attention import build
-from .models import Audit
+from .models import Audit, TelegramDelivery
 from .store import Denied, digest
 
 EVENT = 'owner_attention_schedule_changed'
 NOTICE = 'owner_attention_report_queued'
 SUPPRESSED = 'owner_attention_report_suppressed'
 MAX_CHANGES = 1000
+MAX_ACTIVITY = 20
 
 
 def _events(session):
@@ -59,17 +60,61 @@ def current(session):
 def telegram_reply(session):
     """Return schedule status without exposing an update or authority path."""
     schedule = current(session)
+    recent = activity(session, 1)
+    last = ''
+    if recent:
+        item = recent[0]
+        outcome = ('отправлена' if item['outcome'] == 'queued' else
+                   'подавлена как неизменная')
+        if item['delivery_state'] == 'UNCERTAIN':
+            outcome = 'результат доставки неизвестен'
+        last = f"\nПоследняя сводка ({item['slot']}): {outcome}."
     if not schedule['configured']:
         return ('Напоминания центра внимания ещё не настроены.\n\n'
                 'Настройка доступна владельцу в веб-интерфейсе Commander. '
-                'Просмотр ничего не меняет; выполнение не запускалось.')
+                'Просмотр ничего не меняет; выполнение не запускалось.' + last)
     state = 'включены' if schedule['enabled'] else 'выключены'
     return (f'Напоминания центра внимания: {state}.\n'
             f"Часовой пояс: {schedule['timezone']}.\n"
             f"Время сводок: {', '.join(schedule['report_times'])}.\n"
             f"Тихие часы: {schedule['quiet_start']}–{schedule['quiet_end']}.\n"
-            f"Версия настройки: {schedule['version']}.\n\n"
-            'Просмотр ничего не меняет; выполнение не запускалось.')
+            f"Версия настройки: {schedule['version']}."
+            f"{last}\n\nПросмотр ничего не меняет; выполнение не запускалось.")
+
+
+def activity(session, limit=5):
+    """Return bounded delivery metadata without message bodies or profile identifiers."""
+    if type(limit) is not int or not 1 <= limit <= MAX_ACTIVITY:
+        raise Denied('attention_activity_limit_invalid')
+    rows = session.scalars(select(Audit).where(
+        Audit.event['kind'].as_string().in_((NOTICE, SUPPRESSED)),
+    ).order_by(Audit.sequence.desc()).limit(limit)).all()
+    result = []
+    for row in rows:
+        event = row.event
+        slot, version, summary_hash = (event.get('slot'), event.get('schedule_version'),
+                                       event.get('summary_hash'))
+        if (not isinstance(slot, str) or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]', slot)
+                or type(version) is not int or version < 1
+                or not isinstance(summary_hash, str) or not re.fullmatch(r'[a-f0-9]{64}', summary_hash)):
+            raise Denied('attention_activity_history_invalid')
+        delivery_state = None
+        critical_bypass = False
+        outcome = 'suppressed'
+        if event['kind'] == NOTICE:
+            delivery_id = event.get('delivery_id')
+            delivery = session.get(TelegramDelivery, delivery_id) if isinstance(delivery_id, str) else None
+            if (not delivery or delivery.profile != event.get('profile')
+                    or delivery.state not in {'NEW', 'SENDING', 'SENT', 'UNCERTAIN', 'CANCELLED'}):
+                raise Denied('attention_activity_delivery_invalid')
+            outcome, delivery_state = 'queued', delivery.state
+            critical_bypass = event.get('critical_quiet_bypass') is True
+        elif event.get('reason') != 'unchanged':
+            raise Denied('attention_activity_history_invalid')
+        result.append({'sequence': row.sequence, 'slot': slot, 'outcome': outcome,
+                       'delivery_state': delivery_state, 'schedule_version': version,
+                       'critical_quiet_bypass': critical_bypass})
+    return result
 
 
 def configure(store, role, document, expected_version, operation_id):

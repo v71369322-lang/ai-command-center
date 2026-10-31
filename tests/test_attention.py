@@ -32,6 +32,7 @@ def test_owner_attention_summary_is_read_only_and_prioritized(store):
     assert result['items'][0]['impact'] == 'execution'
     assert result['items'][1]['impact'] == 'planning'
     assert result['reminders_connected'] is False and result['ai_planning_connected'] is False
+    assert result['reminder_activity'] == []
     assert store.snapshot() == before
 
 

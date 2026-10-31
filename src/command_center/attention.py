@@ -63,8 +63,9 @@ def summary(store, role):
     with store.transaction() as session:
         store.check_audit(session)
         result = build(store, session)
-        from .attention_schedule import current
+        from .attention_schedule import activity, current
         result['reminders_connected'] = bool(current(session).get('enabled'))
+        result['reminder_activity'] = activity(session)
         return result
 
 

@@ -5,7 +5,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from command_center.attention_schedule import collect, configure, current
+from command_center.attention_schedule import activity, collect, configure, current, telegram_reply
 from command_center.models import Audit, Control, TelegramDelivery
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
@@ -94,6 +94,33 @@ def test_unchanged_later_slot_is_audited_once_without_duplicate_delivery(store, 
             events = [row.event for row in session.scalars(select(Audit)).all()
                       if row.event['kind'] == 'owner_attention_report_suppressed']
             assert len(events) == 1 and events[0]['reason'] == 'unchanged'
+            recent = activity(session)
+            assert [item['outcome'] for item in recent] == ['suppressed', 'queued']
+            assert recent[0]['delivery_state'] is None and recent[1]['delivery_state'] == 'NEW'
+    finally:
+        client.close()
+
+
+def test_activity_reports_uncertain_delivery_without_message_body(store, monkeypatch):
+    configure(store, 'owner', document(report_times=['14:00']), 0, str(uuid4()))
+    monkeypatch.setattr(store, 'now', lambda session: datetime(
+        2026, 10, 31, 14, 5, tzinfo=timezone.utc))
+    client = MockTelegramHTTP(httpx.MockTransport(BotHTTP()))
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        with store.transaction() as session:
+            delivery_id = collect(bridge, session)
+            session.get(TelegramDelivery, delivery_id).state = 'UNCERTAIN'
+        with store.transaction() as session:
+            value = activity(session, 1)
+            assert value == [{'sequence': value[0]['sequence'], 'slot': '2026-10-31T14:00',
+                              'outcome': 'queued', 'delivery_state': 'UNCERTAIN',
+                              'schedule_version': 1, 'critical_quiet_bypass': False}]
+            assert 'результат доставки неизвестен' in telegram_reply(session)
+            assert 'text' not in value[0] and 'profile' not in value[0] and 'delivery_id' not in value[0]
+        with pytest.raises(Denied, match='activity_limit_invalid'):
+            with store.transaction() as session:
+                activity(session, 21)
     finally:
         client.close()
 

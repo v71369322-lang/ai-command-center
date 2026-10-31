@@ -38,6 +38,12 @@ control/reconciliation condition may use a due report slot during quiet hours;
 the audit receipt records that bypass. These rules do not create escalation or
 execution authority.
 
+The owner view exposes up to five recent report receipts: local schedule slot,
+queued or unchanged-suppressed outcome, durable delivery state, schedule version,
+and critical quiet-hours bypass. It omits Telegram profile hashes, delivery IDs,
+message bodies and request text. `UNCERTAIN` is shown as an unknown delivery
+result and is never rewritten to success by a read.
+
 ## Explicitly not connected
 
 - AI planning of saved requests;
