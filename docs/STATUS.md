@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Актуализация **31 октября 2026**: постоянное исправление Telegram OOM подготовлено
+в [checkpoint восстановления](infrastructure/TELEGRAM_MEMORY_RECOVERY_2026-10-31.md).
+Кандидат `1d7ab452…04d21` на source `912cad8f` сохраняет Telegram 256 MiB,
+отключённый AI-профиль и закрытый task admission. Operator source `5524da5`
+добавляет отдельные exact intent reconciliation и staged apply; 709 targeted
+passed, Draft PR #68 CI SUCCESS. На VPS кандидат ещё не применён: старый релиз
+работает с временным memory containment, а журнал остаётся `INTENT`. Нужны два
+новых точных разрешения владельца у компьютера; merge, paid calls и resume не
+разрешены.
+
 Следующий cloud-этап, **30 октября 2026**: владелец отдельно разрешил разработку
 [одноразового восстановления](f2-2/ONE_CALL_RECOVERY.md). Новый профиль/задача
 ограничены одним вызовом и 34.7868 ₽; исходные FAILED/grant/расход сохраняются.
