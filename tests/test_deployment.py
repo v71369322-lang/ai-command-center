@@ -479,6 +479,7 @@ def test_telegram_profile_is_explicit_db_only_and_default_stays_closed(release):
     m, profile = telegram_release(release)
     service = profile['services']['telegram']
     assert service['secrets'] == ['db_password'] and service['restart'] == 'no'
+    assert service['mem_limit'] == '256m'
     assert not service.get('ports') and not service.get('privileged')
     assert all('docker.sock' not in v['source'] for v in service['volumes'])
     assert set(service['environment']) == {'F1_SOURCE_REVISION', 'F1_DB_USER', 'F1_DB_HOST', 'F1_DB_PASSWORD_FILE'}
