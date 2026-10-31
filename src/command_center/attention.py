@@ -47,6 +47,9 @@ def build(store, session):
         item['urgency'] = {'critical': 'immediate', 'warning': 'soon', 'info': 'normal'}[item['level']]
         item['confidence'] = 'authoritative'
         item['impact'] = 'execution' if item['code'].startswith(('CONTROL_', 'TASK_')) else 'planning'
+        item['target'] = ('control-center' if item['code'].startswith('CONTROL_') else
+                          'task-results' if item['code'].startswith('TASK_') else
+                          'projects-heading')
     highest = next((level for level in ('critical', 'warning', 'info')
                     if any(item['level'] == level for item in items)), None)
     return {'schema': 1, 'items': items, 'task_counts': task_counts,

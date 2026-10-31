@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
-type Item={code:string;level:'critical'|'warning'|'info';count:number;label:string;urgency:string;confidence:string;impact:string};
+type Item={code:string;level:'critical'|'warning'|'info';count:number;label:string;urgency:string;confidence:string;impact:string;target:'control-center'|'task-results'|'projects-heading'};
 type Activity={sequence:number;slot:string;outcome:'queued'|'suppressed'|'critical';delivery_state:string|null;schedule_version:number;critical_quiet_bypass:boolean};
 type DeliveryHealth={state:'never'|'pending'|'confirmed'|'uncertain'|'suppressed';action_required:boolean;last_slot:string|null};
 type View={items:Item[];highest_level:'critical'|'warning'|'info'|null;reminder_activity:Activity[];reminder_delivery_health:DeliveryHealth;total_pending_requests:number;task_admission_halted:boolean;recovery:boolean;reminders_connected:boolean;ai_planning_connected:false};
@@ -23,9 +23,10 @@ function parse(value:unknown):View{
    ||!['critical','warning','info'].includes(String(raw.level))||!Number.isInteger(raw.count)||Number(raw.count)<1
    ||typeof raw.label!=='string'||!raw.label||raw.label.length>100
    ||!['immediate','soon','normal'].includes(String(raw.urgency))||raw.confidence!=='authoritative'
-   ||!['execution','planning'].includes(String(raw.impact)))throw new Error();
+   ||!['execution','planning'].includes(String(raw.impact))
+   ||!['control-center','task-results','projects-heading'].includes(String(raw.target)))throw new Error();
   seen.add(raw.code);return {code:raw.code,level:raw.level as Item['level'],count:Number(raw.count),label:raw.label,
-   urgency:String(raw.urgency),confidence:String(raw.confidence),impact:String(raw.impact)};
+   urgency:String(raw.urgency),confidence:String(raw.confidence),impact:String(raw.impact),target:raw.target as Item['target']};
  });
  const reminder_activity=value.reminder_activity.map(raw=>{if(!record(raw)||!Number.isInteger(raw.sequence)||Number(raw.sequence)<1
   ||typeof raw.slot!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw.slot)
@@ -51,11 +52,11 @@ export function AttentionCenter({request}:{request:Request}){
   <p>Показывает незакрытые решения и очереди. Просмотр ничего не запускает.</p>
   {loading&&<p role="status">Собираем сводку…</p>}{error&&<p role="alert">{error}</p>}
   {view&&<>{view.highest_level&&<p><strong>Высший приоритет:</strong> {view.highest_level==='critical'?'критический':view.highest_level==='warning'?'требует внимания':'информационный'}.</p>}
-   {view.items.length?<ul>{view.items.map(item=><li key={item.code} data-level={item.level}><strong>{item.count}</strong> · {item.label}</li>)}</ul>:<p>Пунктов, требующих внимания, сейчас нет.</p>}
+   {view.items.length?<ul>{view.items.map(item=><li key={item.code} data-level={item.level}><strong>{item.count}</strong> · {item.label} · <a href={'#'+item.target}>Открыть раздел</a></li>)}</ul>:<p>Пунктов, требующих внимания, сейчас нет.</p>}
    {view.reminder_activity.length>0&&<><h3>Последние сводки</h3><ul>{view.reminder_activity.map(item=><li key={item.sequence}>
     {item.slot}: {item.delivery_state==='UNCERTAIN'?'доставка не подтверждена':item.outcome==='suppressed'?'без повтора — состояние не изменилось':item.outcome==='critical'?'критическое изменение поставлено в доставку':'поставлена в доставку'}
     {item.critical_quiet_bypass?' · критическое уведомление в тихие часы':''}</li>)}</ul></>}
-   {view.reminder_delivery_health.action_required&&<p role="alert">Доставка последнего Telegram-напоминания не подтверждена и требует проверки.</p>}
+   {view.reminder_delivery_health.action_required&&<p role="alert">Доставка последнего Telegram-напоминания не подтверждена и требует проверки. <a href="#reminders-heading">Открыть напоминания</a></p>}
    <p>{view.reminders_connected?'Telegram-напоминания включены по сохранённому расписанию.':'Telegram-напоминания выключены.'} AI-планирование запросов ещё не подключено.</p>
    <button disabled={loading} onClick={()=>void reload()}>Обновить сводку</button></>}
  </section>;

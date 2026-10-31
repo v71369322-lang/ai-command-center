@@ -12,6 +12,10 @@ or notification authority.
 - unassigned and per-project request counts;
 - a bounded ordered list for the web control center.
 
+Each item carries a fixed local section target. The web view links to control,
+task results, or project triage as appropriate. These are ordinary same-page
+anchors: following one does not call an API, mutate state, or grant execution.
+
 The endpoint is owner-only, validates the audit chain and returns counts rather
 than request bodies. Reading it does not create a task, approval, outbox row,
 provider call, project access or execution grant.

@@ -54,6 +54,9 @@ def test_due_report_is_queued_once_and_contains_only_bounded_summary(store, monk
             assert collect(bridge, session) == first
             rows = session.scalars(select(TelegramDelivery)).all()
             assert len(rows) == 1 and rows[0].state == 'NEW'
+            assert delivery_health(session) == {
+                'state': 'pending', 'action_required': False,
+                'last_slot': '2026-10-31T14:00'}
             assert rows[0].body['chat_id'] == OWNER
             assert 'Просмотр ничего не запускает' in rows[0].body['text']
             assert len(rows[0].body['text']) < 4096
@@ -98,6 +101,9 @@ def test_unchanged_later_slot_is_audited_once_without_duplicate_delivery(store, 
             recent = activity(session)
             assert [item['outcome'] for item in recent] == ['suppressed', 'queued']
             assert recent[0]['delivery_state'] is None and recent[1]['delivery_state'] == 'NEW'
+            assert delivery_health(session) == {
+                'state': 'suppressed', 'action_required': False,
+                'last_slot': '2026-10-31T14:00'}
     finally:
         client.close()
 
@@ -122,6 +128,11 @@ def test_activity_reports_uncertain_delivery_without_message_body(store, monkeyp
             assert delivery_health(session) == {
                 'state': 'uncertain', 'action_required': True,
                 'last_slot': value[0]['slot']}
+            session.get(TelegramDelivery, delivery_id).state = 'SENT'
+            assert delivery_health(session)['state'] == 'confirmed'
+            session.get(TelegramDelivery, delivery_id).state = 'CANCELLED'
+            assert delivery_health(session)['state'] == 'uncertain'
+            assert 'результат доставки неизвестен' in telegram_reply(session)
         with pytest.raises(Denied, match='activity_limit_invalid'):
             with store.transaction() as session:
                 activity(session, 21)
