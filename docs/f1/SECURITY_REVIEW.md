@@ -427,6 +427,33 @@ durable delivery; web проверяет assignment binding, отменяет la
 не интерпретирует произвольный текст как HTML, URLs или commands. Mutation controls
 в карточке отсутствуют. Rootful cloud proof не заменяет host acceptance.
 
+## Ручные планы после PR #65
+
+Owner-only preview/save используют прежние session/revocation/CSRF/origin и
+F1 Control lock. Schema 2 — документ владельца, без model/response_id/usage;
+не выдаёт фактов provider billing или AI provenance. Existing schema 1 и mock
+planning gateway сохранены. Оба формата имеют общий лимит 100 records и 32768
+canonical JSON bytes; точные envelope/version/UUID/digest/source bindings и
+повторный credential screen обязательны. Историческая ссылка setup сверяется
+с protected setup reader, а смена версии/assignment/context скрывает stale plan.
+DECLARED_MATCH не означает external verification; все authority/provider flags false.
+
+Telegram использует прежний private-owner/source/receive-anchor/runtime guard
+до записи и повторно внутри атомарных save + DONE + reply. UUIDv5 связан с inbox,
+HTTP — UUIDv4. Version conflicts не затирают данные; потерянный HTTP save response
+требует readback. Вложенные commands/HTML остаются текстом, placeholder-шаблон
+не сохраняется. Preview не пишет draft; save не создаёт Task/Approval/Grant,
+ExternalAction, execution Outbox или финансовый reserve. Изменения source pins,
+broker/watchdog/ledger/deployment interlocks отсутствуют.
+
+Raw plans скрыты в generic /api/state для всех ролей, как setup; protected audit
+и checkpoint не переписываются. Full content доступен screened owner readers.
+Известные credentials обнаруживаются, полная DLP неизвестных секретов не
+гарантируется. Downgrade к legacy raw-audit API reader нельзя считать безопасной
+privacy boundary. UI abort/logout/late responses, optimistic concurrency и
+checkpoint refresh проверяются с настоящим PG/API и Chromium 320/390.
+Host/rootless/iPhone/live-provider acceptance этим не доказаны.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

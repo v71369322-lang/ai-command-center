@@ -20,6 +20,7 @@ from .worker import broker
 from .owner_auth import OwnerAuth
 from .coding.contract import CodingRequest, payload as coding_payload, template as coding_template
 from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreRequest, EVENT as PROJECT_SETUP_EVENT
+from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_DRAFT_EVENT
 
 
 class Command(BaseModel):
@@ -247,11 +248,11 @@ def create_app(settings=None, gateway_factory=None):
     def state(role=Depends(human)):
         result = store.snapshot()
         # Keep the protected audit unchanged. Generic timelines are projections;
-        # draft values are read only through the screened owner setup endpoints.
+        # draft values are read only through the screened owner setup/plan endpoints.
         for item in result['events']:
             event = item['event']
-            if event.get('kind') == PROJECT_SETUP_EVENT:
-                item['event'] = {'kind': PROJECT_SETUP_EVENT, 'details_redacted': True}
+            if event.get('kind') in {PROJECT_SETUP_EVENT, PLAN_DRAFT_EVENT}:
+                item['event'] = {'kind': event['kind'], 'details_redacted': True}
         from .coding.integration_config import IntegrationConfig
         if gateway_factory:
             gateway = external_gateway()
@@ -443,6 +444,16 @@ def create_app(settings=None, gateway_factory=None):
                        role=Depends(identity)):
         from .request_review import read
         return read(store, role, request_id)
+
+    @app.post('/api/project-inbox/plan/preview')
+    def manual_plan_preview(body: ManualRequest, role=Depends(identity)):
+        from .manual_plan import preview
+        return preview(store, role, body)
+
+    @app.post('/api/project-inbox/plan')
+    def manual_plan_save(body: ManualSaveRequest, role=Depends(identity)):
+        from .manual_plan import save
+        return save(store, role, ManualRequest.model_validate(body.model_dump(exclude={'operation_id'})), body.operation_id)
 
     @app.get('/api/projects/{project_id}/connection-plan')
     def project_connection_plan(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],

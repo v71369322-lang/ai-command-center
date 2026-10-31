@@ -200,6 +200,16 @@ class TelegramBridge:
                     or int(parts[1]) >= 2**53):
                 raise Denied('telegram_review_reference_invalid')
             return str(uid), {'kind': 'request_review', 'number': parts[1]}
+        if value.split()[:1] == ['/plan_edit']:
+            parts = value.split()
+            from .telegram_manual_plan import number
+            if len(parts) != 2:
+                raise Denied('telegram_manual_plan_arguments_invalid')
+            number(parts[1], 2**53-1)
+            return str(uid), {'kind': 'manual_plan_template', 'number': parts[1]}
+        if value.split()[:1] == ['/draft_plan']:
+            from .telegram_manual_plan import parse
+            return str(uid), parse(value)
         if value.split()[:1] == ['/connection']:
             from .project_inbox import IDS
             parts = value.split()
@@ -414,6 +424,9 @@ class TelegramBridge:
         elif kind == 'project_setup_change':
             from .telegram_project_setup import apply as apply_setup
             apply_setup(self, iid, intent)
+        elif kind == 'manual_plan_save':
+            from .telegram_manual_plan import apply as apply_manual_plan
+            apply_manual_plan(self, iid, intent)
         elif kind == 'assign':
             from .project_inbox import classify, PROJECTS
             from .telegram_project_picker import verify
@@ -450,7 +463,7 @@ class TelegramBridge:
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection', 'project_setup', 'project_setup_history',
-                      'plan_review', 'request_review', 'coding_plan', 'readiness', 'experiment',
+                      'plan_review', 'request_review', 'manual_plan_template', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -484,6 +497,10 @@ class TelegramBridge:
                 elif kind == 'request_review':
                     from .request_review import telegram_reply
                     reply = telegram_reply(self, session, intent, suffix)
+                elif kind == 'manual_plan_template':
+                    from .telegram_manual_plan import template
+                    suffix = '\n'.join('# ' + line if line else '' for line in suffix.splitlines())
+                    reply = template(self, session, intent, suffix)
                 elif kind in {'project_setup', 'project_setup_history'}:
                     from .telegram_project_setup import reply as setup_reply
                     reply = setup_reply(self, session, intent, suffix)
@@ -555,6 +572,7 @@ class TelegramBridge:
                         '/connection project-id — план подключения проекта; '
                         '/setup project-id — черновик подключения, история и редактирование; '
                         '/review номер — запрос, настройки проекта, план и следующий шаг; '
+                        '/plan_edit номер — шаблон ручного плана без AI; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '

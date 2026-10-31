@@ -9,7 +9,7 @@ from .store import Denied, canonical, digest
 NEXT = {
     'select_project': 'Выберите проект для запроса.',
     'complete_setup': 'Заполните черновик подключения выбранного проекта.',
-    'prepare_plan': 'План запроса ещё не сохранён. AI-планирование обычных запросов пока не подключено.',
+    'prepare_plan': 'План запроса ещё не сохранён. Составьте ручной план; AI-планирование обычных запросов пока не подключено.',
     'refresh_plan': 'Сохранённый план устарел. Требуется новый план для текущих условий.',
     'answer_questions': 'В предложении есть вопросы. Уточните требования перед дальнейшей подготовкой.',
     'verify_scope': 'Сверьте предложение с настройками проекта, затем проверьте доступы и среду выполнения.',
@@ -39,8 +39,10 @@ def read_locked(store, session, request_id):
             'COMPLETE' if setup['review']['ready_for_operator_review'] else 'INCOMPLETE')
     proposal = plan['proposal']
     plan_state = 'NEEDS_CLARIFICATION' if proposal and proposal['questions'] else plan['state']
+    setup_reference = plan.get('setup_reference_state', 'NOT_RECORDED')
     states = {'assignment': 'SELECTED' if project else 'UNASSIGNED', 'setup': setup_state, 'plan': plan_state,
-              'plan_setup_binding': 'NOT_CHECKED', 'repository': 'NOT_CHECKED', 'verification': 'NOT_CHECKED',
+              'plan_setup_binding': 'DECLARED_MATCH' if setup_reference == 'CURRENT' else 'NOT_CHECKED',
+              'repository': 'NOT_CHECKED', 'verification': 'NOT_CHECKED',
               'delivery': 'NOT_CHECKED', 'authorization': 'NOT_GRANTED',
               'admission': 'RECOVERY' if context.recovery else 'HALTED' if context.halted else 'OPEN'}
     next_step = ('select_project' if not project else 'complete_setup' if setup_state != 'COMPLETE'
@@ -52,9 +54,10 @@ def read_locked(store, session, request_id):
                           'fingerprint': context.request_fingerprint, 'assignment_version': context.assignment_version},
               'project': project,
               'plan': {'state': plan_state, 'version': plan['version'], 'latest_version': plan['latest_version'],
+                       'origin': plan.get('origin'), 'setup_reference_state': setup_reference,
                        'proposal': proposal, 'provider_evidence_verified': False, 'setup_binding_verified': False},
               'checks': [{'id': key, 'label': label, 'state': states[key]} for key, label in CHECKS],
-              'blocking_checks': [key for key, _ in CHECKS if states[key] not in {'SELECTED', 'COMPLETE', 'CURRENT', 'OPEN'}],
+              'blocking_checks': [key for key, _ in CHECKS if states[key] not in {'SELECTED', 'COMPLETE', 'CURRENT', 'OPEN', 'DECLARED_MATCH'}],
               'next_step': next_step, 'execution_ready': False, 'execution_authorized': False,
               'external_checks_performed': False, 'task_created': False, 'provider_called': False, 'actions_enabled': []}
     result.update(snapshot_digest=digest(result), observed_at=store.now(session).isoformat())
@@ -82,6 +85,8 @@ def telegram_reply(bridge, session, intent, suffix):
                     'INCOMPLETE': 'черновик неполный', 'COMPLETE': 'черновик заполнен, внешние проверки обязательны'}
     plan_states = {'MISSING': 'не сохранён', 'STALE': 'устарел', 'CURRENT': 'непроверенное предложение',
                    'NEEDS_CLARIFICATION': 'нужны уточнения'}
+    if plan.get('origin') == 'owner_authored':
+        plan_states['CURRENT'] = 'ручной черновик владельца'
     state = {r['id']: r['state'] for r in view['checks']}
     admission = {'OPEN': 'обычная остановка не включена; отдельные разрешения всё равно нужны',
                  'HALTED': 'новые запуски остановлены', 'RECOVERY': 'нужна сверка восстановления'}
@@ -101,6 +106,7 @@ def telegram_reply(bridge, session, intent, suffix):
         if project:
             text += f' Настройки: /setup {project["id"]} (версия {project["setup_version"]}).'
         text += '\nЭто текущий обзор сохранённых данных; просмотр не создаёт задачу и не обращается к AI.'
+        text += f' Ручной план: /plan_edit {intent["number"]}.'
         bridge.check_text(text)
         if len(text + suffix) <= 4096 and len(canonical({'chat_id': bridge.owner, 'text': text + suffix}).encode()) <= 8192:
             return text

@@ -398,6 +398,155 @@
         "title": "FinalRecoveryApproval",
         "type": "object"
       },
+      "ManualContent": {
+        "additionalProperties": false,
+        "properties": {
+          "questions": {
+            "items": {
+              "maxLength": 300,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Questions",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          },
+          "summary": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "steps",
+          "questions"
+        ],
+        "title": "ManualContent",
+        "type": "object"
+      },
+      "ManualRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ManualContent"
+          },
+          "expected_assignment_version": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Expected Assignment Version",
+            "type": "integer"
+          },
+          "expected_context_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Context Digest",
+            "type": "string"
+          },
+          "expected_plan_version": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Expected Plan Version",
+            "type": "integer"
+          },
+          "expected_setup_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Setup Digest",
+            "type": "string"
+          },
+          "expected_setup_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Setup Version",
+            "type": "integer"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_context_digest",
+          "expected_assignment_version",
+          "expected_setup_version",
+          "expected_setup_digest",
+          "expected_plan_version",
+          "draft"
+        ],
+        "title": "ManualRequest",
+        "type": "object"
+      },
+      "ManualSaveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ManualContent"
+          },
+          "expected_assignment_version": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Expected Assignment Version",
+            "type": "integer"
+          },
+          "expected_context_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Context Digest",
+            "type": "string"
+          },
+          "expected_plan_version": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Expected Plan Version",
+            "type": "integer"
+          },
+          "expected_setup_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Setup Digest",
+            "type": "string"
+          },
+          "expected_setup_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Setup Version",
+            "type": "integer"
+          },
+          "operation_id": {
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_context_digest",
+          "expected_assignment_version",
+          "expected_setup_version",
+          "expected_setup_digest",
+          "expected_plan_version",
+          "draft",
+          "operation_id"
+        ],
+        "title": "ManualSaveRequest",
+        "type": "object"
+      },
       "PasswordLogin": {
         "additionalProperties": false,
         "properties": {
@@ -569,6 +718,36 @@
           "operation_id"
         ],
         "title": "SaveRequest",
+        "type": "object"
+      },
+      "Step": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance": {
+            "items": {
+              "maxLength": 300,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Acceptance",
+            "type": "array"
+          },
+          "description": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "acceptance"
+        ],
+        "title": "Step",
         "type": "object"
       }
     }
@@ -1695,6 +1874,122 @@
           }
         },
         "summary": "Project Assignment"
+      }
+    },
+    "/api/project-inbox/plan": {
+      "post": {
+        "operationId": "manual_plan_save_api_project_inbox_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Manual Plan Save"
+      }
+    },
+    "/api/project-inbox/plan/preview": {
+      "post": {
+        "operationId": "manual_plan_preview_api_project_inbox_plan_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Manual Plan Preview"
       }
     },
     "/api/project-inbox/review": {

@@ -21,6 +21,7 @@ from command_center.telegram_menu import BUTTONS, keyboard
 from command_center.telegram_project_picker import keyboard as picker_keyboard
 from command_center.project_inbox import PROJECTS
 from command_center.project_setup import read as read_setup
+from command_center.request_plan_store import read as read_plan
 config=connection('/run/telegram/connection.json')
 owner=config.owner_id
 calls=[]
@@ -51,7 +52,12 @@ def handle(request):
                 f'/setup_set lnauto {setup_start+4} acceptance Public synthetic acceptance',
                 '/setup lnauto','/setup_history lnauto',
                 f'/setup_clear lnauto {setup_start+5} target',
-                f'/setup_restore lnauto {setup_start+6} {setup_start+5}', '/setup lnauto', '/review 1']
+                f'/setup_restore lnauto {setup_start+6} {setup_start+5}', '/setup lnauto', '/review 1',
+                '/plan_edit 1',
+                f'/draft_plan 1 1 {setup_start+7} 0\nКратко: Уточнить форму\nШаг: Описать поля\nГотово: Поля перечислены',
+                '/plan 1','/review 1',
+                f'/draft_plan 1 1 {setup_start+7} 1\nКратко: Уточнить критерии\nШаг: Согласовать поля\nГотово: Критерии проверены',
+                '/plan 1']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -98,9 +104,9 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
     service=TelegramService(store,client,poll_seconds=0)
-    result=service.run(max_cycles=42)
-    assert result['completed_cycles']==42 and result['live_verified'] is False
-    assert calls.count('sendMessage')==40
+    result=service.run(max_cycles=48)
+    assert result['completed_cycles']==48 and result['live_verified'] is False
+    assert calls.count('sendMessage')==46
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -153,8 +159,15 @@ try:
     assert sum('Подготовка запроса №1' in value and 'Проект: LNAuto' in value
                and 'План: не сохранён' in value and 'Разрешение на выполнение и расходы не выдано' in value
                and f'(версия {setup_start+7})' in value for value in sent)==1
-    print(json.dumps({'mode':'http_mock','cycles':42,'read_only_queries':29,'project_assignments':1,
-        'request_reviews':1,
+    assert any('Ручной план запроса №1 сохранён: версия 1' in value for value in sent)
+    assert any('Ручной план запроса №1 сохранён: версия 2' in value for value in sent)
+    assert any('Черновик 2' in value and 'Автор: владелец' in value for value in sent)
+    manual=read_plan(store,'owner',service.bridge.profile+':1')
+    assert manual['version']==2 and manual['origin']=='owner_authored'
+    assert manual['state']=='STALE' and manual['proposal'] is None  # Explicit stop/resume changed the context.
+    assert manual['provider_evidence_verified'] is False
+    print(json.dumps({'mode':'http_mock','cycles':48,'read_only_queries':33,'project_assignments':1,
+        'request_reviews':2,'manual_plan_versions_added':2,'manual_plan_provider_called':False,
         'project_setup_versions_added':7,'project_setup_external_checks_performed':False,
         'project_connection_plan_replies':len(PROJECTS)+1,'project_connections_activated':False,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',

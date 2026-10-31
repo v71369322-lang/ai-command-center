@@ -1,5 +1,8 @@
 """Bounded owner-supplied advisory drafts in the existing append-only F1 audit."""
 from typing import Literal
+from datetime import datetime
+from uuid import UUID
+import re
 
 from pydantic import Field, ValidationError
 from sqlalchemy import select
@@ -7,12 +10,33 @@ from sqlalchemy import select
 from .coding.http_contract import Usage
 from .models import Audit
 from .project_inbox import check_content, owner
-from .request_planning import HEX, REQUEST, Plan, PlanningContext, Strict, _context, _review_response, limits
+from .request_planning import HEX, REQUEST, Plan, PlanningContext, Strict, Step, Text, _context, _review_response, limits
 from .store import Denied, canonical, digest
 
 EVENT = 'saved_request_plan_draft'
 MAX_PROPOSALS = 100
 MAX_DOCUMENT_BYTES = 32768
+OPERATION = r'^[a-f0-9]{8}-[a-f0-9]{4}-[45][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
+
+
+class ManualContent(Strict):
+    summary: Text
+    steps: list[Step] = Field(min_length=1, max_length=8)
+    questions: list[Text] = Field(max_length=5)
+
+
+class ManualRequest(Strict):
+    request_id: str = Field(pattern=REQUEST)
+    expected_context_digest: str = Field(pattern=HEX)
+    expected_assignment_version: int = Field(ge=1, le=1000)
+    expected_setup_version: int = Field(ge=0, le=500)
+    expected_setup_digest: str = Field(pattern=HEX)
+    expected_plan_version: int = Field(ge=0, le=MAX_PROPOSALS)
+    draft: ManualContent
+
+
+class ManualSaveRequest(ManualRequest):
+    operation_id: str = Field(pattern=OPERATION.replace('[45]', '4'))
 
 
 class Document(Strict):
@@ -33,7 +57,34 @@ class Document(Strict):
     execution_authorized: Literal[False]
 
 
+class ManualDocument(Strict):
+    schema_version: Literal[2]
+    request_id: str = Field(pattern=REQUEST)
+    context_digest: str = Field(pattern=HEX)
+    project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab']
+    assignment_version: int = Field(ge=1, le=1000)
+    revision: str = Field(pattern=r'^[a-f0-9]{40}$')
+    proposal: Plan
+    setup_version: int = Field(ge=0, le=500)
+    setup_digest: str = Field(pattern=HEX)
+    operation_id: str = Field(pattern=OPERATION)
+    input_digest: str = Field(pattern=HEX)
+    origin: Literal['owner_authored']
+    provider_evidence_verified: Literal[False]
+    execution_authorized: Literal[False]
+
+
+def manual_input(document, version):
+    return ManualRequest(request_id=document.request_id, expected_context_digest=document.context_digest,
+        expected_assignment_version=document.assignment_version, expected_setup_version=document.setup_version,
+        expected_setup_digest=document.setup_digest, expected_plan_version=version - 1,
+        draft=ManualContent(summary=document.proposal.summary, steps=document.proposal.steps,
+                            questions=document.proposal.questions)).model_dump()
+
+
 def identity(document):
+    if document.get('origin') == 'owner_authored':
+        return digest({'origin': document['origin'], 'operation_id': document['operation_id']})
     return digest({key: document[key] for key in ('request_id', 'context_digest', 'response_id', 'origin')})
 
 
@@ -50,10 +101,24 @@ def _records(session):
         try:
             if not isinstance(raw, dict) or len(canonical(raw).encode()) > MAX_DOCUMENT_BYTES:
                 raise ValueError()
-            document = Document.model_validate(raw)
+            if type(raw.get('schema_version')) is not int or raw['schema_version'] not in {1, 2}:
+                raise ValueError()
+            document = (ManualDocument if raw['schema_version'] == 2 else Document).model_validate(raw)
             normalized = document.model_dump()
-            limits(document.model, document.context_tokens, document.max_output_tokens)
-            usage = document.usage
+            if isinstance(document, Document):
+                limits(document.model, document.context_tokens, document.max_output_tokens)
+                usage = document.usage
+                if (usage.total_tokens != usage.input_tokens + usage.output_tokens
+                        or usage.input_tokens > document.context_tokens or usage.output_tokens > document.max_output_tokens):
+                    raise ValueError()
+            else:
+                operation = UUID(document.operation_id)
+                if (set(event) != {'kind','actor','task_id','time','revision','proposal_id','request_id','version','document','document_digest'}
+                        or datetime.fromisoformat(event['time']).tzinfo is None
+                        or not re.fullmatch(r'[a-f0-9]{40}', document.revision)
+                        or str(operation) != document.operation_id or operation.version not in {4,5}
+                        or document.input_digest != digest(manual_input(document, event['version']))):
+                    raise ValueError()
             if (canonical(normalized) != canonical(raw) or event.get('actor') != 'owner'
                     or event.get('task_id') is not None or event.get('revision') != document.revision
                     or event.get('request_id') != document.request_id
@@ -62,9 +127,7 @@ def _records(session):
                     or type(event.get('version')) is not int
                     or event['version'] != versions.get(document.request_id, 0) + 1
                     or document.proposal.context_digest != document.context_digest
-                    or document.project_id is None and not document.proposal.questions
-                    or usage.total_tokens != usage.input_tokens + usage.output_tokens
-                    or usage.input_tokens > document.context_tokens or usage.output_tokens > document.max_output_tokens):
+                    or document.project_id is None and not document.proposal.questions):
                 raise ValueError()
         except (Denied, ValueError, KeyError, TypeError):
             raise Denied('planning_draft_integrity') from None
@@ -75,7 +138,8 @@ def _records(session):
 
 def _screen(store, document):
     plan = document.proposal
-    for value in [document.model, document.response_id, plan.summary, *plan.questions,
+    provider = [document.model, document.response_id] if isinstance(document, Document) else []
+    for value in [*provider, plan.summary, *plan.questions,
                   *[value for step in plan.steps for value in [step.description, *step.acceptance]]]:
         try:
             if '\x00' in value:
@@ -161,7 +225,17 @@ def read_locked(store, session, request_id, *, version=None):
     if current and (document.project_id != snapshot.project_id or document.assignment_version != snapshot.assignment_version
                     or document.revision != snapshot.source_revision):
         raise Denied('planning_draft_integrity')
+    setup_state = 'NOT_RECORDED'
+    if isinstance(document, ManualDocument):
+        from .project_setup import read_locked as setup_read
+        setup = setup_read(store, session, document.project_id, selected=document.setup_version)
+        if setup['draft_digest'] != document.setup_digest:
+            raise Denied('planning_draft_integrity')
+        matches = setup['latest_version'] == document.setup_version
+        setup_state = 'CURRENT' if current and matches else 'STALE'
+        current = current and matches
     return {**common, 'state': 'CURRENT' if current else 'STALE', 'proposal_id': event['proposal_id'],
             'origin': document.origin, 'project_id': snapshot.project_id, 'version': event['version'],
+            'setup_reference_state': setup_state,
             'latest_version': latest_version,
             'proposal': document.proposal.model_dump() if current else None}
