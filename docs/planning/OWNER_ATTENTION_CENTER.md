@@ -50,7 +50,9 @@ result and is never rewritten to success by a read.
 
 The API and web center also reduce the latest receipt to a bounded delivery
 health state: never attempted, pending, confirmed, unchanged-suppressed, or
-uncertain. Only the uncertain state asks the owner to inspect delivery. The
+uncertain. A queued or sending receipt older than five minutes is reported as
+stalled without mutating it. Uncertain and stalled states ask the owner to
+inspect delivery. The
 `/attention` and `/reminders` Telegram views use the same durable receipt and
 never probe Telegram or infer success while being read.
 

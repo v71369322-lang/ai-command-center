@@ -1,8 +1,9 @@
 """Versioned owner reminder schedule and durable Telegram summary collection."""
 import re
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from .attention import build
 from .models import Audit, TelegramDelivery
@@ -63,14 +64,17 @@ def telegram_reply(session):
     """Return schedule status without exposing an update or authority path."""
     schedule = current(session)
     recent = activity(session, 1)
+    health = delivery_health(session)
     last = ''
     if recent:
         item = recent[0]
-        outcome = ('отправлена' if item['outcome'] == 'queued' else
+        outcome = ('поставлена в очередь' if health['state'] == 'pending' else
+                   'доставлена' if health['state'] == 'confirmed' else
                    'критическое изменение отправлено' if item['outcome'] == 'critical' else
                    'подавлена как неизменная')
-        if item['delivery_state'] in {'UNCERTAIN', 'CANCELLED'}:
-            outcome = 'результат доставки неизвестен'
+        if health['state'] in {'uncertain', 'stalled'}:
+            outcome = ('доставка застряла и требует проверки' if health['state'] == 'stalled'
+                       else 'результат доставки неизвестен')
         last = f"\nПоследняя сводка ({item['slot']}): {outcome}."
     if not schedule['configured']:
         return ('Напоминания центра внимания ещё не настроены.\n\n'
@@ -121,22 +125,33 @@ def activity(session, limit=5):
     return result
 
 
-def delivery_health(session):
+def delivery_health(session, now=None):
     """Summarize the latest durable delivery receipt without probing Telegram."""
     recent = activity(session, 1)
     if not recent:
         return {'state': 'never', 'action_required': False, 'last_slot': None}
     latest = recent[0]
     delivery_state = latest['delivery_state']
+    row = session.get(Audit, latest['sequence'])
+    try:
+        observed_at = datetime.fromisoformat(row.event['time'])
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise Denied('attention_activity_history_invalid') from None
+    now = now or session.execute(text('SELECT clock_timestamp()')).scalar_one()
+    if observed_at.tzinfo is None or now.tzinfo is None or observed_at > now:
+        raise Denied('attention_activity_history_invalid')
     if latest['outcome'] == 'suppressed':
         state = 'suppressed'
     elif delivery_state == 'SENT':
         state = 'confirmed'
     elif delivery_state in {'NEW', 'SENDING'}:
-        state = 'pending'
+        delivery = session.get(TelegramDelivery, row.event.get('delivery_id'))
+        stalled = (delivery_state == 'SENDING' and delivery.deadline is not None
+                   and delivery.deadline <= now) or (now - observed_at >= timedelta(minutes=5))
+        state = 'stalled' if stalled else 'pending'
     else:
         state = 'uncertain'
-    return {'state': state, 'action_required': state == 'uncertain',
+    return {'state': state, 'action_required': state in {'uncertain', 'stalled'},
             'last_slot': latest['slot']}
 
 

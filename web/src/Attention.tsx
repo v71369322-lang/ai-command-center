@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 type Item={code:string;level:'critical'|'warning'|'info';count:number;label:string;urgency:string;confidence:string;impact:string;target:'control-center'|'task-results'|'projects-heading'};
 type Activity={sequence:number;slot:string;outcome:'queued'|'suppressed'|'critical';delivery_state:string|null;schedule_version:number;critical_quiet_bypass:boolean};
-type DeliveryHealth={state:'never'|'pending'|'confirmed'|'uncertain'|'suppressed';action_required:boolean;last_slot:string|null};
+type DeliveryHealth={state:'never'|'pending'|'confirmed'|'uncertain'|'suppressed'|'stalled';action_required:boolean;last_slot:string|null};
 type View={items:Item[];highest_level:'critical'|'warning'|'info'|null;reminder_activity:Activity[];reminder_delivery_health:DeliveryHealth;total_pending_requests:number;task_admission_halted:boolean;recovery:boolean;reminders_connected:boolean;ai_planning_connected:false};
 function record(value:unknown):value is Record<string,unknown>{return typeof value==='object'&&value!==null&&!Array.isArray(value)}
 function parse(value:unknown):View{
@@ -14,7 +14,7 @@ function parse(value:unknown):View{
   ||typeof value.reminders_connected!=='boolean'||value.ai_planning_connected!==false||value.execution_started!==false
   ||!Array.isArray(value.reminder_activity)||value.reminder_activity.length>5
   ||!record(value.reminder_delivery_health)
-  ||!['never','pending','confirmed','uncertain','suppressed'].includes(String(value.reminder_delivery_health.state))
+  ||!['never','pending','confirmed','uncertain','suppressed','stalled'].includes(String(value.reminder_delivery_health.state))
   ||typeof value.reminder_delivery_health.action_required!=='boolean'
   ||!(value.reminder_delivery_health.last_slot===null||(typeof value.reminder_delivery_health.last_slot==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value.reminder_delivery_health.last_slot))))throw new Error();
  const seen=new Set<string>();

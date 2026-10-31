@@ -69,7 +69,7 @@ def summary(store, role):
         from .attention_schedule import activity, current, delivery_health
         result['reminders_connected'] = bool(current(session).get('enabled'))
         result['reminder_activity'] = activity(session)
-        result['reminder_delivery_health'] = delivery_health(session)
+        result['reminder_delivery_health'] = delivery_health(session, store.now(session))
         return result
 
 
@@ -78,7 +78,7 @@ def telegram_reply(store, session):
     result = build(store, session)
     from .attention_schedule import current, delivery_health
     schedule = current(session)
-    health = delivery_health(session)
+    health = delivery_health(session, store.now(session))
     lines = ['Центр внимания AI Commander']
     if result['items']:
         lines.extend(f"{item['count']} · {item['label']}" for item in result['items'])

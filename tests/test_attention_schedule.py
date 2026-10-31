@@ -54,9 +54,15 @@ def test_due_report_is_queued_once_and_contains_only_bounded_summary(store, monk
             assert collect(bridge, session) == first
             rows = session.scalars(select(TelegramDelivery)).all()
             assert len(rows) == 1 and rows[0].state == 'NEW'
-            assert delivery_health(session) == {
+            assert delivery_health(session, datetime(
+                2026, 10, 31, 14, 5, tzinfo=timezone.utc)) == {
                 'state': 'pending', 'action_required': False,
                 'last_slot': '2026-10-31T14:00'}
+            assert delivery_health(session, datetime(
+                2026, 10, 31, 14, 10, tzinfo=timezone.utc)) == {
+                'state': 'stalled', 'action_required': True,
+                'last_slot': '2026-10-31T14:00'}
+            assert rows[0].state == 'NEW'
             assert rows[0].body['chat_id'] == OWNER
             assert 'Просмотр ничего не запускает' in rows[0].body['text']
             assert len(rows[0].body['text']) < 4096

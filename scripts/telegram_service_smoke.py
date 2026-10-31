@@ -89,8 +89,11 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
     service=TelegramService(store,client,poll_seconds=0)
-    result=service.run(max_cycles=40)
-    require(result['completed_cycles']==40 and result['live_verified'] is False, 'initial_cycles')
+    # Six menu commands add durable replies ahead of the asynchronous coding
+    # result. Keep bounded scheduling slack so a healthy worker result reaches
+    # the transport before exact delivery assertions run.
+    result=service.run(max_cycles=48)
+    require(result['completed_cycles']==48 and result['live_verified'] is False, 'initial_cycles')
     # Fixed message updates, every menu button, and the coding-result
     # notification. The project-choice callback is acknowledged separately and
     # therefore is not a sendMessage call. Keep this coupled to the canonical
@@ -135,7 +138,7 @@ try:
     require(after['budget']==before['budget'] and after['tasks']==before['tasks'], 'resume_scope')
     require(any('Обычная остановка снята для новых разрешённых задач' in value for value in sent), 'resume_reply')
     require(all(len(value)<=4096 for value in sent), 'message_length')
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':14+len(BUTTONS),'project_assignments':1,
+    print(json.dumps({'mode':'http_mock','cycles':48,'read_only_queries':14+len(BUTTONS),'project_assignments':1,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,
