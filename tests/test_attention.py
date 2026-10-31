@@ -25,6 +25,12 @@ def test_owner_attention_summary_is_read_only_and_prioritized(store):
     assert result['total_pending_requests'] == 2
     assert [item['code'] for item in result['items'][:2]] == [
         'CONTROL_HALTED', 'REQUEST_UNASSIGNED']
+    assert result['highest_level'] == 'warning' and len(result['attention_hash']) == 64
+    assert result['items'][0]['level'] == 'warning'
+    assert result['items'][0]['urgency'] == 'soon'
+    assert result['items'][0]['confidence'] == 'authoritative'
+    assert result['items'][0]['impact'] == 'execution'
+    assert result['items'][1]['impact'] == 'planning'
     assert result['reminders_connected'] is False and result['ai_planning_connected'] is False
     assert store.snapshot() == before
 

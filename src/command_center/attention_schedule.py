@@ -10,6 +10,7 @@ from .store import Denied, digest
 
 EVENT = 'owner_attention_schedule_changed'
 NOTICE = 'owner_attention_report_queued'
+SUPPRESSED = 'owner_attention_report_suppressed'
 MAX_CHANGES = 1000
 
 
@@ -108,29 +109,44 @@ def collect(bridge, session):
         return None
     now = bridge.store.now(session).astimezone(ZoneInfo(schedule['timezone']))
     clock = now.strftime('%H:%M')
-    if _quiet(clock, schedule['quiet_start'], schedule['quiet_end']):
-        return None
-    due = [value for value in schedule['report_times'] if value <= clock
-           and not _quiet(value, schedule['quiet_start'], schedule['quiet_end'])]
+    due = [value for value in schedule['report_times'] if value <= clock]
     if not due:
+        return None
+    snapshot = build(bridge.store, session)
+    critical = snapshot['highest_level'] == 'critical'
+    if _quiet(clock, schedule['quiet_start'], schedule['quiet_end']) and not critical:
         return None
     slot = now.date().isoformat() + 'T' + due[-1]
     existing = session.scalar(select(Audit).where(
-        Audit.event['kind'].as_string() == NOTICE,
+        Audit.event['kind'].as_string().in_((NOTICE, SUPPRESSED)),
         Audit.event['profile'].as_string() == bridge.profile,
         Audit.event['slot'].as_string() == slot).limit(1))
     if existing:
+        if existing.event['kind'] == SUPPRESSED:
+            return None
         delivery = existing.event.get('delivery_id')
         if not isinstance(delivery, str) or not re.fullmatch(r'[a-f0-9]{64}', delivery):
             raise Denied('attention_notice_history_invalid')
         return delivery
-    snapshot = build(bridge.store, session)
+    latest = session.scalar(select(Audit).where(
+        Audit.event['kind'].as_string() == NOTICE,
+        Audit.event['profile'].as_string() == bridge.profile,
+    ).order_by(Audit.sequence.desc()).limit(1))
+    summary_hash = snapshot['attention_hash']
+    if (latest and latest.event.get('summary_hash') == summary_hash
+            and latest.event.get('schedule_version') == schedule['version']):
+        bridge.store.audit(session, SUPPRESSED, 'system', profile=bridge.profile, slot=slot,
+                           schedule_version=schedule['version'], summary_hash=summary_hash,
+                           reason='unchanged')
+        return None
     lines = [f"{item['count']} · {item['label']}" for item in snapshot['items']]
-    text = ('Сводка AI Commander\n' + ('\n'.join(lines) if lines else 'Пунктов, требующих внимания, нет.')
+    heading = 'Критическая сводка AI Commander' if critical else 'Сводка AI Commander'
+    text = (heading + '\n' + ('\n'.join(lines) if lines else 'Пунктов, требующих внимания, нет.')
             + '\n\nПросмотр ничего не запускает. Откройте центр для подробностей.')
     key = 'attention:' + slot + ':' + digest(snapshot)
     delivery = bridge.enqueue(session, key, text)
     bridge.store.audit(session, NOTICE, 'system', profile=bridge.profile, slot=slot,
                        delivery_id=delivery, schedule_version=schedule['version'],
-                       summary_hash=digest(snapshot))
+                       summary_hash=summary_hash, critical_quiet_bypass=bool(
+                           critical and _quiet(clock, schedule['quiet_start'], schedule['quiet_end'])))
     return delivery

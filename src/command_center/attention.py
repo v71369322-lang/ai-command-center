@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 
 from .models import Control, Task, TelegramInbox
 from .project_inbox import PROJECTS, history
-from .store import Denied
+from .store import Denied, digest
 
 
 def build(store, session):
@@ -43,8 +43,15 @@ def build(store, session):
     if rows:
         items.append({'code': 'REQUEST_NEEDS_PLANNING', 'level': 'info',
                       'count': len(rows), 'label': 'Запросы ожидают планирования'})
+    for item in items:
+        item['urgency'] = {'critical': 'immediate', 'warning': 'soon', 'info': 'normal'}[item['level']]
+        item['confidence'] = 'authoritative'
+        item['impact'] = 'execution' if item['code'].startswith(('CONTROL_', 'TASK_')) else 'planning'
+    highest = next((level for level in ('critical', 'warning', 'info')
+                    if any(item['level'] == level for item in items)), None)
     return {'schema': 1, 'items': items, 'task_counts': task_counts,
             'project_counts': project_counts, 'total_pending_requests': len(rows),
+            'highest_level': highest, 'attention_hash': digest(items),
             'task_admission_halted': bool(control.halted), 'recovery': bool(control.recovery),
             'ai_planning_connected': False, 'reminders_connected': False,
             'execution_started': False}

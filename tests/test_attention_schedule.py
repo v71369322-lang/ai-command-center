@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 
 from command_center.attention_schedule import collect, configure, current
-from command_center.models import TelegramDelivery
+from command_center.models import Audit, Control, TelegramDelivery
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
 from test_telegram_bridge import BotHTTP, OWNER
@@ -72,6 +72,48 @@ def test_quiet_hours_and_disabled_schedule_do_not_queue(store, monkeypatch):
         configure(store, 'owner', document(enabled=False, report_times=['14:00']), 1, str(uuid4()))
         with store.transaction() as session:
             assert collect(bridge, session) is None
+    finally:
+        client.close()
+
+
+def test_unchanged_later_slot_is_audited_once_without_duplicate_delivery(store, monkeypatch):
+    configure(store, 'owner', document(report_times=['08:00', '14:00']), 0, str(uuid4()))
+    clock = [datetime(2026, 10, 31, 8, 5, tzinfo=timezone.utc)]
+    monkeypatch.setattr(store, 'now', lambda session: clock[0])
+    client = MockTelegramHTTP(httpx.MockTransport(BotHTTP()))
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        with store.transaction() as session:
+            assert collect(bridge, session) is not None
+        clock[0] = datetime(2026, 10, 31, 14, 5, tzinfo=timezone.utc)
+        with store.transaction() as session:
+            assert collect(bridge, session) is None
+        with store.transaction() as session:
+            assert collect(bridge, session) is None
+            assert len(session.scalars(select(TelegramDelivery)).all()) == 1
+            events = [row.event for row in session.scalars(select(Audit)).all()
+                      if row.event['kind'] == 'owner_attention_report_suppressed']
+            assert len(events) == 1 and events[0]['reason'] == 'unchanged'
+    finally:
+        client.close()
+
+
+def test_critical_due_report_can_bypass_quiet_hours_with_audit_receipt(store, monkeypatch):
+    configure(store, 'owner', document(report_times=['23:00']), 0, str(uuid4()))
+    with store.transaction() as session:
+        session.get(Control, 1).recovery = True
+    monkeypatch.setattr(store, 'now', lambda session: datetime(
+        2026, 10, 31, 23, 30, tzinfo=timezone.utc))
+    client = MockTelegramHTTP(httpx.MockTransport(BotHTTP()))
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        with store.transaction() as session:
+            delivery = collect(bridge, session)
+            row = session.get(TelegramDelivery, delivery)
+            assert row.body['text'].startswith('Критическая сводка AI Commander')
+            notice = next(row.event for row in session.scalars(select(Audit)).all()
+                          if row.event['kind'] == 'owner_attention_report_queued')
+            assert notice['critical_quiet_bypass'] is True
     finally:
         client.close()
 

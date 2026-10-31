@@ -30,6 +30,14 @@ and profile provide restart-safe deduplication. Unknown sends retain the existin
 `UNCERTAIN` semantics. Collection does not resume tasks, authorize AI, or contact
 project systems.
 
+Each item also carries deterministic severity, urgency, confidence and impact
+metadata derived from authoritative local state. A later scheduled slot is
+recorded but does not send another Telegram message when the aggregate is
+unchanged. A changed aggregate is delivered at the next due slot. A critical
+control/reconciliation condition may use a due report slot during quiet hours;
+the audit receipt records that bypass. These rules do not create escalation or
+execution authority.
+
 ## Explicitly not connected
 
 - AI planning of saved requests;
