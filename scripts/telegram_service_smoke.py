@@ -94,11 +94,12 @@ try:
     # the transport before exact delivery assertions run.
     result=service.run(max_cycles=48)
     require(result['completed_cycles']==48 and result['live_verified'] is False, 'initial_cycles')
-    # Fixed message updates, every menu button, and the coding-result
-    # notification. The project-choice callback is acknowledged separately and
-    # therefore is not a sendMessage call. Keep this coupled to the canonical
-    # menu instead of silently pinning the smoke to an obsolete button count.
-    require(calls.count('sendMessage')==16+len(BUTTONS), 'send_count')
+    # Seventeen fixed update replies, every menu button, and the asynchronous
+    # coding-result notification. Keep this coupled to the canonical menu
+    # instead of silently pinning the smoke to an obsolete button count.
+    actual_sends, expected_sends = calls.count('sendMessage'), 18+len(BUTTONS)
+    require(actual_sends == expected_sends,
+            f'send_count_{actual_sends}_expected_{expected_sends}')
     require(sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                 and 'Сводка не запускает задачи' in value for value in sent)==1, 'readiness')
     require(menus==[keyboard(),keyboard()], 'menus')
