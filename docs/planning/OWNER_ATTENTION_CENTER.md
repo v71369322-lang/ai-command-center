@@ -16,16 +16,25 @@ The endpoint is owner-only, validates the audit chain and returns counts rather
 than request bodies. Reading it does not create a task, approval, outbox row,
 provider call, project access or execution grant.
 
+## Scheduled Telegram summaries
+
+The owner can store a versioned schedule with an IANA timezone, one to three
+daily report times and quiet hours. The schedule is disabled until explicitly
+enabled. Configuration is stored in the existing hash-chained audit ledger with
+optimistic versioning and idempotency; no schema migration or second authority
+is introduced.
+
+The active Telegram bridge collects the latest due non-quiet slot and queues a
+bounded summary through the existing durable `TelegramDelivery` path. The slot
+and profile provide restart-safe deduplication. Unknown sends retain the existing
+`UNCERTAIN` semantics. Collection does not resume tasks, authorize AI, or contact
+project systems.
+
 ## Explicitly not connected
 
-- automatic reminders and scheduled reports;
-- quiet-hours enforcement or an owner timezone;
 - AI planning of saved requests;
 - CRM/repository access for project labels;
-- Telegram push delivery for the summary.
+- escalation or automatic action based on a reminder.
 
-The UI states these gaps directly. A later reminder slice must reuse this summary,
-store an owner-selected timezone and schedule, honor quiet hours, deduplicate
-durably and use the existing Telegram delivery/outbox authority. Merely opening
-the summary or choosing a schedule cannot authorize AI, resume tasks or access a
-project system.
+The UI states these gaps directly. Merely opening the summary or choosing a
+schedule cannot authorize AI, resume tasks or access a project system.

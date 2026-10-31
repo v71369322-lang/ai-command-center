@@ -621,6 +621,8 @@ class TelegramBridge:
             from .telegram_experiment_watch import collect
             collect(self, session)
             collect(RecoveryBridge(self), session)
+            from .attention_schedule import collect as collect_attention
+            collect_attention(self, session)
 
     def deliver_one(self):
         self.guard()
