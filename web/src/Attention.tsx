@@ -4,7 +4,7 @@ type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 type Item={code:string;level:'critical'|'warning'|'info';count:number;label:string;urgency:string;confidence:string;impact:string;target:'control-center'|'task-results'|'projects-heading'};
 type Activity={sequence:number;slot:string;outcome:'queued'|'suppressed'|'critical';delivery_state:string|null;schedule_version:number;critical_quiet_bypass:boolean};
 type DeliveryHealth={state:'never'|'pending'|'confirmed'|'uncertain'|'suppressed'|'stalled';action_required:boolean;last_slot:string|null};
-type View={items:Item[];highest_level:'critical'|'warning'|'info'|null;reminder_activity:Activity[];reminder_delivery_health:DeliveryHealth;total_pending_requests:number;task_admission_halted:boolean;recovery:boolean;reminders_connected:boolean;ai_planning_connected:false};
+type View={items:Item[];highest_level:'critical'|'warning'|'info'|null;reminder_activity:Activity[];reminder_delivery_health:DeliveryHealth;reminder_schedule_state:'not_configured'|'disabled'|'active';total_pending_requests:number;task_admission_halted:boolean;recovery:boolean;reminders_connected:boolean;ai_planning_connected:false};
 function record(value:unknown):value is Record<string,unknown>{return typeof value==='object'&&value!==null&&!Array.isArray(value)}
 function parse(value:unknown):View{
  if(!record(value)||value.schema!==1||!Array.isArray(value.items)||value.items.length>8
@@ -12,6 +12,7 @@ function parse(value:unknown):View{
   ||typeof value.task_admission_halted!=='boolean'||typeof value.recovery!=='boolean'
   ||![null,'critical','warning','info'].includes(value.highest_level as null|string)
   ||typeof value.reminders_connected!=='boolean'||value.ai_planning_connected!==false||value.execution_started!==false
+  ||!['not_configured','disabled','active'].includes(String(value.reminder_schedule_state))
   ||!Array.isArray(value.reminder_activity)||value.reminder_activity.length>5
   ||!record(value.reminder_delivery_health)
   ||!['never','pending','confirmed','uncertain','suppressed','stalled'].includes(String(value.reminder_delivery_health.state))
@@ -34,7 +35,7 @@ function parse(value:unknown):View{
   ||!(raw.delivery_state===null||['NEW','SENDING','SENT','UNCERTAIN','CANCELLED'].includes(String(raw.delivery_state)))
   ||!Number.isInteger(raw.schedule_version)||Number(raw.schedule_version)<1||typeof raw.critical_quiet_bypass!=='boolean')throw new Error();
   return raw as unknown as Activity});
- return {items,highest_level:value.highest_level as View['highest_level'],reminder_activity,reminder_delivery_health:value.reminder_delivery_health as unknown as DeliveryHealth,total_pending_requests:Number(value.total_pending_requests),task_admission_halted:value.task_admission_halted,
+ return {items,highest_level:value.highest_level as View['highest_level'],reminder_activity,reminder_delivery_health:value.reminder_delivery_health as unknown as DeliveryHealth,reminder_schedule_state:value.reminder_schedule_state as View['reminder_schedule_state'],total_pending_requests:Number(value.total_pending_requests),task_admission_halted:value.task_admission_halted,
   recovery:value.recovery,reminders_connected:value.reminders_connected,ai_planning_connected:false};
 }
 
@@ -57,7 +58,7 @@ export function AttentionCenter({request}:{request:Request}){
     {item.slot}: {item.delivery_state==='UNCERTAIN'?'доставка не подтверждена':item.outcome==='suppressed'?'без повтора — состояние не изменилось':item.outcome==='critical'?'критическое изменение поставлено в доставку':'поставлена в доставку'}
     {item.critical_quiet_bypass?' · критическое уведомление в тихие часы':''}</li>)}</ul></>}
    {view.reminder_delivery_health.action_required&&<p role="alert">Доставка последнего Telegram-напоминания не подтверждена и требует проверки. <a href="#reminders-heading">Открыть напоминания</a></p>}
-   <p>{view.reminders_connected?'Telegram-напоминания включены по сохранённому расписанию.':'Telegram-напоминания выключены.'} AI-планирование запросов ещё не подключено.</p>
+   <p>{view.reminder_schedule_state==='active'?'Telegram-напоминания включены по сохранённому расписанию.':view.reminder_schedule_state==='disabled'?'Расписание Telegram сохранено, но напоминания выключены.':'Расписание Telegram-напоминаний ещё не настроено.'} AI-планирование запросов ещё не подключено.</p>
    <button disabled={loading} onClick={()=>void reload()}>Обновить сводку</button></>}
  </section>;
 }

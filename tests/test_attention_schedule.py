@@ -208,6 +208,14 @@ def test_owner_can_configure_schedule_through_api(client, headers):
     payload = document() | {'expected_version': 0, 'operation_id': str(uuid4())}
     saved = client.post('/api/attention/schedule', headers=headers['owner'], json=payload)
     assert saved.status_code == 200 and saved.json()['version'] == 1
-    assert client.get('/api/attention', headers=headers['owner']).json()['reminders_connected'] is True
+    attention = client.get('/api/attention', headers=headers['owner']).json()
+    assert attention['reminders_connected'] is True
+    assert attention['reminder_schedule_state'] == 'active'
+    disabled = document(enabled=False) | {
+        'expected_version': 1, 'operation_id': str(uuid4())}
+    assert client.post('/api/attention/schedule', headers=headers['owner'], json=disabled).status_code == 200
+    attention = client.get('/api/attention', headers=headers['owner']).json()
+    assert attention['reminders_connected'] is False
+    assert attention['reminder_schedule_state'] == 'disabled'
     assert client.get('/api/attention/schedule', headers=headers['operator']).status_code == 409
     assert client.post('/api/attention/schedule', headers=headers['agent'], json=payload).status_code == 409

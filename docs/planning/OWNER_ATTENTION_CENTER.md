@@ -56,6 +56,10 @@ inspect delivery. The
 `/attention` and `/reminders` Telegram views use the same durable receipt and
 never probe Telegram or infer success while being read.
 
+The attention summary distinguishes an unconfigured schedule from a saved but
+disabled schedule and an active one. This explains why no reminder will arrive
+without treating configuration as proof of Telegram connectivity.
+
 When reminders are enabled, collection records aggregate state transitions. A
 new critical recovery/reconciliation aggregate queues one proactive Telegram
 notification immediately, including during quiet hours, and records the exact

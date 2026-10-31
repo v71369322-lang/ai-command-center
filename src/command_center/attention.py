@@ -67,7 +67,10 @@ def summary(store, role):
         store.check_audit(session)
         result = build(store, session)
         from .attention_schedule import activity, current, delivery_health
-        result['reminders_connected'] = bool(current(session).get('enabled'))
+        schedule = current(session)
+        result['reminders_connected'] = bool(schedule.get('enabled'))
+        result['reminder_schedule_state'] = ('not_configured' if not schedule['configured'] else
+                                             'active' if schedule['enabled'] else 'disabled')
         result['reminder_activity'] = activity(session)
         result['reminder_delivery_health'] = delivery_health(session, store.now(session))
         return result
@@ -88,7 +91,9 @@ def telegram_reply(store, session):
         '',
         f"Запросов без проекта: {result['project_counts']['unassigned']}.",
         f"Запросов, ожидающих планирования: {result['total_pending_requests']}.",
-        'Напоминания: ' + ('включены.' if schedule.get('enabled') else 'выключены.'),
+        ('Напоминания: включены.' if schedule.get('enabled') else
+         'Напоминания: расписание настроено, но выключено.' if schedule.get('configured') else
+         'Напоминания: расписание ещё не настроено.'),
         ('Доставка напоминаний требует проверки.' if health['action_required'] else
          'Доставка напоминаний: подтверждена.' if health['state'] == 'confirmed' else
          'Доставка напоминаний: ожидает подтверждения.' if health['state'] == 'pending' else
