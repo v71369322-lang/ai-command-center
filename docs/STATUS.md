@@ -1,5 +1,18 @@
 # Текущий контекст и облачный handoff
 
+Продолжение **31 октября 2026, после PR #66**: [очередь стадий подготовки](projects/PREPARATION_QUEUE.md)
+показывает следующий шаг каждого сохранённого запроса, счётчики по стадиям,
+project/stage filters и доступ к старым запросам по страницам. Мобильная панель
+и private-owner `/queue` используют один checked PG reader. Intake anchors,
+assignment/setup/plan history загружаются один раз под прежним Control lock;
+общие validators сохранены. API pages связываются digest снимка: изменения
+требуют перечитать первую страницу. Стадия сверки задачи и подключений не является
+разрешением на запуск; authority/provider/external flags остаются false.
+PR #66 проверен заново: HEAD 07b6693, full CI SUCCESS — 1568 Python /1 прежнее
+предупреждение, 962 infrastructure, все container smokes. Финальные HEAD/merge-ref/CI
+нового этапа фиксируются в отдельном Draft PR поверх #66. VPS/AI/реальные проекты
+не затронуты; frozen recovery/release pairs не менялись.
+
 Продолжение **31 октября 2026, после PR #65**: [ручные планы запроса](projects/MANUAL_REQUEST_PLANS.md)
 добавляют редактирование цели, шагов, критериев и вопросов в мобильной карточке
 и private-owner Telegram. Это owner-authored schema 2 в прежнем audit journal:

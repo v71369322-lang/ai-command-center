@@ -211,7 +211,14 @@ def read_locked(store, session, request_id, *, version=None):
     if version is not None and (type(version) is not int or not 1 <= version <= MAX_PROPOSALS):
         raise Denied('planning_draft_version_invalid')
     snapshot = _context(store, session, request_id)
-    records = [value for value in _records(session).values() if value[1].request_id == request_id]
+    from .project_setup import read_locked as setup_read
+    return _read_context(store, snapshot, _records(session),
+        lambda pid, selected: setup_read(store, session, pid, selected=selected), version=version)
+
+
+def _read_context(store, snapshot, history, setup_reader, *, version=None):
+    request_id = snapshot.request_id
+    records = [value for value in history.values() if value[1].request_id == request_id]
     common = {'request_id': request_id, 'execution_authorized': False, 'task_created': False,
               'provider_evidence_verified': False}
     latest_version = records[-1][0]['version'] if records else 0
@@ -227,8 +234,7 @@ def read_locked(store, session, request_id, *, version=None):
         raise Denied('planning_draft_integrity')
     setup_state = 'NOT_RECORDED'
     if isinstance(document, ManualDocument):
-        from .project_setup import read_locked as setup_read
-        setup = setup_read(store, session, document.project_id, selected=document.setup_version)
+        setup = setup_reader(document.project_id, document.setup_version)
         if setup['draft_digest'] != document.setup_digest:
             raise Denied('planning_draft_integrity')
         matches = setup['latest_version'] == document.setup_version

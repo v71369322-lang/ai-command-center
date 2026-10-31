@@ -439,6 +439,14 @@ def create_app(settings=None, gateway_factory=None):
         from .project_inbox import classify
         return classify(store, role, **body.model_dump())
 
+    @app.get('/api/project-inbox/preparation')
+    def preparation_queue(project: Literal['all', 'unassigned', 'command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'] = 'all',
+                          stage: Literal['all', 'select_project', 'complete_setup', 'prepare_plan', 'refresh_plan', 'answer_questions', 'verify_scope'] = 'all',
+                          page: int = Query(default=1, ge=1, le=100),
+                          snapshot: str | None = Query(default=None, pattern=r'^[a-f0-9]{64}$'), role=Depends(identity)):
+        from .request_preparation import read
+        return read(store, role, project=project, stage=stage, page=page, snapshot=snapshot)
+
     @app.get('/api/project-inbox/review')
     def request_review(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
                        role=Depends(identity)):

@@ -6,3 +6,5 @@
 .project-setup button:disabled{opacity:.55;cursor:default}
 .request-review{margin-top:1rem;overflow-wrap:anywhere}.request-review summary{min-height:44px;cursor:pointer;padding:.5rem 0}.request-review section{padding:.5rem;border-left:3px solid #737f90}.request-review ul,.request-review ol{padding-left:1.25rem}
 .manual-plan{margin-top:1rem;overflow-wrap:anywhere}.manual-plan fieldset{min-width:0;margin:.5rem 0;padding:.65rem}.manual-plan label{display:block;margin-top:.5rem}.manual-plan input,.manual-plan textarea{box-sizing:border-box;width:100%;max-width:100%}.manual-plan textarea{min-height:5rem}.manual-plan button{margin:.4rem .4rem .4rem 0}
+
+.preparation-queue{margin:1rem 0;border:1px solid #42516a;border-radius:8px;padding:.75rem}.preparation-queue select{display:block;width:100%;min-height:44px;margin:.4rem 0 .8rem}.preparation-queue button{min-height:44px;max-width:100%;white-space:normal}.preparation-queue p,.preparation-queue li{overflow-wrap:anywhere}.preparation-pages{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0}

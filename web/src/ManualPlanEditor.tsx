@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useId,useRef,useState} from 'react';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 export type PlanDraft={summary:string;steps:{description:string;acceptance:string[]}[];questions:string[]};
@@ -57,7 +57,8 @@ export function ManualPlanEditor({reference,initial,request,onSaved,onReload}:{r
   catch{if(current===generation.current)setError('Текущие сведения недоступны. Обновите очередь перед следующей записью.')}
   finally{if(current===generation.current)setBusy(false)}
  }
- const prefix='manual-'+reference.request_id+'-';
+ const instance=useId();
+ const prefix='manual-'+instance+'-';
  return <section className="manual-plan" aria-label="Редактор ручного плана" aria-busy={busy}>
   <h4>Ручной план</h4><p>Автором будете вы. Черновик сохраняется без AI-вызова, запуска задачи и разрешения расходов. Ключи, пароли и клиентские данные не вводите.</p>
   {busy&&<p role="status">Обрабатываем ручной план…</p>}{(error||previewError)&&<p role="alert">{error||previewError}</p>}
