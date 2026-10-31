@@ -87,7 +87,10 @@ try:
     service=TelegramService(store,client,poll_seconds=0)
     result=service.run(max_cycles=40)
     assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==22
+    # Sixteen fixed updates, every menu button, readiness, and one coding-result
+    # notification. Keep the assertion coupled to the canonical menu instead of
+    # silently pinning the smoke test to an obsolete button count.
+    assert calls.count('sendMessage')==18+len(BUTTONS)
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -127,7 +130,7 @@ try:
     assert after['budget']==before['budget'] and after['tasks']==before['tasks']
     assert any('Обычная остановка снята для новых разрешённых задач' in value for value in sent)
     assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':18,'project_assignments':1,
+    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':14+len(BUTTONS),'project_assignments':1,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,
