@@ -1,5 +1,12 @@
 # Текущий контекст и облачный handoff
 
+Cloud-продолжение **31 октября 2026**: [Owner attention center](planning/OWNER_ATTENTION_CENTER.md)
+добавляет owner-only read-only сводку halted/recovery, задач, требующих решения,
+и очередей `NEEDS_PLANNING` по проектам. Web явно показывает, что reminders и
+AI planning пока не подключены. Чтение не создаёт task/grant/outbox и не даёт
+доступ к CRM/repository. Это отдельная зависимая ветка поверх Telegram recovery;
+VPS и текущий бот не обновляются автоматически.
+
 Актуализация **31 октября 2026**: постоянное исправление Telegram OOM подготовлено
 в [checkpoint восстановления](infrastructure/TELEGRAM_MEMORY_RECOVERY_2026-10-31.md).
 Кандидат `1d7ab452…04d21` на source `912cad8f` сохраняет Telegram 256 MiB,

@@ -426,6 +426,11 @@ def create_app(settings=None, gateway_factory=None):
         from .project_inbox import inbox
         return inbox(store, role, project)
 
+    @app.get('/api/attention')
+    def attention(role=Depends(identity)):
+        from .attention import summary
+        return summary(store, role)
+
     @app.post('/api/project-inbox/assign')
     def project_assignment(body: ProjectAssignment, role=Depends(identity)):
         from .project_inbox import classify
