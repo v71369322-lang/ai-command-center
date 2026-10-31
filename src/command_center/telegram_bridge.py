@@ -194,6 +194,11 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        attention_commands = {'/attention': 'attention', '/reminders': 'reminders'}
+        if value in attention_commands:
+            return str(uid), {'kind': attention_commands[value]}
+        if value.split()[:1] and value.split()[0] in attention_commands:
+            raise Denied('telegram_attention_arguments_forbidden')
         if value == '/plan':
             return str(uid), {'kind': 'help'}
         if value.split()[:1] == ['/plan']:
@@ -431,7 +436,8 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
-        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'plan_review', 'coding_plan', 'readiness', 'experiment',
+        elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
+                      'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -459,6 +465,12 @@ class TelegramBridge:
                 elif kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
+                elif kind == 'attention':
+                    from .attention import telegram_reply
+                    reply = telegram_reply(self.store, session)
+                elif kind == 'reminders':
+                    from .attention_schedule import telegram_reply
+                    reply = telegram_reply(session)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -524,6 +536,7 @@ class TelegramBridge:
                         '/request номер — открыть запрос; '
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '
+                        '/attention — центр внимания; /reminders — расписание сводок; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
@@ -621,6 +634,8 @@ class TelegramBridge:
             from .telegram_experiment_watch import collect
             collect(self, session)
             collect(RecoveryBridge(self), session)
+            from .attention_schedule import collect as collect_attention
+            collect_attention(self, session)
 
     def deliver_one(self):
         self.guard()

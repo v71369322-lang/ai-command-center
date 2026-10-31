@@ -2,6 +2,7 @@
 
 BUTTONS = (
     ('📁 Проекты', '/projects'), ('📥 Запросы', '/requests'),
+    ('🔔 Центр внимания', '/attention'), ('⏰ Напоминания', '/reminders'),
     ('🧪 Результаты тестов', '/tasks'), ('ℹ️ Помощь', '/help'),
 )
 
@@ -9,4 +10,5 @@ BUTTONS = (
 def keyboard():
     """Return a fresh Bot API ReplyKeyboardMarkup, never caller-defined actions."""
     return {'keyboard': [[{'text': label} for label, _ in BUTTONS[start:start + 2]]
-                         for start in (0, 2)], 'resize_keyboard': True, 'is_persistent': True}
+                         for start in range(0, len(BUTTONS), 2)],
+            'resize_keyboard': True, 'is_persistent': True}

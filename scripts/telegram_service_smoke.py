@@ -27,6 +27,9 @@ menus=[]
 pickers=[]
 resume_cards=[]
 resume_mode=False
+def require(condition, code):
+    if not condition:
+        raise RuntimeError('telegram_smoke_assertion:' + code)
 def handle(request):
     method=request.url.path.rsplit('/',1)[-1]
     body=json.loads(request.content)
@@ -52,6 +55,7 @@ def handle(request):
                     result[index]={'update_id':7,'callback_query':{'id':'public-project-choice',
                         'from':{'id':owner,'is_bot':False},'data':'pj:1:0:lnauto',
                         'message':{'message_id':1,'chat':{'id':owner,'type':'private'}}}}
+            result=result[:20]  # Match the bridge and Bot API batch ceiling.
         if resume_mode:
             result=[]
             if body['offset']<=100:
@@ -63,10 +67,10 @@ def handle(request):
                     'from':{'id':owner,'is_bot':False},'data':data,
                     'message':{'message_id':message_id,'chat':{'id':owner,'type':'private'}}}}]
     elif method=='answerCallbackQuery':
-        assert body in ({'callback_query_id':'public-project-choice'},{'callback_query_id':'public-normal-resume'})
+        require(body in ({'callback_query_id':'public-project-choice'},{'callback_query_id':'public-normal-resume'}), 'callback_body')
         result=True
     elif method=='sendMessage':
-        assert body['chat_id']==owner
+        require(body['chat_id']==owner, 'send_chat')
         sent.append(body['text'])
         if 'keyboard' in body.get('reply_markup',{}):
             menus.append(body['reply_markup'])
@@ -85,36 +89,44 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
     service=TelegramService(store,client,poll_seconds=0)
-    result=service.run(max_cycles=40)
-    assert result['completed_cycles']==40 and result['live_verified'] is False
-    assert calls.count('sendMessage')==22
-    assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
-               and 'Сводка не запускает задачи' in value for value in sent)==1
-    assert menus==[keyboard(),keyboard()]
-    assert pickers==[picker_keyboard('1',0),picker_keyboard('1',0),picker_keyboard('1',1)]
-    assert calls.count('answerCallbackQuery')==1
-    assert any('пока нет' in value for value in sent)
-    assert any('не найдена' in value for value in sent)
-    assert any('Запрос №1 сохранён' in value for value in sent)
-    assert sum('Текст запроса (не команда):' in value and 'Synthetic container service request' in value
-               for value in sent)==6
-    assert any('Проект: LNAuto. Версия назначения: 1' in value for value in sent)
-    assert any('LNAuto: 1\n/requests lnauto' in value for value in sent)
-    assert any('Очередь: LNAuto. Ожидают планирования: 1.' in value for value in sent)
-    assert any('Очередь: Ваниль и Сахар. Ожидают планирования: 0.' in value for value in sent)
-    assert any('Очередь: Не распределены. Ожидают планирования: 0.' in value for value in sent)
-    assert any('Тестовый разработчик (mock) принят:' in value for value in sent)
-    assert any('Проверка 1: найдена ошибка. Проверка 2: пройдена после исправления.' in value
-               and 'Результат независимо проверен' in value
-               and 'PR подготовлен в mock-режиме, не опубликован' in value for value in sent)
+    # Six menu commands add durable replies ahead of the asynchronous coding
+    # result. Keep bounded scheduling slack so a healthy worker result reaches
+    # the transport before exact delivery assertions run.
+    result=service.run(max_cycles=48)
+    require(result['completed_cycles']==48 and result['live_verified'] is False, 'initial_cycles')
+    # Seventeen fixed update replies, every menu button, and the asynchronous
+    # coding-result notification. Keep this coupled to the canonical menu
+    # instead of silently pinning the smoke to an obsolete button count.
+    actual_sends, expected_sends = calls.count('sendMessage'), 18+len(BUTTONS)
+    require(actual_sends == expected_sends,
+            f'send_count_{actual_sends}_expected_{expected_sends}')
+    require(sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
+                and 'Сводка не запускает задачи' in value for value in sent)==1, 'readiness')
+    require(menus==[keyboard(),keyboard()], 'menus')
+    require(pickers==[picker_keyboard('1',0),picker_keyboard('1',0),picker_keyboard('1',1)], 'pickers')
+    require(calls.count('answerCallbackQuery')==1, 'callback_count')
+    require(any('пока нет' in value for value in sent), 'empty_tasks')
+    require(any('не найдена' in value for value in sent), 'missing_task')
+    require(any('Запрос №1 сохранён' in value for value in sent), 'request_saved')
+    require(sum('Текст запроса (не команда):' in value and 'Synthetic container service request' in value
+                for value in sent)==6, 'request_body_count')
+    require(any('Проект: LNAuto. Версия назначения: 1' in value for value in sent), 'assignment')
+    require(any('LNAuto: 1\n/requests lnauto' in value for value in sent), 'project_counts')
+    require(any('Очередь: LNAuto. Ожидают планирования: 1.' in value for value in sent), 'lnauto_queue')
+    require(any('Очередь: Ваниль и Сахар. Ожидают планирования: 0.' in value for value in sent), 'vanilla_queue')
+    require(any('Очередь: Не распределены. Ожидают планирования: 0.' in value for value in sent), 'unassigned_queue')
+    require(any('Тестовый разработчик (mock) принят:' in value for value in sent), 'coding_accepted')
+    require(any('Проверка 1: найдена ошибка. Проверка 2: пройдена после исправления.' in value
+                and 'Результат независимо проверен' in value
+                and 'PR подготовлен в mock-режиме, не опубликован' in value for value in sent), 'coding_result')
     from command_center.models import TelegramInbox
     row_id=service.bridge.profile+':15'
     with store.transaction() as session:
         task_id=session.get(TelegramInbox,row_id).task_id
     coding_task=store.get(task_id)
-    assert coding_task['state']=='SUCCEEDED'
-    assert [r['checks']['passed'] for r in coding_task['coding']['test_runs']]==[False,True]
-    assert coding_task['coding']['pr']['published'] is False and coding_task['coding']['pr']['url'] is None
+    require(coding_task['state']=='SUCCEEDED', 'coding_state')
+    require([r['checks']['passed'] for r in coding_task['coding']['test_runs']]==[False,True], 'coding_checks')
+    require(coding_task['coding']['pr']['published'] is False and coding_task['coding']['pr']['url'] is None, 'coding_pr')
     # Run the real service/PG action from a separately confirmed normal stop.
     # The callback is returned only after its sendMessage receipt was observed.
     store.halt('owner')
@@ -122,12 +134,12 @@ try:
     resume_mode=True
     resumed=service.run(max_cycles=3)
     after=store.snapshot()
-    assert resumed['completed_cycles']==3 and len(resume_cards)==1
-    assert after['halted'] is False and after['epoch']==before['epoch']+1
-    assert after['budget']==before['budget'] and after['tasks']==before['tasks']
-    assert any('Обычная остановка снята для новых разрешённых задач' in value for value in sent)
-    assert all(len(value)<=4096 for value in sent)
-    print(json.dumps({'mode':'http_mock','cycles':40,'read_only_queries':18,'project_assignments':1,
+    require(resumed['completed_cycles']==3 and len(resume_cards)==1, 'resume_cycles')
+    require(after['halted'] is False and after['epoch']==before['epoch']+1, 'resume_state')
+    require(after['budget']==before['budget'] and after['tasks']==before['tasks'], 'resume_scope')
+    require(any('Обычная остановка снята для новых разрешённых задач' in value for value in sent), 'resume_reply')
+    require(all(len(value)<=4096 for value in sent), 'message_length')
+    print(json.dumps({'mode':'http_mock','cycles':48,'read_only_queries':14+len(BUTTONS),'project_assignments':1,
         'readiness_summary_delivered':True,'readiness_ai_status':'unknown_without_gateway_profile',
         'owner_menu_replies':len(menus),'menu_buttons':len(BUTTONS),
         'project_picker_cards':len(pickers),'project_choice_callbacks':1,
@@ -142,6 +154,8 @@ finally:
 def command(*args):
     result = docker(*args, timeout=90)
     if result.returncode:
+        if result.stderr:
+            print(result.stderr.decode(errors='replace')[-2000:])
         raise RuntimeError('telegram_container_smoke_failed:' + args[0])
     return result.stdout
 

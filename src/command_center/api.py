@@ -59,6 +59,17 @@ class ProjectAssignment(BaseModel):
     operation_id: str = Field(pattern=r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$')
 
 
+class AttentionScheduleRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    enabled: bool
+    timezone: str = Field(min_length=1, max_length=64)
+    report_times: list[str] = Field(min_length=1, max_length=3)
+    quiet_start: str = Field(pattern=r'^[0-2][0-9]:[0-5][0-9]$')
+    quiet_end: str = Field(pattern=r'^[0-2][0-9]:[0-5][0-9]$')
+    expected_version: int = Field(ge=0, le=1000, strict=True)
+    operation_id: str = Field(pattern=r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$')
+
+
 class ErrorResponse(BaseModel):
     detail: str
 
@@ -425,6 +436,26 @@ def create_app(settings=None, gateway_factory=None):
                       role=Depends(identity)):
         from .project_inbox import inbox
         return inbox(store, role, project)
+
+    @app.get('/api/attention')
+    def attention(role=Depends(identity)):
+        from .attention import summary
+        return summary(store, role)
+
+    @app.get('/api/attention/schedule')
+    def attention_schedule(role=Depends(identity)):
+        from .attention_schedule import current
+        if role != 'owner':
+            raise Denied('owner_required')
+        with store.transaction() as session:
+            store.check_audit(session)
+            return current(session)
+
+    @app.post('/api/attention/schedule')
+    def update_attention_schedule(body: AttentionScheduleRequest, role=Depends(identity)):
+        from .attention_schedule import configure
+        document = body.model_dump(exclude={'expected_version', 'operation_id'})
+        return configure(store, role, document, body.expected_version, body.operation_id)
 
     @app.post('/api/project-inbox/assign')
     def project_assignment(body: ProjectAssignment, role=Depends(identity)):
