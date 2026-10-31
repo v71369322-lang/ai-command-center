@@ -137,10 +137,45 @@ def test_critical_due_report_can_bypass_quiet_hours_with_audit_receipt(store, mo
         with store.transaction() as session:
             delivery = collect(bridge, session)
             row = session.get(TelegramDelivery, delivery)
-            assert row.body['text'].startswith('Критическая сводка AI Commander')
+            assert row.body['text'].startswith('Критическое изменение AI Commander')
             notice = next(row.event for row in session.scalars(select(Audit)).all()
-                          if row.event['kind'] == 'owner_attention_report_queued')
+                          if row.event['kind'] == 'owner_attention_critical_queued')
             assert notice['critical_quiet_bypass'] is True
+    finally:
+        client.close()
+
+
+def test_new_critical_transition_notifies_once_and_recurrence_notifies_again(store, monkeypatch):
+    configure(store, 'owner', document(report_times=['21:00']), 0, str(uuid4()))
+    monkeypatch.setattr(store, 'now', lambda session: datetime(
+        2026, 10, 31, 10, 0, tzinfo=timezone.utc))
+    client = MockTelegramHTTP(httpx.MockTransport(BotHTTP()))
+    bridge = TelegramBridge(store, client, OWNER)
+    try:
+        # Establish a normal observation without sending anything.
+        with store.transaction() as session:
+            assert collect(bridge, session) is None
+            session.get(Control, 1).recovery = True
+        with store.transaction() as session:
+            first = collect(bridge, session)
+            assert first is not None
+            assert collect(bridge, session) is None
+            assert len(session.scalars(select(TelegramDelivery)).all()) == 1
+        # Observing recovery completion rearms a later recurrence of the same state.
+        with store.transaction() as session:
+            session.get(Control, 1).recovery = False
+        with store.transaction() as session:
+            assert collect(bridge, session) is None
+            session.get(Control, 1).recovery = True
+        with store.transaction() as session:
+            second = collect(bridge, session)
+            assert second != first
+            recent = activity(session)
+            assert [item['outcome'] for item in recent] == ['critical', 'critical']
+            assert all(item['critical_quiet_bypass'] is False for item in recent)
+            observations = [row for row in session.scalars(select(Audit)).all()
+                            if row.event['kind'] == 'owner_attention_observed']
+            assert len(observations) == 4
     finally:
         client.close()
 

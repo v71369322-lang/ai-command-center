@@ -44,6 +44,14 @@ and critical quiet-hours bypass. It omits Telegram profile hashes, delivery IDs,
 message bodies and request text. `UNCERTAIN` is shown as an unknown delivery
 result and is never rewritten to success by a read.
 
+When reminders are enabled, collection records aggregate state transitions. A
+new critical recovery/reconciliation aggregate queues one proactive Telegram
+notification immediately, including during quiet hours, and records the exact
+observation sequence. Repeated polls of the same aggregate do not queue another
+message. A return to normal state is observed without a notification, allowing a
+later recurrence of the same critical aggregate to produce a new, separately
+deduplicated notification.
+
 ## Explicitly not connected
 
 - AI planning of saved requests;

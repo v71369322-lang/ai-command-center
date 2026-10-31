@@ -11,6 +11,8 @@ from .store import Denied, digest
 EVENT = 'owner_attention_schedule_changed'
 NOTICE = 'owner_attention_report_queued'
 SUPPRESSED = 'owner_attention_report_suppressed'
+OBSERVED = 'owner_attention_observed'
+CRITICAL = 'owner_attention_critical_queued'
 MAX_CHANGES = 1000
 MAX_ACTIVITY = 20
 
@@ -65,6 +67,7 @@ def telegram_reply(session):
     if recent:
         item = recent[0]
         outcome = ('отправлена' if item['outcome'] == 'queued' else
+                   'критическое изменение отправлено' if item['outcome'] == 'critical' else
                    'подавлена как неизменная')
         if item['delivery_state'] == 'UNCERTAIN':
             outcome = 'результат доставки неизвестен'
@@ -87,7 +90,7 @@ def activity(session, limit=5):
     if type(limit) is not int or not 1 <= limit <= MAX_ACTIVITY:
         raise Denied('attention_activity_limit_invalid')
     rows = session.scalars(select(Audit).where(
-        Audit.event['kind'].as_string().in_((NOTICE, SUPPRESSED)),
+        Audit.event['kind'].as_string().in_((NOTICE, SUPPRESSED, CRITICAL)),
     ).order_by(Audit.sequence.desc()).limit(limit)).all()
     result = []
     for row in rows:
@@ -101,13 +104,14 @@ def activity(session, limit=5):
         delivery_state = None
         critical_bypass = False
         outcome = 'suppressed'
-        if event['kind'] == NOTICE:
+        if event['kind'] in {NOTICE, CRITICAL}:
             delivery_id = event.get('delivery_id')
             delivery = session.get(TelegramDelivery, delivery_id) if isinstance(delivery_id, str) else None
             if (not delivery or delivery.profile != event.get('profile')
                     or delivery.state not in {'NEW', 'SENDING', 'SENT', 'UNCERTAIN', 'CANCELLED'}):
                 raise Denied('attention_activity_delivery_invalid')
-            outcome, delivery_state = 'queued', delivery.state
+            outcome = 'critical' if event['kind'] == CRITICAL else 'queued'
+            delivery_state = delivery.state
             critical_bypass = event.get('critical_quiet_bypass') is True
         elif event.get('reason') != 'unchanged':
             raise Denied('attention_activity_history_invalid')
@@ -115,6 +119,34 @@ def activity(session, limit=5):
                        'delivery_state': delivery_state, 'schedule_version': version,
                        'critical_quiet_bypass': critical_bypass})
     return result
+
+
+def _observe(bridge, session, snapshot, now, schedule):
+    latest = session.scalar(select(Audit).where(
+        Audit.event['kind'].as_string() == OBSERVED,
+        Audit.event['profile'].as_string() == bridge.profile,
+    ).order_by(Audit.sequence.desc()).limit(1))
+    summary_hash = snapshot['attention_hash']
+    critical = snapshot['highest_level'] == 'critical'
+    if latest and latest.event.get('summary_hash') == summary_hash:
+        return None
+    bridge.store.audit(session, OBSERVED, 'system', profile=bridge.profile,
+                       summary_hash=summary_hash, critical=critical,
+                       schedule_version=schedule['version'])
+    observation = session.scalar(select(Audit).order_by(Audit.sequence.desc()).limit(1))
+    if not critical:
+        return None
+    lines = [f"{item['count']} · {item['label']}" for item in snapshot['items']
+             if item['level'] == 'critical']
+    text = ('Критическое изменение AI Commander\n' + '\n'.join(lines)
+            + '\n\nУведомление ничего не запускает. Откройте /attention для общей сводки.')
+    delivery = bridge.enqueue(session, f'attention-critical:{observation.sequence}:{summary_hash}', text)
+    quiet = _quiet(now.strftime('%H:%M'), schedule['quiet_start'], schedule['quiet_end'])
+    bridge.store.audit(session, CRITICAL, 'system', profile=bridge.profile,
+                       slot=now.strftime('%Y-%m-%dT%H:%M'), delivery_id=delivery,
+                       schedule_version=schedule['version'], summary_hash=summary_hash,
+                       observation_sequence=observation.sequence, critical_quiet_bypass=quiet)
+    return delivery
 
 
 def configure(store, role, document, expected_version, operation_id):
@@ -153,14 +185,15 @@ def collect(bridge, session):
     if not schedule.get('enabled'):
         return None
     now = bridge.store.now(session).astimezone(ZoneInfo(schedule['timezone']))
+    snapshot = build(bridge.store, session)
+    proactive = _observe(bridge, session, snapshot, now, schedule)
     clock = now.strftime('%H:%M')
     due = [value for value in schedule['report_times'] if value <= clock]
     if not due:
-        return None
-    snapshot = build(bridge.store, session)
+        return proactive
     critical = snapshot['highest_level'] == 'critical'
     if _quiet(clock, schedule['quiet_start'], schedule['quiet_end']) and not critical:
-        return None
+        return proactive
     slot = now.date().isoformat() + 'T' + due[-1]
     existing = session.scalar(select(Audit).where(
         Audit.event['kind'].as_string().in_((NOTICE, SUPPRESSED)),
@@ -168,13 +201,13 @@ def collect(bridge, session):
         Audit.event['slot'].as_string() == slot).limit(1))
     if existing:
         if existing.event['kind'] == SUPPRESSED:
-            return None
+            return proactive
         delivery = existing.event.get('delivery_id')
         if not isinstance(delivery, str) or not re.fullmatch(r'[a-f0-9]{64}', delivery):
             raise Denied('attention_notice_history_invalid')
         return delivery
     latest = session.scalar(select(Audit).where(
-        Audit.event['kind'].as_string() == NOTICE,
+        Audit.event['kind'].as_string().in_((NOTICE, CRITICAL)),
         Audit.event['profile'].as_string() == bridge.profile,
     ).order_by(Audit.sequence.desc()).limit(1))
     summary_hash = snapshot['attention_hash']
@@ -183,7 +216,7 @@ def collect(bridge, session):
         bridge.store.audit(session, SUPPRESSED, 'system', profile=bridge.profile, slot=slot,
                            schedule_version=schedule['version'], summary_hash=summary_hash,
                            reason='unchanged')
-        return None
+        return proactive
     lines = [f"{item['count']} · {item['label']}" for item in snapshot['items']]
     heading = 'Критическая сводка AI Commander' if critical else 'Сводка AI Commander'
     text = (heading + '\n' + ('\n'.join(lines) if lines else 'Пунктов, требующих внимания, нет.')

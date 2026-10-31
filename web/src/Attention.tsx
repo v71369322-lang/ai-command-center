@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 type Item={code:string;level:'critical'|'warning'|'info';count:number;label:string;urgency:string;confidence:string;impact:string};
-type Activity={sequence:number;slot:string;outcome:'queued'|'suppressed';delivery_state:string|null;schedule_version:number;critical_quiet_bypass:boolean};
+type Activity={sequence:number;slot:string;outcome:'queued'|'suppressed'|'critical';delivery_state:string|null;schedule_version:number;critical_quiet_bypass:boolean};
 type View={items:Item[];highest_level:'critical'|'warning'|'info'|null;reminder_activity:Activity[];total_pending_requests:number;task_admission_halted:boolean;recovery:boolean;reminders_connected:boolean;ai_planning_connected:false};
 function record(value:unknown):value is Record<string,unknown>{return typeof value==='object'&&value!==null&&!Array.isArray(value)}
 function parse(value:unknown):View{
@@ -24,7 +24,7 @@ function parse(value:unknown):View{
  });
  const reminder_activity=value.reminder_activity.map(raw=>{if(!record(raw)||!Number.isInteger(raw.sequence)||Number(raw.sequence)<1
   ||typeof raw.slot!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw.slot)
-  ||!['queued','suppressed'].includes(String(raw.outcome))
+  ||!['queued','suppressed','critical'].includes(String(raw.outcome))
   ||!(raw.delivery_state===null||['NEW','SENDING','SENT','UNCERTAIN','CANCELLED'].includes(String(raw.delivery_state)))
   ||!Number.isInteger(raw.schedule_version)||Number(raw.schedule_version)<1||typeof raw.critical_quiet_bypass!=='boolean')throw new Error();
   return raw as unknown as Activity});
@@ -48,7 +48,7 @@ export function AttentionCenter({request}:{request:Request}){
   {view&&<>{view.highest_level&&<p><strong>Высший приоритет:</strong> {view.highest_level==='critical'?'критический':view.highest_level==='warning'?'требует внимания':'информационный'}.</p>}
    {view.items.length?<ul>{view.items.map(item=><li key={item.code} data-level={item.level}><strong>{item.count}</strong> · {item.label}</li>)}</ul>:<p>Пунктов, требующих внимания, сейчас нет.</p>}
    {view.reminder_activity.length>0&&<><h3>Последние сводки</h3><ul>{view.reminder_activity.map(item=><li key={item.sequence}>
-    {item.slot}: {item.delivery_state==='UNCERTAIN'?'доставка не подтверждена':item.outcome==='suppressed'?'без повтора — состояние не изменилось':'поставлена в доставку'}
+    {item.slot}: {item.delivery_state==='UNCERTAIN'?'доставка не подтверждена':item.outcome==='suppressed'?'без повтора — состояние не изменилось':item.outcome==='critical'?'критическое изменение поставлено в доставку':'поставлена в доставку'}
     {item.critical_quiet_bypass?' · критическое уведомление в тихие часы':''}</li>)}</ul></>}
    <p>{view.reminders_connected?'Telegram-напоминания включены по сохранённому расписанию.':'Telegram-напоминания выключены.'} AI-планирование запросов ещё не подключено.</p>
    <button disabled={loading} onClick={()=>void reload()}>Обновить сводку</button></>}
