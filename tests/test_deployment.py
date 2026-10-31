@@ -820,6 +820,60 @@ def test_failed_rollout_is_durable_and_not_blindly_retried(operator, monkeypatch
         operator.apply('update', checksum(operator.bundle))
 
 
+def test_exact_intent_can_be_reconciled_without_runtime_mutation(operator):
+    intended = {
+        'phase': 'INTENT', 'bundle': checksum(operator.bundle),
+        'revision': operator.m['revision'], 'migration_hash': operator.m['migration_hash'],
+        'database_image': operator.m['database_image'], 'previous_bundle': 'a' * 64,
+        'directory': str(operator.directory.resolve()),
+    }
+    atomic_json(operator.root / 'deployment.json', intended)
+    result = operator.reconcile_intent(checksum(operator.bundle))
+    receipt = json.loads((operator.root / 'deployment.json').read_text())
+    assert result == {'go_live': False}
+    assert receipt == {**intended, 'phase': 'VERIFIED', 'checks': result}
+    assert operator.engine.calls == []
+
+
+@pytest.mark.parametrize('change', ['approval', 'phase', 'bundle', 'revision', 'directory',
+                                    'migration_hash', 'database_image'])
+def test_intent_reconciliation_rejects_changed_scope(operator, change):
+    intended = {
+        'phase': 'INTENT', 'bundle': checksum(operator.bundle),
+        'revision': operator.m['revision'], 'migration_hash': operator.m['migration_hash'],
+        'database_image': operator.m['database_image'], 'previous_bundle': 'a' * 64,
+        'directory': str(operator.directory.resolve()),
+    }
+    approval = intended['bundle']
+    if change == 'approval':
+        approval = 'b' * 64
+    elif change == 'phase':
+        intended[change] = 'VERIFIED'
+    elif change == 'directory':
+        intended[change] = str(operator.directory.parent / 'other')
+    else:
+        intended[change] = '0' * len(str(intended[change]))
+    atomic_json(operator.root / 'deployment.json', intended)
+    with pytest.raises(ValueError, match='authorization|intent_changed'):
+        operator.reconcile_intent(approval)
+    assert json.loads((operator.root / 'deployment.json').read_text()) == intended
+    assert operator.engine.calls == []
+
+
+def test_failed_intent_reconciliation_preserves_unknown_state(operator, monkeypatch):
+    intended = {
+        'phase': 'INTENT', 'bundle': checksum(operator.bundle),
+        'revision': operator.m['revision'], 'migration_hash': operator.m['migration_hash'],
+        'database_image': operator.m['database_image'], 'previous_bundle': 'a' * 64,
+        'directory': str(operator.directory.resolve()),
+    }
+    atomic_json(operator.root / 'deployment.json', intended)
+    monkeypatch.setattr(operator, 'postcheck', lambda: (_ for _ in ()).throw(RuntimeError('unhealthy')))
+    with pytest.raises(RuntimeError, match='unhealthy'):
+        operator.reconcile_intent(checksum(operator.bundle))
+    assert json.loads((operator.root / 'deployment.json').read_text()) == intended
+
+
 @pytest.mark.parametrize('phase', ['VERIFIED', 'INTENT'])
 def test_rollback_only_exact_predecessor_without_database_restore(operator, phase):
     mark_current(operator, phase=phase, previous=checksum(operator.bundle))
