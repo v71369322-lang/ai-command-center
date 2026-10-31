@@ -22,6 +22,12 @@ CHECKS = (
 )
 
 
+def preparation_step(has_project, setup_state, plan_state):
+    return ('select_project' if not has_project else 'complete_setup' if setup_state != 'COMPLETE'
+            else 'prepare_plan' if plan_state == 'MISSING' else 'refresh_plan' if plan_state == 'STALE'
+            else 'answer_questions' if plan_state == 'NEEDS_CLARIFICATION' else 'verify_scope')
+
+
 def read_locked(store, session, request_id):
     """Caller owns the existing checked F1 Control transaction."""
     context = _context(store, session, request_id)
@@ -45,9 +51,7 @@ def read_locked(store, session, request_id):
               'repository': 'NOT_CHECKED', 'verification': 'NOT_CHECKED',
               'delivery': 'NOT_CHECKED', 'authorization': 'NOT_GRANTED',
               'admission': 'RECOVERY' if context.recovery else 'HALTED' if context.halted else 'OPEN'}
-    next_step = ('select_project' if not project else 'complete_setup' if setup_state != 'COMPLETE'
-                 else 'prepare_plan' if plan_state == 'MISSING' else 'refresh_plan' if plan_state == 'STALE'
-                 else 'answer_questions' if plan_state == 'NEEDS_CLARIFICATION' else 'verify_scope')
+    next_step = preparation_step(bool(project), setup_state, plan_state)
     result = {'schema': 1, 'scope': 'REQUEST_REVIEW_ONLY',
               'source_revision': context.source_revision, 'context_digest': context.binding,
               'request': {'id': context.request_id, 'text': context.text,

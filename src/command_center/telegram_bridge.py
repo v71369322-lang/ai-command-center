@@ -192,6 +192,9 @@ class TelegramBridge:
             if len(parts) != 2 or parts[1] not in IDS | {'all', 'unassigned'}:
                 raise Denied('telegram_project_filter_invalid')
             return str(uid), {'kind': 'requests', 'project': parts[1]}
+        if value.split()[:1] == ['/queue']:
+            from .request_preparation import telegram_parse
+            return str(uid), telegram_parse(value)
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
         if value.split()[:1] == ['/review']:
@@ -463,7 +466,7 @@ class TelegramBridge:
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'project_connection', 'project_setup', 'project_setup_history',
-                      'plan_review', 'request_review', 'manual_plan_template', 'coding_plan', 'readiness', 'experiment',
+                      'plan_review', 'request_review', 'preparation_queue', 'manual_plan_template', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -494,6 +497,9 @@ class TelegramBridge:
                 elif kind == 'project_connection':
                     from .telegram_project_connection import reply as connection_reply
                     reply = connection_reply(intent['project_id'])
+                elif kind == 'preparation_queue':
+                    from .request_preparation import telegram_reply
+                    reply = telegram_reply(self, session, intent, suffix)
                 elif kind == 'request_review':
                     from .request_review import telegram_reply
                     reply = telegram_reply(self, session, intent, suffix)
@@ -566,6 +572,7 @@ class TelegramBridge:
                         'Текст сохраняется и ожидает планирования.\n\n'
                         '/menu — показать меню; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
+                        '/queue — стадии подготовки, фильтры и страницы запросов; '
                         '/request номер — открыть запрос; '
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '

@@ -57,7 +57,7 @@ def handle(request):
                 f'/draft_plan 1 1 {setup_start+7} 0\nКратко: Уточнить форму\nШаг: Описать поля\nГотово: Поля перечислены',
                 '/plan 1','/review 1',
                 f'/draft_plan 1 1 {setup_start+7} 1\nКратко: Уточнить критерии\nШаг: Согласовать поля\nГотово: Критерии проверены',
-                '/plan 1']
+                '/plan 1', '/queue', '/queue lnauto verify_scope', '/queue lnauto answer_questions']
         result=[{'update_id':i,'message':{
             'message_id':100+i,'date':1700000000,'from':{'id':owner,'is_bot':False,'first_name':'Public fixture owner'},
             'chat':{'id':owner,'type':'private'},'text':value}}
@@ -104,9 +104,9 @@ client=ConfiguredTelegramHTTP('/run/telegram/connection.json',digest(config.mode
     store.settings.source_revision,transport=httpx.MockTransport(handle))
 try:
     service=TelegramService(store,client,poll_seconds=0)
-    result=service.run(max_cycles=48)
-    assert result['completed_cycles']==48 and result['live_verified'] is False
-    assert calls.count('sendMessage')==46
+    result=service.run(max_cycles=51)
+    assert result['completed_cycles']==51 and result['live_verified'] is False
+    assert calls.count('sendMessage')==49
     assert sum('Состояние AI Commander' in value and 'Состояние gateway неизвестно' in value
                and 'Сводка не запускает задачи' in value for value in sent)==1
     assert menus==[keyboard(),keyboard()]
@@ -162,11 +162,16 @@ try:
     assert any('Ручной план запроса №1 сохранён: версия 1' in value for value in sent)
     assert any('Ручной план запроса №1 сохранён: версия 2' in value for value in sent)
     assert any('Черновик 2' in value and 'Автор: владелец' in value for value in sent)
+    preparation=[value for value in sent if 'Подготовка запросов. Снимок UTC:' in value]
+    assert len(preparation)==3
+    assert sum('Найдено: 1 из 1' in value for value in preparation)==2
+    assert sum('Найдено: 0 из 1' in value for value in preparation)==1
+    assert all('Сверить задачу и подключения: 1' in value and 'не разрешение запуска' in value for value in preparation)
     manual=read_plan(store,'owner',service.bridge.profile+':1')
     assert manual['version']==2 and manual['origin']=='owner_authored'
     assert manual['state']=='STALE' and manual['proposal'] is None  # Explicit stop/resume changed the context.
     assert manual['provider_evidence_verified'] is False
-    print(json.dumps({'mode':'http_mock','cycles':48,'read_only_queries':33,'project_assignments':1,
+    print(json.dumps({'mode':'http_mock','cycles':51,'read_only_queries':36,'preparation_queue_replies':3,'project_assignments':1,
         'request_reviews':2,'manual_plan_versions_added':2,'manual_plan_provider_called':False,
         'project_setup_versions_added':7,'project_setup_external_checks_performed':False,
         'project_connection_plan_replies':len(PROJECTS)+1,'project_connections_activated':False,

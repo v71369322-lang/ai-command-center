@@ -454,6 +454,26 @@ privacy boundary. UI abort/logout/late responses, optimistic concurrency и
 checkpoint refresh проверяются с настоящим PG/API и Chromium 320/390.
 Host/rootless/iPhone/live-provider acceptance этим не доказаны.
 
+## Очередь стадий подготовки после PR #66
+
+Новый owner-only GET и private-profile `/queue` читают существующие records под
+одним Control lock. Bulk intake query выбирает тот же earliest owner receive
+anchor; pure intake/context/plan validators общие с индивидуальными readers.
+Все pending inputs проверяются до фильтра/страницы. Setup replay и plan history
+загружаются один раз, memoization живёт только внутри проверенной транзакции.
+Неполный, sensitive или повреждённый снимок не заменяется пустым/готовым ответом.
+Новые tables/writers/permission grants отсутствуют; provider/ledger/executor не вызываются.
+
+Snapshot digest связывает ordered rows, source/Control context, versions и filters,
+не является approval/capability. Web pagination требует совпадения digest, после
+conflict начинает чтение заново. TG выдаёт явно датированные свежие pages, profile
+не выбирается пользовательским аргументом. Прежние guards durable query/reply и
+rotation screen сохраняются. Composite reply отдельно ограничен Bot API bytes/
+characters; input snippets сохраняют прежний guard. Новый UI validates false
+flags/counts/stages, отменяет late responses и не исполняет текст. Одновременные
+редакторы одного запроса имеют разные HTML IDs. Source/recovery/build/deployment
+pins и все F1 financial/execution boundaries сохранены. Cloud CI не host acceptance.
+
 ## Не закрывать без внешнего evidence
 
 Host-compromise isolation, независимая custody/immutability checkpoints/backups,

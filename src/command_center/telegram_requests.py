@@ -6,21 +6,30 @@ from .models import Audit, TelegramInbox
 from .store import Denied, canonical, digest
 
 
-def captured_text(session, row):
-    """Validate immutable intake before any reader copies its contents."""
+def _captured_text(row, anchor):
+    """Shared intake validation for individual readers and a checked batch."""
     number = row.id.removeprefix(row.profile + ':')
     if (row.state != 'NEEDS_PLANNING' or not isinstance(row.intent, dict)
             or set(row.intent) != {'kind', 'text'} or row.intent.get('kind') != 'capture'
             or row.task_id is not None or row.fingerprint != digest(row.intent)
             or not isinstance(row.intent.get('text'), str) or not 1 <= len(row.intent['text'].encode()) <= 2000
-            or not session.execute(select(Audit).where(
-                Audit.event['kind'].as_string() == 'telegram_update_received',
-                Audit.event['actor'].as_string() == 'owner',
-                Audit.event['profile'].as_string() == row.profile,
-                Audit.event['update_id'].as_string() == number,
-                Audit.event['intent_hash'].as_string() == row.fingerprint)).first()):
+            or not isinstance(anchor, dict) or anchor.get('kind') != 'telegram_update_received'
+            or anchor.get('actor') != 'owner' or anchor.get('profile') != row.profile
+            or anchor.get('update_id') != number or anchor.get('intent_hash') != row.fingerprint):
         raise Denied('telegram_saved_request_integrity')
     return row.intent['text']
+
+
+def captured_text(session, row):
+    """Validate immutable intake before any reader copies its contents."""
+    number = row.id.removeprefix(row.profile + ':')
+    anchor = session.scalar(select(Audit).where(
+        Audit.event['kind'].as_string() == 'telegram_update_received',
+        Audit.event['actor'].as_string() == 'owner',
+        Audit.event['profile'].as_string() == row.profile,
+        Audit.event['update_id'].as_string() == number,
+        Audit.event['intent_hash'].as_string() == row.fingerprint).order_by(Audit.sequence).limit(1))
+    return _captured_text(row, anchor.event if anchor else None)
 
 
 def capture_receipt(inbox_id):

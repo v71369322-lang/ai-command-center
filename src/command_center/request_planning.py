@@ -93,12 +93,20 @@ def _context(store, session, request_id):
         Audit.event['actor'].as_string() == 'owner', Audit.event['profile'].as_string() == row.profile,
         Audit.event['update_id'].as_string() == row.id.rsplit(':', 1)[1],
         Audit.event['intent_hash'].as_string() == row.fingerprint).order_by(Audit.sequence).limit(1))
-    control = session.get(Control, 1)
+    return _context_values(store, row, value, selection, anchor.event if anchor else None, session.get(Control, 1))
+
+
+def _context_values(store, row, value, selection, anchor, control):
+    """Same checked context construction for a row and an audit-checked batch."""
+    if (not re.fullmatch(REQUEST, row.id) or int(row.id.rsplit(':', 1)[1]) >= 2**53):
+        raise Denied('planning_request_invalid')
+    if selection and selection['request_fingerprint'] != row.fingerprint:
+        raise Denied('project_request_binding_changed')
     try:
         return PlanningContext(schema_version=1, request_id=row.id, request_fingerprint=row.fingerprint,
             text=value, project_id=selection['project_id'] if selection else None,
             assignment_version=selection['version'] if selection else 0,
-            intake_revision=anchor.event.get('revision') if anchor else None,
+            intake_revision=anchor.get('revision') if anchor else None,
             source_revision=store.settings.source_revision, control_epoch=control.epoch,
             halted=control.halted, recovery=control.recovery)
     except ValidationError:
