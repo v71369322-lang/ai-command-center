@@ -31,7 +31,8 @@ def test_menu_is_delivered_by_strict_transport_without_execution(bridge, store, 
     assert service.deliver_one()['state'] == 'SENT'
     body = fake.sent[0]
     assert body['reply_markup'] == keyboard()
-    assert 'Голос отключён' in body['text'] and 'AI-эксперимент требует отдельного разрешения' in body['text']
+    assert ('Голосовая заметка с подписью /calendar' in body['text']
+            and 'AI-эксперимент требует отдельного разрешения' in body['text'])
     assert '/experiment' in body['text']
     assert '/menu' in body['text'] and 'ожидает планирования' in body['text']
     assert len(canonical(body).encode()) <= 8192

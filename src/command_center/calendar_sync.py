@@ -14,7 +14,8 @@ BINDING = 'owner_google_calendar_binding_changed'
 PREPARED = 'google_calendar_sync_prepared'
 UNKNOWN = 'google_calendar_sync_unknown'
 SYNCED = 'google_calendar_sync_completed'
-SYNC_EVENTS = (PREPARED, UNKNOWN, SYNCED)
+REJECTED = 'google_calendar_sync_rejected'
+SYNC_EVENTS = (PREPARED, UNKNOWN, SYNCED, REJECTED)
 MAX_BINDINGS = 100
 MAX_SYNCS = 500
 
@@ -119,6 +120,10 @@ def sync_state(session, draft_id):
                     or not re.fullmatch(r'[a-f0-9]{64}', event['etag_hash'])):
                 raise Denied('google_calendar_sync_history_invalid')
             state.update(state='SYNCED', event_id=event['event_id'])
+        elif event['kind'] == REJECTED and state['state'] == 'PREPARED':
+            if not re.fullmatch(r'[a-z0-9_]{3,80}', event.get('error_code', '')):
+                raise Denied('google_calendar_sync_history_invalid')
+            state.update(state='FAILED', error_code=event['error_code'])
         else:
             raise Denied('google_calendar_sync_history_invalid')
     return state
@@ -153,11 +158,11 @@ def prepare_sync(store, role, draft_id, operation_id):
         return sync_state(session, draft_id)
 
 
-def record_outcome(store, draft_id, request_hash, operation_id, outcome, response=None):
+def record_outcome(store, draft_id, request_hash, operation_id, outcome, response=None, error_code=None):
     """Record publisher evidence; UNKNOWN requires reconciliation before any retry."""
     _uuid(draft_id, 'calendar_reference_invalid')
     _uuid(operation_id, 'google_calendar_operation_invalid')
-    if outcome not in {'unknown', 'synced'} or not re.fullmatch(r'[a-f0-9]{64}', request_hash or ''):
+    if outcome not in {'unknown', 'synced', 'failed'} or not re.fullmatch(r'[a-f0-9]{64}', request_hash or ''):
         raise Denied('google_calendar_outcome_invalid')
     with store.transaction() as session:
         store.check_audit(session)
@@ -171,18 +176,27 @@ def record_outcome(store, draft_id, request_hash, operation_id, outcome, respons
         if state['state'] not in {'PREPARED', 'UNKNOWN'} or state['request_hash'] != request_hash:
             raise Denied('google_calendar_outcome_stale')
         if outcome == 'unknown':
-            if state['state'] != 'PREPARED' or response is not None:
+            if state['state'] != 'PREPARED' or response is not None or error_code is not None:
                 raise Denied('google_calendar_outcome_stale')
             store.audit(session, UNKNOWN, 'calendar_publisher', draft_id=draft_id,
                         request_hash=request_hash, operation_id=operation_id,
                         retry_permitted=False, reconciliation_required=True)
-        else:
+        elif outcome == 'synced':
+            if error_code is not None:
+                raise Denied('google_calendar_outcome_invalid')
             draft = get_draft_locked(session, draft_id)
             verified = verify_event(response, draft_id, draft['document'])
             store.audit(session, SYNCED, 'calendar_publisher', draft_id=draft_id,
                         request_hash=request_hash, operation_id=operation_id,
                         event_id=verified['event_id'], etag_hash=digest(response['etag']),
                         document_hash=verified['document_hash'])
+        else:
+            if (state['state'] != 'PREPARED' or response is not None
+                    or not isinstance(error_code, str) or not re.fullmatch(r'[a-z0-9_]{3,80}', error_code)):
+                raise Denied('google_calendar_outcome_invalid')
+            store.audit(session, REJECTED, 'calendar_publisher', draft_id=draft_id,
+                        request_hash=request_hash, operation_id=operation_id,
+                        error_code=error_code, retry_permitted=False)
         return sync_state(session, draft_id)
 
 
@@ -197,3 +211,19 @@ def reconciliation_plan(store, role, draft_id):
             raise Denied('google_calendar_reconciliation_not_required')
         return {'request': reconciliation_request(binding['calendar_id'], draft_id),
                 'request_hash': state['request_hash'], 'external_call_performed': False}
+
+
+def publication_plan(store, draft_id):
+    """Reconstruct the exact prepared request without reading OAuth credentials."""
+    with store.transaction() as session:
+        store.check_audit(session)
+        state = sync_state(session, draft_id)
+        binding = current_binding(session)
+        draft = get_draft_locked(session, draft_id)
+        if state['state'] != 'PREPARED' or not binding.get('enabled'):
+            raise Denied('google_calendar_publication_not_prepared')
+        request = insert_request(binding['calendar_id'], draft_id, draft['document'])
+        if (state['binding_version'] != binding['version'] or state['document_hash'] != digest(draft['document'])
+                or state['request_hash'] != digest(request)):
+            raise Denied('google_calendar_publication_context_changed')
+        return {'request': request, 'request_hash': state['request_hash'], 'draft_id': draft_id}

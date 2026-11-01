@@ -65,8 +65,8 @@ Telegram-напоминания. Только отдельное подтвер�
 не угадывается и требует нового уточнённого сообщения.
 
 1. Trusted downloader/transcription worker поверх готового voice intake/readback contract.
-2. OAuth-привязка выделенного Google Calendar при участии владельца.
-3. Publisher worker и status view поверх готового durable state.
+2. Реальная OAuth-привязка выделенного Google Calendar при участии владельца.
+3. Защищённая custody refresh token и deployment publisher worker.
 4. Синтетическая приёмка, затем один реальный event без участников.
 
 Офлайн-контракт Google Insert уже фиксирует минимальное событие без участников и
@@ -87,6 +87,16 @@ Voice intake также подготовлен: только owner voice с яв
 event. Контракт расшифровки связывает ответ с SHA-256 аудио, требует русский
 bounded text и всегда возвращает `confirmed=false`/`event_created=false`, чтобы
 владелец сначала увидел readback и календарную карточку.
+
+OAuth Authorization Code + PKCE contract теперь фиксирует exact `calendar.events`
+scope, offline consent, state/verifier fingerprints и token exchange без client
+secret. Token response возвращает наружу только fingerprints; custody raw refresh
+token остаётся обязанностью доверенного deployment layer.
+
+Publisher orchestration также готов: он реконструирует только exact `PREPARED`
+request, успешный ответ проверяет до `SYNCED`, transport timeout сохраняет как
+`UNKNOWN`, а определённый HTTP rejection — как terminal `FAILED` с bounded code.
+Provider response body и credential values в audit не записываются.
 
 Google Calendar — параллельный канал и не является prerequisite подключения
 первого project adapter к Telegram.
