@@ -1,5 +1,13 @@
 # Текущий контекст и облачный handoff
 
+Operator checkpoint **1 ноября 2026**: приложение `c3619ea` закреплено для
+будущего единого mobile/project release относительно runtime checkpoint `322186d`.
+Офлайн-проверка подтверждает отсутствие изменений DB models/lockfiles/Dockerfiles/
+compose и наличие voice/system/project modules. Это ещё не release profile и не
+deployment: live bundle reconciliation, exact operator transition, rootless build
+и VPS postcheck остаются явными блокерами. См.
+[MOBILE_PROJECT_RELEASE_CHECKPOINT_2026-11-01.md](infrastructure/MOBILE_PROJECT_RELEASE_CHECKPOINT_2026-11-01.md).
+
 Cloud continuation **1 ноября 2026, project control**: зависимая ветка
 `feat/project-connection-repair-control` добавляет единый project catalog,
 evidence-bound состояние `VERIFIED_DISABLED`, `/project project-id`, web/API
