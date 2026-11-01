@@ -13,6 +13,7 @@ from .models import Audit, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
 
 ISSUED = 'telegram_calendar_card_issued'
+REMINDER = 'telegram_calendar_reminder_queued'
 LABEL_ADD = 'Добавить в календарь'
 LABEL_CANCEL = 'Отмена'
 
@@ -154,3 +155,30 @@ def list_reply(session):
              for row in rows]
     return ('Последние события календаря:\n' + '\n'.join(lines)
             + '\n\nGoogle Calendar ещё не подключён; просмотр ничего не отправляет.')
+
+
+def collect_reminders(bridge, session):
+    """Queue each confirmed local reminder once through the existing delivery path."""
+    now = bridge.store.now(session)
+    queued = []
+    for row in list_drafts_locked(session, 'owner', 20):
+        if row['state'] != 'CONFIRMED_LOCAL':
+            continue
+        document = row['document']
+        start, end = datetime.fromisoformat(document['start']), datetime.fromisoformat(document['end'])
+        due = start - timedelta(minutes=document['telegram_reminder_minutes'])
+        if not due <= now < end:
+            continue
+        existing = session.execute(select(Audit).where(
+            Audit.event['kind'].as_string() == REMINDER,
+            Audit.event['profile'].as_string() == bridge.profile,
+            Audit.event['draft_id'].as_string() == row['id'])).first()
+        if existing:
+            continue
+        text = (f"Напоминание: {document['title']}\nНачало: {document['start']}\n\n"
+                'Google Calendar может быть ещё не подключён. Напоминание ничего не запускает.')
+        delivery = bridge.enqueue(session, f"calendar-reminder:{row['id']}:{digest(document)}", text)
+        bridge.store.audit(session, REMINDER, 'system', profile=bridge.profile, draft_id=row['id'],
+                           delivery_id=delivery, document_hash=digest(document), due_at=due.isoformat())
+        queued.append(delivery)
+    return queued

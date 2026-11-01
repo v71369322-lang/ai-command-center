@@ -1,12 +1,14 @@
 import httpx
 import pytest
 from sqlalchemy import select
+from datetime import timedelta
 
 from command_center.attention_schedule import configure
-from command_center.calendar_drafts import list_drafts
+from command_center.calendar_drafts import create, decide, list_drafts
 from command_center.models import TelegramDelivery
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
+from command_center.telegram_calendar import collect_reminders
 from test_telegram_bridge import BotHTTP, OWNER, message
 from test_telegram_task_status import authority, response
 from uuid import uuid4
@@ -95,3 +97,22 @@ def test_calendar_requires_an_explicit_owner_timezone(store):
     with pytest.raises(Denied, match='timezone_not_configured'):
         service.receive(message(1, '/calendar 2026-11-03 15:00 30 20 Встреча'))
     client.close()
+
+
+def test_confirmed_local_event_queues_one_independent_telegram_reminder(bridge, store):
+    service, _ = bridge
+    with store.transaction() as session:
+        now = store.now(session)
+    start = now.replace(microsecond=0) + timedelta(minutes=20)
+    end = now.replace(microsecond=0) + timedelta(minutes=50)
+    document = {'title': 'Проверить первый проект', 'start': start.isoformat(), 'end': end.isoformat(),
+                'timezone': 'UTC', 'note': '', 'telegram_reminder_minutes': 30}
+    draft = create(store, 'owner', document, str(uuid4()), 'a' * 64)
+    decide(store, 'owner', draft['id'], 1, str(uuid4()), True)
+    with store.transaction() as session:
+        first = collect_reminders(service, session)
+        second = collect_reminders(service, session)
+        assert len(first) == 1 and second == []
+        delivery = session.get(TelegramDelivery, first[0])
+        assert 'Проверить первый проект' in delivery.body['text']
+        assert delivery.state == 'NEW'
