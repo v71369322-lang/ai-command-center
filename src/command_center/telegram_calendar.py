@@ -170,10 +170,13 @@ def apply_decision(bridge, iid, intent):
             bridge.finish(session, iid, text)
 
 
-def list_reply(session):
+def list_reply(session, profile=None):
     rows = list_drafts_locked(session, 'owner', 5)
+    from .telegram_calendar_voice import pending_count
+    voices = pending_count(session, profile) if profile else 0
     if not rows:
-        return ('Черновиков календаря пока нет. Пример:\n'
+        voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.\n' if voices else '\n'
+        return ('Черновиков календаря пока нет.' + voice + 'Пример:\n'
                 '/calendar завтра в 15:00 на 30 минут, напомни за 20 минут — Созвон\n\n'
                 'Google Calendar ещё не подключён.')
     labels = {'DRAFT': 'ждёт подтверждения', 'CONFIRMED_LOCAL': 'подтверждено локально',
@@ -182,7 +185,8 @@ def list_reply(session):
                    'UNKNOWN': ' · Google требует сверки', 'SYNCED': ' · Google синхронизирован'}
     lines = [f"• {row['document']['start']} · {row['document']['title']} · {labels[row['state']]}"
              f"{sync_labels[sync_state(session, row['id'])['state']]}" for row in rows]
-    return ('Последние события календаря:\n' + '\n'.join(lines)
+    voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.' if voices else ''
+    return ('Последние события календаря:\n' + '\n'.join(lines) + voice
             + '\n\nGoogle Calendar ещё не подключён; просмотр ничего не отправляет.')
 
 

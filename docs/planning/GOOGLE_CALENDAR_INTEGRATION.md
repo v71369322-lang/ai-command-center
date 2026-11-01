@@ -64,7 +64,7 @@ Telegram-напоминания. Только отдельное подтвер�
 часам в IANA timezone владельца. Невозможное или неоднозначное локальное время
 не угадывается и требует нового уточнённого сообщения.
 
-1. Голосовая расшифровка с явным readback.
+1. Trusted downloader/transcription worker поверх готового voice intake/readback contract.
 2. OAuth-привязка выделенного Google Calendar при участии владельца.
 3. Publisher worker и status view поверх готового durable state.
 4. Синтетическая приёмка, затем один реальный event без участников.
@@ -80,6 +80,13 @@ calendar ID, version и fingerprint credential — само credential value н�
 переходит в `UNKNOWN`, запрещает повтор и выдаёт только bounded reconciliation
 lookup. Точное событие переводит его в `SYNCED`; подмена title/time/private binding
 отклоняется без изменения состояния.
+
+Voice intake также подготовлен: только owner voice с явной подписью `/calendar`,
+до 120 секунд и 5 MiB в разрешённом audio MIME сохраняется как pending metadata.
+Текущий слой не вызывает Telegram `getFile`, не скачивает audio и не создаёт
+event. Контракт расшифровки связывает ответ с SHA-256 аудио, требует русский
+bounded text и всегда возвращает `confirmed=false`/`event_created=false`, чтобы
+владелец сначала увидел readback и календарную карточку.
 
 Google Calendar — параллельный канал и не является prerequisite подключения
 первого project adapter к Telegram.

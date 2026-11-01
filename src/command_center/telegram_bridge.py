@@ -129,6 +129,10 @@ class TelegramBridge:
                 intent['callback_query_id'] = query_id
             return str(uid), intent
         value = message.get('text')
+        if value is None and 'voice' in message:
+            from .telegram_calendar_voice import parse_message
+            sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
+            return str(uid), parse_message(message, sensitive)
         self.check_text(value)
         value = dict(BUTTONS).get(value, value)
         if value.startswith('/demo '):
@@ -448,6 +452,11 @@ class TelegramBridge:
         elif kind == 'calendar_decide':
             from .telegram_calendar import apply_decision
             apply_decision(self, iid, intent)
+        elif kind == 'calendar_voice':
+            from .telegram_calendar_voice import capture
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                capture(self, session, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
                       'calendar_list', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
@@ -485,7 +494,7 @@ class TelegramBridge:
                     reply = telegram_reply(session)
                 elif kind == 'calendar_list':
                     from .telegram_calendar import list_reply
-                    reply = list_reply(session)
+                    reply = list_reply(session, self.profile)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -564,7 +573,8 @@ class TelegramBridge:
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
-                        'Голос отключён. Обычные запросы ожидают планирования; '
+                        'Голосовая заметка с подписью /calendar сохраняется без скачивания и ожидает расшифровки. '
+                        'Обычные запросы ожидают планирования; '
                         'AI-эксперимент требует отдельного разрешения. Условия: /readiness.', keyboard())
         with self.store.transaction() as session:
             row = session.get(TelegramInbox, iid)
