@@ -1,5 +1,14 @@
 # Текущий контекст и облачный handoff
 
+Cloud continuation **1 ноября 2026, project control**: зависимая ветка
+`feat/project-connection-repair-control` добавляет единый project catalog,
+evidence-bound состояние `VERIFIED_DISABLED`, `/project project-id`, web/API
+статусы и локальный пятистадийный repair plan. Любое подключение сохраняет
+execution/paid AI/merge/deployment выключенными; незаметная замена repository
+запрещена. Центр внимания отдельно показывает назначенные запросы без подключения.
+Описание: [project connection and repair control](projects/PROJECT_CONNECTION_AND_REPAIR_CONTROL.md).
+Реальный repository manifest не импортировался, сеть/VPS/GitHub не использовались.
+
 Cloud continuation **1 ноября 2026**: ветка `feat/telegram-voice-system-status`
 поверх календарного PR добавляет обычное голосовое поручение (`/task` или без
 подписи), `/voice` и `/system`. Приём сохраняет только bounded metadata:

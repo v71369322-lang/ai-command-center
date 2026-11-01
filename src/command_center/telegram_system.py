@@ -5,6 +5,8 @@ from sqlalchemy import func, select
 from .models import Control, TelegramInbox
 from .store import Denied
 from .telegram_voice_requests import pending_count
+from .project_connections import statuses
+from .project_catalog import PROJECTS
 
 
 def reply(session, profile):
@@ -16,6 +18,7 @@ def reply(session, profile):
     if type(text_pending) is not int or not 0 <= text_pending <= 1000:
         raise Denied('telegram_system_counts_invalid')
     admission = 'остановлен' if control.halted or control.recovery else 'открыт'
+    connected = len(statuses(session))
     return (f'Контур AI Commander (локальная сводка)\n\n'
             f'• Telegram и диспетчер: команда принята; вход новых запусков {admission}.\n'
             f'• Очередь: текстовых запросов {text_pending}; голосовых до расшифровки {pending_count(session, profile)}.\n'
@@ -25,6 +28,7 @@ def reply(session, profile):
             '• Проверяющий: проверяет результат, source revision и границы полномочий; '
             'отклонённый ответ не публикуется.\n'
             '• Watchdog: контролирует зависшие исполнения; его здоровье на VPS этой командой не проверяется.\n'
+            f'• Подключения проектов: проверено {connected} из {len(PROJECTS)}; проверка не включает execution.\n'
             '• Автоисправление проектов: пока не включено. Для каждого проекта потребуются отдельный '
             'репозиторий, ограниченный доступ, тесты и PR.\n\n'
             'Сводка ничего не запускает, не обращается к внешним API и не изменяет проекты.')

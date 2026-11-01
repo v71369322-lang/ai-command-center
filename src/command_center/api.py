@@ -437,6 +437,20 @@ def create_app(settings=None, gateway_factory=None):
         from .project_inbox import inbox
         return inbox(store, role, project)
 
+    @app.get('/api/projects/{project_id}')
+    def project_status(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],
+                       role=Depends(identity)):
+        if role != 'owner':
+            raise Denied('owner_required')
+        from .project_catalog import summary
+        from .project_connections import statuses
+        with store.transaction() as session:
+            store.check_audit(session)
+            connection = statuses(session).get(project_id)
+            return {'project': summary(project_id), 'connection': connection,
+                    'execution_connected': False, 'repair_plan_available': connection is not None,
+                    'merge_enabled': False, 'deployment_enabled': False}
+
     @app.get('/api/attention')
     def attention(role=Depends(identity)):
         from .attention import summary

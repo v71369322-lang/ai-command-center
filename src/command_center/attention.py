@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 
 from .models import Control, Task, TelegramInbox
 from .project_inbox import PROJECTS, history
+from .project_connections import statuses
 from .store import Denied, digest
 
 
@@ -19,6 +20,7 @@ def build(store, session):
     for row in rows:
         assigned = assignments.get(row.id)
         project_counts[assigned['project_id'] if assigned and assigned['project_id'] else 'unassigned'] += 1
+    connected = statuses(session)
 
     items = []
     if control.recovery:
@@ -43,6 +45,12 @@ def build(store, session):
     if rows:
         items.append({'code': 'REQUEST_NEEDS_PLANNING', 'level': 'info',
                       'count': len(rows), 'label': 'Запросы ожидают планирования'})
+    disconnected_requests = sum(count for project_id, count in project_counts.items()
+                                if project_id != 'unassigned' and project_id not in connected)
+    if disconnected_requests:
+        items.append({'code': 'PROJECT_CONNECTION_REQUIRED', 'level': 'warning',
+                      'count': disconnected_requests,
+                      'label': 'Назначенные запросы ждут подключения репозитория'})
     for item in items:
         item['urgency'] = {'critical': 'immediate', 'warning': 'soon', 'info': 'normal'}[item['level']]
         item['confidence'] = 'authoritative'
@@ -57,6 +65,7 @@ def build(store, session):
             'highest_level': highest, 'attention_hash': digest(items),
             'task_admission_halted': bool(control.halted), 'recovery': bool(control.recovery),
             'ai_planning_connected': False, 'reminders_connected': False,
+            'connected_projects': len(connected), 'project_connections_complete': len(connected) == len(PROJECTS),
             'execution_started': False}
 
 
@@ -91,6 +100,7 @@ def telegram_reply(store, session):
         '',
         f"Запросов без проекта: {result['project_counts']['unassigned']}.",
         f"Запросов, ожидающих планирования: {result['total_pending_requests']}.",
+        f"Проверенных подключений проектов: {result['connected_projects']} из {len(PROJECTS)}.",
         ('Напоминания: включены.' if schedule.get('enabled') else
          'Напоминания: расписание настроено, но выключено.' if schedule.get('configured') else
          'Напоминания: расписание ещё не настроено.'),

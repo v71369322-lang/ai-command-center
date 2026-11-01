@@ -75,11 +75,30 @@ def project_queue(bridge, session, project='all'):
 
 def projects_reply(bridge, session):
     from .project_inbox import PROJECTS
+    from .project_connections import statuses
     _, counts = project_queue(bridge, session)
-    parts = [f'{label}: {counts[key]}\n/requests {key}' for key, label in PROJECTS]
+    connections = statuses(session)
+    parts = [f'{label}: {counts[key]}\n/requests {key}\n/project {key} · '
+             f'{"репозиторий проверен, запуск выключен" if key in connections else "не подключён"}'
+             for key, label in PROJECTS]
     parts.append(f'Не распределены: {counts["unassigned"]}\n/requests unassigned')
     return (f'Сохранённые запросы этого Telegram-подключения: {sum(counts.values())}.\n'
             'Ожидают планирования; выполнение не запускалось.\n\n' + '\n\n'.join(parts))
+
+
+def project_reply(session, project_id):
+    from .project_catalog import summary
+    from .project_connections import statuses
+    project = summary(project_id)
+    connection = statuses(session).get(project_id)
+    if not connection:
+        state = ('Репозиторий не подключён. Следующий этап: ограничить GitHub App одним репозиторием, '
+                 'проверить identity/default branch/baseline/branch protection и сохранить evidence.')
+    else:
+        state = (f"Репозиторий: {connection['repository']}\nBaseline: {connection['baseline_sha']}\n"
+                 'Соединение проверено, но execution, paid AI, merge и deployment выключены.')
+    return (f"{project['label']}\nРиск: {project['risk']}\nГраница: {project['boundary']}\n\n{state}\n\n"
+            'Без отдельного плана и разрешения анализ, исправление и публикация не запускаются.')
 
 
 def request_reply(bridge, session, intent, *, suffix=''):
