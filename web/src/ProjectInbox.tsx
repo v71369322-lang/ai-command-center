@@ -5,7 +5,8 @@ const ids=['command-center','vanilla-sugar','lnauto','capital-lab'] as const;
 type Project=typeof ids[number];
 type Filter=Project|'all'|'unassigned';
 type Row={id:string;text:string;project_id:Project|null;assignment_version:number};
-type View={projects:{id:Project;label:string}[];requests:Row[];counts:Record<string,number>;total_pending:number;filter:Filter};
+type ConnectionState='DISCONNECTED'|'VERIFIED_DISABLED';
+type View={projects:{id:Project;label:string;connection_state:ConnectionState}[];requests:Row[];counts:Record<string,number>;total_pending:number;filter:Filter};
 function record(value:unknown):value is Record<string,unknown>{return typeof value==='object'&&value!==null&&!Array.isArray(value)}
 function project(value:unknown):value is Project{return typeof value==='string'&&ids.includes(value as Project)}
 function parse(value:unknown,filter:Filter):View{
@@ -14,8 +15,8 @@ function parse(value:unknown,filter:Filter):View{
    ||!Number.isInteger(value.total_pending)||Number(value.total_pending)<0||Number(value.total_pending)>1000)throw new Error();
  const projects=value.projects.map((item:unknown,index)=>{
   if(!record(item)||item.id!==ids[index]||typeof item.label!=='string'||!item.label||item.label.length>64
-    ||item.execution_connected!==false)throw new Error();
-  return {id:item.id as Project,label:item.label};
+    ||item.execution_connected!==false||!['DISCONNECTED','VERIFIED_DISABLED'].includes(String(item.connection_state)))throw new Error();
+  return {id:item.id as Project,label:item.label,connection_state:item.connection_state as ConnectionState};
  });
  const counts=value.counts;
  if(Object.keys(counts).length!==5||!['unassigned',...ids].every(key=>Number.isInteger(counts[key])&&Number(counts[key])>=0)
@@ -86,10 +87,12 @@ export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Prom
  return <section className="project-inbox" aria-labelledby="projects-heading" aria-busy={loading||saving}>
   <h2 id="projects-heading">Проекты и запросы</h2>
   <p>Выбор проекта упорядочивает запросы. Он не разрешает запуск AI или доступ к CRM.</p>
-  {view&&<ul>{view.projects.map(item=><li key={item.id}>{item.label}: {view.counts[item.id]} · AI-разработка не подключена</li>)}</ul>}
+  {view&&<ul>{view.projects.map(item=><li key={item.id}><strong>{item.label}</strong>: {view.counts[item.id]} · {
+   item.connection_state==='VERIFIED_DISABLED'?'репозиторий проверен, запуск выключен':'репозиторий не подключён'
+  } · AI-разработка не подключена</li>)}</ul>}
   <label htmlFor="project-filter">Показать запросы</label><select id="project-filter" value={filter} disabled={loading||saving} onChange={event=>setFilter(event.target.value as Filter)}>
    <option value="all">Все проекты</option><option value="unassigned">Не распределены</option>
-   {(view?.projects??ids.map(id=>({id,label:id}))).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
+   {(view?.projects??ids.map(id=>({id,label:id,connection_state:'DISCONNECTED' as ConnectionState}))).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
   </select>
   {loading&&<p role="status">Загружаем очередь проектов…</p>}
   {notice&&<p role="status">{notice}</p>}

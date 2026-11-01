@@ -6,12 +6,9 @@ from sqlalchemy import select
 from .models import Audit, TelegramInbox
 from .store import Denied, digest
 from .telegram_requests import captured_text
+from .project_catalog import PROJECTS as CATALOG, IDS
 
-PROJECTS = (
-    ('command-center', 'AI Commander'), ('vanilla-sugar', 'Ваниль и Сахар'),
-    ('lnauto', 'LNAuto'), ('capital-lab', 'Capital Lab'),
-)
-IDS = frozenset(key for key, _ in PROJECTS)
+PROJECTS = tuple((item['id'], item['label']) for item in CATALOG)
 EVENT = 'project_request_classified'
 MAX_CHANGES = 1000
 
@@ -86,7 +83,11 @@ def inbox(store, role, project='all'):
             if (project == 'all' or key == project) and len(result) < 50:
                 result.append({'id': row.id, 'text': value, 'state': 'NEEDS_PLANNING', 'project_id': pid,
                                'assignment_version': assigned['version'] if assigned else 0})
-        return {'projects': [{'id': key, 'label': label, 'execution_connected': False} for key, label in PROJECTS],
+        from .project_connections import statuses
+        connections = statuses(session)
+        return {'projects': [{'id': key, 'label': label, 'execution_connected': False,
+                              'connection_state': connections.get(key, {}).get('state', 'DISCONNECTED')}
+                             for key, label in PROJECTS],
                 'requests': result, 'counts': counts, 'total_pending': len(rows), 'filter': project,
                 'ai_planning_connected': False}
 

@@ -25,6 +25,7 @@ def test_owner_attention_summary_is_read_only_and_prioritized(store):
     assert result['total_pending_requests'] == 2
     assert [item['code'] for item in result['items'][:2]] == [
         'CONTROL_HALTED', 'REQUEST_UNASSIGNED']
+    assert any(item['code'] == 'PROJECT_CONNECTION_REQUIRED' for item in result['items'])
     assert result['highest_level'] == 'warning' and len(result['attention_hash']) == 64
     assert result['items'][0]['level'] == 'warning'
     assert result['items'][0]['urgency'] == 'soon'
@@ -34,6 +35,7 @@ def test_owner_attention_summary_is_read_only_and_prioritized(store):
     assert result['items'][1]['impact'] == 'planning'
     assert result['items'][1]['target'] == 'projects-heading'
     assert result['reminders_connected'] is False and result['ai_planning_connected'] is False
+    assert result['connected_projects'] == 0 and result['project_connections_complete'] is False
     assert result['reminder_schedule_state'] == 'not_configured'
     assert result['reminder_activity'] == []
     assert result['reminder_delivery_health'] == {

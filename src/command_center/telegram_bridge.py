@@ -207,6 +207,12 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value.split()[:1] == ['/project']:
+            from .project_catalog import IDS
+            parts = value.split()
+            if len(parts) != 2 or parts[1] not in IDS:
+                raise Denied('telegram_project_reference_invalid')
+            return str(uid), {'kind': 'project', 'project_id': parts[1]}
         if value in {'/voice', '/system'}:
             return str(uid), {'kind': value[1:]}
         if value.split()[:1] in [['/voice'], ['/system']]:
@@ -476,7 +482,7 @@ class TelegramBridge:
             from .telegram_voice_transcripts import decide
             decide(self, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
-                      'calendar_list', 'voice', 'system', 'plan_review', 'coding_plan', 'readiness', 'experiment',
+                      'calendar_list', 'voice', 'system', 'project', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -504,6 +510,9 @@ class TelegramBridge:
                 elif kind == 'projects':
                     from .telegram_requests import projects_reply
                     reply = projects_reply(self, session)
+                elif kind == 'project':
+                    from .telegram_requests import project_reply
+                    reply = project_reply(session, intent['project_id'])
                 elif kind == 'attention':
                     from .attention import telegram_reply
                     reply = telegram_reply(self.store, session)
@@ -583,7 +592,7 @@ class TelegramBridge:
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
                         '/plan номер — посмотреть сохранённый черновик плана; '
-                        '/projects — проекты и назначение; '
+                        '/projects — проекты и назначение; /project project-id — подключение и границы; '
                         '/attention — центр внимания; /reminders — расписание сводок; '
                         '/voice — голосовые поручения до расшифровки; /system — роли и состояние компонентов; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
