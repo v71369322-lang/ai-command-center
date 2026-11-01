@@ -116,6 +116,9 @@ class TelegramBridge:
             elif token.startswith('cl:'):
                 from .telegram_calendar import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('vr:'):
+                from .telegram_voice_transcripts import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             else:
                 if not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token):
                     raise Denied('telegram_callback_invalid')
@@ -130,8 +133,11 @@ class TelegramBridge:
             return str(uid), intent
         value = message.get('text')
         if value is None and 'voice' in message:
-            from .telegram_calendar_voice import parse_message
             sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
+            if message.get('caption') == '/calendar':
+                from .telegram_calendar_voice import parse_message
+            else:
+                from .telegram_voice_requests import parse_message
             return str(uid), parse_message(message, sensitive)
         self.check_text(value)
         value = dict(BUTTONS).get(value, value)
@@ -201,6 +207,10 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value in {'/voice', '/system'}:
+            return str(uid), {'kind': value[1:]}
+        if value.split()[:1] in [['/voice'], ['/system']]:
+            raise Denied('telegram_query_arguments_forbidden')
         if value == '/calendar' or value.split()[:1] == ['/calendar']:
             from .telegram_calendar import parse_command
             return str(uid), parse_command(value)
@@ -457,8 +467,16 @@ class TelegramBridge:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 capture(self, session, iid, intent)
+        elif kind == 'voice_request':
+            from .telegram_voice_requests import capture
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                capture(self, session, iid, intent)
+        elif kind == 'voice_confirm':
+            from .telegram_voice_transcripts import decide
+            decide(self, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
-                      'calendar_list', 'plan_review', 'coding_plan', 'readiness', 'experiment',
+                      'calendar_list', 'voice', 'system', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -495,6 +513,12 @@ class TelegramBridge:
                 elif kind == 'calendar_list':
                     from .telegram_calendar import list_reply
                     reply = list_reply(session, self.profile)
+                elif kind == 'voice':
+                    from .telegram_voice_requests import reply as voice_reply
+                    reply = voice_reply(session, self.profile)
+                elif kind == 'system':
+                    from .telegram_system import reply as system_reply
+                    reply = system_reply(session, self.profile)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -561,6 +585,7 @@ class TelegramBridge:
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; '
                         '/attention — центр внимания; /reminders — расписание сводок; '
+                        '/voice — голосовые поручения до расшифровки; /system — роли и состояние компонентов; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
                         '/experiment — состояние и результат первого AI-эксперимента; '
                         '/prepare_experiment — подготовить этот тест без запуска и расходов; '
@@ -573,7 +598,8 @@ class TelegramBridge:
                         '/coding_plan — план тестового разработчика; /coding_demo — запустить mock-упражнение; '
                         '/tasks — последние тесты; /status UUID — состояние теста; /cancel UUID; /stop; '
                         '/resume — запросить снятие обычной остановки с подтверждением. '
-                        'Голосовая заметка с подписью /calendar сохраняется без скачивания и ожидает расшифровки. '
+                        'Обычное голосовое или голосовое с подписью /task сохраняется как поручение; '
+                        'подпись /calendar направляет его в календарь. Файл не скачивается до доверенной расшифровки. '
                         'Обычные запросы ожидают планирования; '
                         'AI-эксперимент требует отдельного разрешения. Условия: /readiness.', keyboard())
         with self.store.transaction() as session:

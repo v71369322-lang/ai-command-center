@@ -88,4 +88,4 @@ def test_foreign_or_group_chat_cannot_read_attention(bridge):
 def test_owner_menu_exposes_read_only_attention_views():
     rows = [[button['text'] for button in row] for row in keyboard()['keyboard']]
     assert rows == [['📁 Проекты', '📥 Запросы'], ['🔔 Центр внимания', '⏰ Напоминания'],
-                    ['🧪 Результаты тестов', 'ℹ️ Помощь']]
+                    ['🎙 Голос', '🧩 Система'], ['🧪 Результаты тестов', 'ℹ️ Помощь']]

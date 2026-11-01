@@ -31,7 +31,7 @@ def test_menu_is_delivered_by_strict_transport_without_execution(bridge, store, 
     assert service.deliver_one()['state'] == 'SENT'
     body = fake.sent[0]
     assert body['reply_markup'] == keyboard()
-    assert ('Голосовая заметка с подписью /calendar' in body['text']
+    assert ('Обычное голосовое или голосовое с подписью /task' in body['text']
             and 'AI-эксперимент требует отдельного разрешения' in body['text'])
     assert '/experiment' in body['text']
     assert '/menu' in body['text'] and 'ожидает планирования' in body['text']
@@ -50,7 +50,8 @@ def test_buttons_reuse_existing_read_only_intents_even_while_halted(bridge, stor
     while service.deliver_one():
         pass
     assert fake.sent[-1]['chat_id'] == OWNER
-    assert 'выполнение не запускалось' in fake.sent[-1]['text'].lower() or command in {'/help', '/tasks'}
+    assert ('выполнение не запускалось' in fake.sent[-1]['text'].lower()
+            or command in {'/help', '/tasks', '/voice', '/system'})
     assert authority(store) == before
 
 

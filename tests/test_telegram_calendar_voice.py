@@ -52,12 +52,12 @@ def test_invalid_voice_metadata_fails_before_inbox_write(bridge, store, changes)
     assert authority(store) == before
 
 
-def test_voice_without_explicit_calendar_caption_remains_rejected(bridge):
+def test_voice_without_calendar_caption_routes_to_general_request(bridge):
     service, _ = bridge
     update = voice()
     update['message'].pop('caption')
-    with pytest.raises(Denied, match='telegram_text_only'):
-        service.receive(update)
+    result = service.receive(update)
+    assert result['state'] == 'DONE'
 
 
 def test_transcript_contract_requires_exact_audio_and_owner_readback():
