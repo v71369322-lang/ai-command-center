@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Cloud continuation **1 ноября 2026, registration operator**: отдельная ветка
+`feat/project-connection-registration` добавляет двухшаговую локальную запись
+уже проверенного repository evidence. Фиксированный project catalog теперь
+проверяется самим manifest-контрактом; формально корректный чужой repository
+отклоняется. Plan не открывает DB, apply требует точный digest/clean revision/
+короткий owner deadline и сохраняет только `VERIFIED_DISABLED`. Сеть, credentials,
+execution, paid AI, merge и deployment не включаются. Описание:
+[PROJECT_CONNECTION_REGISTRATION.md](projects/PROJECT_CONNECTION_REGISTRATION.md).
+GitHub App ещё не переключён с синтетического репозитория, evidence реального
+Commander не создавался, VPS не менялся.
+
 VPS reconciliation **1 ноября 2026**: активный журнал найден в
 `/home/acc-control/f30/state/deployment.json`; он по-прежнему фиксирует bundle
 `ac6462b…094d`, revision `322186d`, phase `INTENT`. Telegram работает при
