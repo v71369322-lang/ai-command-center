@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the ACC bounded maintenance mailbox
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=acc-operations.service
+
+[Install]
+WantedBy=timers.target

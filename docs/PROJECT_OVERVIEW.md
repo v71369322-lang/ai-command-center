@@ -35,3 +35,19 @@ AI Command Center — персональная облачная система �
 - `security/` — будущая детализация безопасности, доступа и восстановления.
 
 Полный реестр архитектурных решений и итоговый аудит будут переданы отдельными заданиями. Содержание этапа 0B должно быть получено от владельца; текущая документация его не утверждает и не разрешает начинать реализацию.
+
+## Обновление Stage 0C-1
+
+Получен первый тематический пакет восстановления [Foundation & Personal AI Assistant](history/stage-0c-1/HISTORICAL_DECISION_REGISTER.md) из [сводки владельца](history/stage-0c-1/SOURCE_PACKAGE.md). Это 26 индивидуальных пунктов, а не весь исторический реестр. Назначение — owner-controlled AI director/orchestration для нескольких проектов, в том числе работающий независимо от домашнего ПК.
+
+Текущее [состояние инфраструктуры](architecture/INFRASTRUCTURE_STATUS.md): VPS уже куплен по сообщению владельца; доступ к консоли временно нарушен во время maintenance. Это не свидетельство настроенного/развёрнутого центра. Выше сохранён контекст задания 0A; его будущее время не означает, что покупка всё ещё pending. Настройка/развёртывание в Stage 0C не разрешены.
+
+Stage 0C-1 разрешает только документационную сверку на базе ветки PR #2. PR #2 не объединяется, main не изменяется. Распределение новых функций ассистента по MVP пока OPEN; 0C-2 требует следующего задания.
+
+## Stage 0C-5: available architecture audit для владельца
+
+[Final audit](history/stage-0c-5/FINAL_ARCHITECTURE_AUDIT.md) оценивает 0A/0B и все пять historical packages: 138 supplied H records, не установленное число original decisions. 107 прежних H/OPS-C/R/D сохранены. [Source master plan](history/stage-0c-5/SOURCE_PACKAGE.md) не разрешает coding/operations.
+
+Вывод DERIVED: ready for owner review with registered gaps, не approved freeze или proof tested functionality. Подтверждённых owner-owner conflicts не найдено. [Ledger](history/stage-0c-5/CONFLICTS_AND_UNCERTAINTIES.md) разделяет 1 scope-choice CRITICAL_BLOCKER, 8 STAGE_GATE, 3 NONBLOCKING_OPEN, 3 MISSING_EVIDENCE. Все technical OPEN не требуют глобального закрытия до первого отдельно разрешённого local synthetic slice.
+
+[Owner handoff на русском](history/stage-0c-5/OWNER_ACCEPTANCE_HANDOFF.md) и [future master proposal](history/stage-0c-5/MASTER_PLAN_IMPACT.md) конкретны для review, не исполнены. VPS purchase не config/deploy permission; current infrastructure readiness/billing unknown, реальные проекты не подключаются. После documentation PR — STOP.

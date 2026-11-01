@@ -1,0 +1,52 @@
+{
+  "name": "acc-f1-lab",
+  "x-f1-preparation": {
+    "deployable": false,
+    "source_baseline": "d551cfb8dd29deb5540d9842faf704f1612d598e",
+    "blockers": ["host-audit", "bounded-rootless-launcher-adapter", "independent-watchdog", "vpn-https-app-mfa", "offsite-and-key-custody", "owner-trial-authorization"]
+  },
+  "services": {
+    "db": {
+      "image": "postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0",
+      "environment": {"POSTGRES_DB": "f1", "POSTGRES_USER": "f1_admin", "POSTGRES_PASSWORD_FILE": "/run/secrets/db_admin_password"},
+      "secrets": ["db_admin_password"],
+      "volumes": ["pgdata:/var/lib/postgresql/data"],
+      "networks": ["control"],
+      "healthcheck": {"test": ["CMD-SHELL", "pg_isready -U f1_admin -d f1"], "interval": "5s", "timeout": "2s", "retries": 12},
+      "mem_limit": "1g", "cpus": 1, "pids_limit": 128, "restart": "no",
+      "logging": {"driver": "local", "options": {"max-size": "10m", "max-file": "3"}}
+    },
+    "redis": {
+      "image": "redis:7-bookworm@sha256:44960b3100c48159a66d28c18b0588c193492e25f7551d60e51dd464fc3eca5b",
+      "user": "10001:10001", "read_only": true, "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "command": ["sh", "/redis.sh"],
+      "volumes": ["../../deploy/redis.sh:/redis.sh:ro"],
+      "secrets": ["redis_password"], "networks": ["control"],
+      "tmpfs": ["/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777"],
+      "mem_limit": "128m", "cpus": 0.25, "pids_limit": 32, "restart": "no",
+      "logging": {"driver": "local", "options": {"max-size": "10m", "max-file": "3"}}
+    },
+    "api": {
+      "image": "${F1_API_IMAGE:?digest-pinned-image-required}",
+      "user": "10001:10001", "read_only": true, "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "command": ["uvicorn", "command_center.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"],
+      "environment": {"F1_DB_USER": "f1_app", "F1_DB_HOST": "db", "F1_DB_PASSWORD_FILE": "/run/secrets/db_password", "F1_REDIS_URL": "redis://redis:6379/0", "F1_REDIS_PASSWORD_FILE": "/run/secrets/redis_password", "F1_IDENTITIES_FILE": "/run/secrets/identities", "F1_SOURCE_REVISION": "${F1_SOURCE_REVISION:?exact-source-required}"},
+      "secrets": ["db_password", "redis_password", "identities"],
+      "ports": ["127.0.0.1:8000:8000"], "networks": ["control", "frontend"],
+      "tmpfs": ["/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777"],
+      "mem_limit": "256m", "cpus": 0.5, "pids_limit": 64, "restart": "no",
+      "depends_on": {"db": {"condition": "service_healthy"}},
+      "logging": {"driver": "local", "options": {"max-size": "10m", "max-file": "3"}}
+    }
+  },
+  "networks": {"control": {"internal": true}, "frontend": {}},
+  "volumes": {"pgdata": {}},
+  "secrets": {
+    "db_admin_password": {"file": "/etc/ai-command-center/f1/secrets/db_admin_password"},
+    "db_password": {"file": "/etc/ai-command-center/f1/secrets/db_password"},
+    "redis_password": {"file": "/etc/ai-command-center/f1/secrets/redis_password"},
+    "identities": {"file": "/etc/ai-command-center/f1/secrets/identities.json"}
+  }
+}

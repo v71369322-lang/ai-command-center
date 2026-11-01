@@ -1,0 +1,9 @@
+{
+  "mode": "disabled",
+  "live_authorized": false,
+  "first_experiment": {
+    "id": "f2.2-first-live",
+    "model": "gpt-5.4-mini-2026-03-17",
+    "evidence": {}
+  }
+}

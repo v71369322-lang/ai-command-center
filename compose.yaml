@@ -1,0 +1,185 @@
+name: acc-f1
+x-bounded-logging: &bounded_logging
+  driver: local
+  options:
+    max-size: ${F1_SERVICE_LOG_MIB:-10}m
+    max-file: '${F1_SERVICE_LOG_FILES:-3}'
+services:
+  db:
+    image: postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
+    environment:
+      POSTGRES_DB: f1
+      POSTGRES_USER: f1_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+    secrets: [db_admin_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [control]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U f1_admin -d f1']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded_logging
+  redis:
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    working_dir: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    image: redis:7-bookworm@sha256:44960b3100c48159a66d28c18b0588c193492e25f7551d60e51dd464fc3eca5b
+    command: [sh, /redis.sh]
+    secrets: [redis_password]
+    volumes: [./deploy/redis.sh:/redis.sh:ro]
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    logging: *bounded_logging
+  api:
+    build:
+      context: .
+      target: app
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-app:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    command: [uvicorn, command_center.api:create_app, --factory, --host, 0.0.0.0, --port, '8000', --no-access-log]
+    environment: &app_env
+      F1_DB_USER: f1_app
+      F1_DB_HOST: db
+      F1_DB_PASSWORD_FILE: /run/secrets/db_password
+      F1_REDIS_URL: redis://redis:6379/0
+      F1_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      F1_IDENTITIES_FILE: /run/secrets/identities
+      F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    secrets: [db_password, redis_password, identities]
+    ports: ['127.0.0.1:8000:8000']
+    networks: [control, access]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    logging: *bounded_logging
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+  worker:
+    profiles: [worker]
+    build:
+      context: .
+      target: worker
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-worker:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    environment:
+      F1_REDIS_URL: redis://redis:6379/0
+      F1_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      F1_BROKER_TOKEN_FILE: /run/secrets/broker_token
+      F1_BROKER_SOCKET: /run/f1-broker/runtime.sock
+      F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    secrets: [redis_password, broker_token]
+    volumes: [./.runtime/broker-socket:/run/f1-broker:ro]
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    logging: *bounded_logging
+    depends_on:
+      runtime-broker: {condition: service_started}
+      redis: {condition: service_started}
+  runtime-broker:
+    profiles: [worker]
+    build:
+      context: .
+      target: broker
+      args:
+        F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+    image: acc-f1-broker:local
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    group_add: ["${F1_DOCKER_GID:?Local cloud socket group required}"]
+    environment: &runtime_env
+      F1_DB_USER: f1_runtime
+      F1_DB_HOST: db
+      F1_DB_PASSWORD_FILE: /run/secrets/db_runtime_password
+      F1_REDIS_URL: redis://redis:6379/0
+      F1_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      F1_SOURCE_REVISION: ${F1_SOURCE_REVISION:?Exact Git SHA required}
+      F1_BROKER_TOKEN_FILE: /run/secrets/broker_token
+      F1_RUNTIME_LEDGER: /var/lib/f1-runtime/ledger.sqlite
+      F1_EXECUTOR_IMAGE: ${F1_EXECUTOR_IMAGE:-acc-f1-executor:local}
+      F1_RUNTIME_MODE: cloud-rootful-test
+      DOCKER_CONFIG: /tmp/docker-client
+    secrets: [db_runtime_password, redis_password, broker_token]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.runtime/broker-socket:/run/f1-broker
+      - ./.runtime/runtime-ledger:/var/lib/f1-runtime
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    logging: *bounded_logging
+    depends_on:
+      db: {condition: service_healthy}
+  watchdog:
+    profiles: [worker]
+    image: acc-f1-broker:local
+    command: [python, -m, command_center.watchdog]
+    user: "${F1_RUNTIME_UID:-1000}:${F1_RUNTIME_GID:-1000}"
+    group_add: ["${F1_DOCKER_GID:?Local cloud socket group required}"]
+    environment:
+      <<: *runtime_env
+    secrets: [db_runtime_password, redis_password]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.runtime/runtime-ledger:/var/lib/f1-runtime
+    networks: [control]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # The watchdog imports the same runtime stack as the broker. Production
+    # evidence showed the 128 MiB cgroup being OOM-killed while the host still
+    # had ample memory, which silently closes task admission. Keep it bounded
+    # but give it the same headroom as the broker and worker.
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 32
+    logging: *bounded_logging
+    depends_on:
+      db: {condition: service_healthy}
+networks:
+  access: {}
+  control:
+    internal: true
+volumes:
+  pgdata:
+secrets:
+  db_admin_password:
+    file: ./.runtime/secrets/db_admin_password
+  db_password:
+    file: ./.runtime/secrets/db_password
+  redis_password:
+    file: ./.runtime/secrets/redis_password
+  identities:
+    file: ./.runtime/secrets/identities.json
+  db_runtime_password:
+    file: ./.runtime/secrets/db_runtime_password
+  broker_token:
+    file: ./.runtime/secrets/broker_token

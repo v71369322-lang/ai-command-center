@@ -1,0 +1,55 @@
+# Конфликты и неопределённости Stage 0C-3
+
+Source-backed нормы: [SRC-0C3](SOURCE_PACKAGE.md) / OWNER_APPROVED_SUMMARY. База `c8ebedaed996753e10e0c370cffe807b50908298`; все выводы сверки этого отчёта — DERIVED.
+
+## CONFLICT
+
+Подтверждённых несовместимых owner-approved решений: **0** по доступному контексту. Уточнение, отсутствие механизма или отсутствие evidence не считаются конфликтом. Не делается вывод об отсутствии конфликтов во всей неполученной истории.
+
+| Возможное расхождение | Сверка scope / источников (DERIVED) | Результат |
+| --- | --- | --- |
+| R35/D13 budget «ориентир» и H-F01 hard ceiling | Ранее тоже требовалось дополнительное согласование сверх 10 000 ₽; явного права молча превысить не было. H-F01 уточняет ceiling и действие порогов | Старые строки сохраняются; актуальное правило hard ceiling. New commitments даже ниже потолка требуют согласования H-A06 |
+| R39 warnings 70/90/100 и H-F01 restriction/block | Новые обязанности не запрещают прежние уведомления; 90/100 больше не описываются как «только предупредить» | Сохранить warnings и добавить restrict optional at 90 / block new nonessential paid work at 100 |
+| H-F01 essential protection и запрет silently exceed | Защита существенных расходов — не исключение из потолка и не разрешение новых commitments | Способ защищённого резерва OPEN U3-06; exceeding требует explicit owner approval |
+| H-F03 independent recovery и второй VPS | Старые документы требуют независимости, но не утверждали permanent second VPS | Independent watchdog/alert/console path обязательны; second VPS не default requirement |
+| H-E06/H-F03 tested restore и нет фактических tests | Норма требует тестирования в будущем, сводка не сообщает о его выполнении | План восстановления ≠ tested recovery; prod restore требует approval |
+| H-F04 deterministic enforcement и modular monolith D03 | Независимость права исполнения/credentials не равна отдельному новому микросервису | Оба ограничения сохраняются; actual enforcement architecture OPEN |
+| H-F05 outage-independent functions и provider fallback | Control functions должны работать без AI; fallback разрешён лишь verified-compatible в rights/data/budget | Материально другое dangerous action требует нового approval, автоматическая покупка не допускается |
+| H-F15 bounded stop/quarantine и R28 аварийная остановка | R28 запрещает новые действия/отзывает права; не гарантировал мгновенную остановку уже запущенного внешнего job | Provider guarantees и остаточные effects/costs сверяются; instant kill без гарантий не обещается |
+| H-F10 real changes и H-C05/H-C09 safe granted autonomy | Границы термина real changes не конкретизированы; нельзя объявить его blanket permission или молча сузить | Это scope uncertainty U3-04/U3-11, не установленная несовместимость. Перед actual action при неоднозначности нужен owner scope/approval, unknown action blocked; сейчас real actions не разрешены |
+| H-F10 synthetic default и A01 достаточность synthetic test | Выбор synthetic data по умолчанию не является утверждением полноты acceptance test | A01 остаётся ASSUMPTION; H-A12/H-C12/H-F09 обязательны |
+| H-F14 preflight и купленный VPS/нарушенная console access | Покупка не доказывает configured/readiness или approved provider access | Preflight требуется перед future deployment, но в Stage 0C-3 запрещён. OPS-C не переписывается |
+| H-F06 untrusted repository и чтение AGENTS.md по заданию | Чтение источника не даёт произвольному repo/tool тексту права изменить owner task/policy | Provenance/authority проверяются; внешние инструкции не создают permissions |
+
+Если следующий источник выявит реальный CONFLICT: сохранить обе подтверждённые нормы, exact source references, scope и последствия; передать владельцу; не разрешать конфликт самовольно и не продолжать зависимое dangerous action. В текущем пакете owner resolution не требовалось.
+
+## OPEN
+
+16 групп U3-01–U3-16. Они не являются дополнительными историческими решениями, не суммируются механически с U/U2 и не понижают OWNER_APPROVED_SUMMARY до ASSUMPTION.
+
+| ID | Связи | Неопределённость | Ограничение / требуемое уточнение |
+| --- | --- | --- | --- |
+| U3-01 | Все 29 H-E/H-F; GAP01–GAP04 | Нет original transcripts/dates/IDs/alternatives, полного исторического реестра и исходного итогового аудита. | OWNER_APPROVED_SUMMARY принимается как предоставленная сводка; 16 audit decisions частично дополняют GAP03, но не закрывают его и не дают operational evidence. |
+| U3-02 | H-E01,H-E07,H-E10,H-E12; R41–R43; 0C-1 U12 | Не определены functional metric sources, health thresholds, confidence, degradation trends, RCA evidence и семантика свежести. | Не считать падение sales infra outage, прогноз — фактом, unknown/stale/paused — healthy. Детальные state definitions/thresholds утверждаются отдельно. |
+| U3-03 | H-E02,H-E03,H-E12,H-E13; H-B03,H-B04,H-C10; 0C-1 U03 | Не выбраны polling cadence, dedup keys/windows, meaningful change, incident severity/urgency/confidence/impact criteria, dashboard/card schema и timezone. | Сохраняются 23:00–08:00 local quiet hours и 08:00/14:00/21:00 reports из 0C-1; новых чисел или critical exceptions по усмотрению AI нет. |
+| U3-04 | H-E03,H-E04,H-E06,H-E13,H-F03,H-F04,H-F07,H-F10,H-F13; D23; U2-05 | Нет полного preauthorization/incident/risk policy, exact action identity/expiry и перечня safe containment/remediation; scope термина real changes H-F10 относительно safe granted autonomy H-C05/H-C09 не уточнён. | Dangerous actions, prod data/DB restore, dangerous resume after compromise требуют owner approval; unanswered card не согласие. Incident policy не расширяет права. |
+| U3-05 | H-E02,H-E05,H-F08,H-F15; D20,D22,D24; U2-08 | Не определены timeout/retry/backoff/rate-limit/circuit-breaker parameters, review-cycle limits, lease/heartbeat/expiry values. | Сами механизмы и bounded behavior source-approved; точные значения/алгоритмы/библиотеки OPEN. Никаких invented retry caps/TTL/retention. |
+| U3-06 | H-E08,H-F01,H-F05,H-F08,H-F15; R35–R40; D24 | Не выбраны месячный период/timezone, tariffs/currency rules, delayed billing model, связь actual/reserved/forecast/unconfirmed, essential reserve и atomic accounting. | Hard ceiling 10 000 ₽/месяц и поведение 70/90/100 уже утверждены; forecast не списывается как факт, billing delays не дают free budget. Essential protection не разрешает молчаливое превышение. |
+| U3-07 | H-E06,H-F02,H-F03,H-F10,H-F16; D25–D27 | Не выбраны offsite backup placement, protected-log/backup access, retention, verification environment, restore plan/tests, dependency pins; RPO/RTO не доказаны. | В baseline найдены только OPEN RPO/RTO, численных целей ≤15 min/≤4 h нет. Условная оговорка SRC-0C3 не утверждает их как target; если представлены ранее обсуждённые цели, они provisional и требуют feasibility tests. |
+| U3-08 | H-E09,H-F03,H-F13,H-F14; D26; OPS-C01–OPS-C05 | Не известны конкретный failure domain, watchdog/alert/console path, provider/region/OS/readiness и работоспособность emergency recovery. | Не требуется permanent second VPS by default. VPS purchased — owner-reported; console impairment reported, ни доступа, ни preflight/проверки в этом этапе. |
+| U3-09 | H-E10,H-E11,H-F13; R28,R32 | Не определены detection rules, authorized containment, evidence preservation, incident investigation/reconciliation и resume protocol. | Stop unsafe actions/revoke exposed permissions/independent alert, сохранить evidence; не уничтожать журналы/копии и не возобновлять опасные операции без owner approval. |
+| U3-10 | H-E11,H-F04,H-F06; H-A07; D19,D21,D23,D25 | Не выбраны policy schema, trustworthy action classification, actual credential enforcement, revocation и точка исполнения. | Unknown actions blocked и independent deterministic enforcement обязательны. Никакой новый microservice/secret platform не выбран; AI review не permission authority. |
+| U3-11 | H-F02,H-F05,H-F06,H-F10,H-F14; D25,D28 | Нет установленной applicable jurisdiction/legal basis/localization/hosting/transfer assessment, data inventory и approved real-data flow. | Не выводить юрисдикцию из RUB/языка/купленного VPS. Real customer data не читать/обрабатывать; будущий review включает logs/backups/tasks/APIs и minimization/deidentification. |
+| U3-12 | H-E09,H-F05,H-F14,H-F15; H-D02; D22,D26 | Не подтверждены API availability/permissions, provider terms/region/cost, compatibility fallback, stop/quarantine guarantees, lease enforcement при потере control. | Telegram/web/monitoring/history/emergency не зависят от AI; affected jobs pause/reconcile. Не обещать immediate kill без гарантии; no prohibited circumvention, no preflight now. |
+| U3-13 | H-E11,H-F06; H-A07,H-B08,H-B09,H-D04 | Не выбраны trust/provenance schema, adversarial suite, exfiltration/network/secret controls и suspicious-action rules. | External messages/files/websites/tool outputs/repository content — data, не самовыданные полномочия; controls source-approved, конкретная реализация OPEN. |
+| U3-14 | H-E05,H-F07,H-F09,H-F11,H-F12,H-F15; D19,D20,D24; U2-03,U2-09 | Не выбраны operation identifiers, idempotency/status protocols, object ownership, locks/equivalent concurrency, optimistic versions/expiration/fencing и durable cost reconciliation. | Ambiguous dangerous effect → pause dependents/reconcile; stale write → re-read/recalculate safely or stop. Конкретная SQL/Redis lock implementation и lease durations не выбираются. |
+| U3-15 | H-F07,H-F08,H-F09,H-F16; R25,R26,R33,R51; D18,D27,D29 | Нет exact revision/dependency/checksum/CI/provenance formats, completeness criteria, risk-to-check matrix и фактических test/security/restore evidence. | Pin tasks/CI/releases, revalidate before merge/release/dangerous action; exact artifact only. Прежнее A01 не подтверждает completion, новый CI vendor/signature format не утверждается. |
+| U3-16 | H-E01,H-E07,H-E12,H-E13,H-F14; R49; D16,D29; U2-13 | Не распределены новые monitoring/incident features по MVP/следующим поставкам; тема/состав 0C-4 не предоставлены. | Нормы безопасности обязательны в релевантном scope; business analytics не добавляется автоматически в MVP. 0C-3 только документация, дальнейшее задание ждёт владельца. |
+
+## ASSUMPTION и проверка восстановления
+
+Новых ASSUMPTION — **0**. A01 остаётся непроверенным. Численные RPO/RTO targets в baseline не найдены: только OPEN-упоминания в D26, GAP06, INFRASTRUCTURE_STATUS и MVP_SCOPE. SRC-0C3 содержит условное правило о ранее обсуждённых ≤15 минут/≤4 часов; условие не превращается в новое утверждение target или доказательство performance.
+
+Названия механизмов из supplied summary (backoff, circuit breakers, leases/heartbeats, locking/equivalent concurrency, fencing where appropriate) source-approved как требования. Параметры, concrete implementation и фактическая readiness — OPEN. Ни один старый OPEN о выборе конкретной реализации не закрывается одними словами «tested», «trusted» или «independent».
+
+Package G частично пополняет GAP03 approved audit-summary решениями, но исходный полный аудит и execution evidence недоступны. Тема 0C-3 теперь известна, прежние отчёты U10/U2-13 сохраняют исторический статус; всё остальное, включая 0C-4, не объявляется разрешённым или закрытым.

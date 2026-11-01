@@ -1,0 +1,10 @@
+[Unit]
+Description=F1 local backup schedule; not an RPO guarantee
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=15s
+Persistent=true
+Unit=f1-backup.service
+[Install]
+WantedBy=timers.target

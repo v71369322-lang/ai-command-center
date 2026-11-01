@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "duration_seconds": 3600,
+  "max_operations": 32,
+  "max_updates": 0,
+  "base_bundle": "0ee8a6023296fdacfe632c2f364c488b2564db399bfd15af357812e41004d64b",
+  "releases": {
+    "0ee8a6023296fdacfe632c2f364c488b2564db399bfd15af357812e41004d64b": {
+      "directory": "/home/acc-control/f32/bundle-telegram",
+      "revision": "316dc1615dea224bcf4bd595d87048d19820bd21"
+    }
+  }
+}

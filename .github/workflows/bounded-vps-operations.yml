@@ -1,0 +1,33 @@
+name: Bounded VPS maintenance mailbox
+on:
+  push:
+    branches: [ops/bounded-vps-requests]
+permissions:
+  contents: read
+concurrency:
+  group: bounded-vps-operations
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Validate explicit non-secret request, no VPS access
+        run: python3 infra/vps/operations/submit.py --request-file infra/vps/operations/pending_request.json
+  mailbox:
+    needs: validate
+    if: contains(github.event.head_commit.message, '[request-acc-operation]')
+    runs-on: [acc-ops-mailbox]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Submit typed request through the installed unprivileged producer
+        run: /usr/bin/python3 /usr/local/lib/acc-operations/submit.py --request-file infra/vps/operations/pending_request.json --publish

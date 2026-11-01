@@ -1,0 +1,47 @@
+name: F1 and F2 synthetic verification
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: f1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  synthetic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Locked dependencies and static checks
+        run: |
+          python -m pip install uv==0.12.23
+          uv sync --frozen
+          .venv/bin/ruff check src tests scripts
+          .venv/bin/ruff check infra/vps
+          .venv/bin/pytest infra/vps/tests -q
+          .venv/bin/python scripts/export_contract.py --check
+          npm ci --prefix web
+          npm run --prefix web build
+          .venv/bin/playwright install --with-deps chromium
+      - name: Final clean-source tests and container smoke
+        run: |
+          python scripts/bootstrap_secrets.py
+          scripts/verify_cloud.sh
+      - name: Ubuntu 24.04 deployment prerequisites (not a VPS test)
+        run: sh scripts/ubuntu_deployment_probe.sh
+      - name: Stop only owned synthetic services
+        if: always()
+        run: |
+          export F1_SOURCE_REVISION="$(git rev-parse HEAD)"
+          export F1_DOCKER_GID="$(stat -c %g /var/run/docker.sock)"
+          scripts/docker_local.sh compose --profile worker stop
