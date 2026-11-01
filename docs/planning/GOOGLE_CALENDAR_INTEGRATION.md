@@ -66,13 +66,20 @@ Telegram-напоминания. Только отдельное подтвер�
 
 1. Голосовая расшифровка с явным readback.
 2. OAuth-привязка выделенного Google Calendar при участии владельца.
-3. Durable publisher state и status view.
+3. Publisher worker и status view поверх готового durable state.
 4. Синтетическая приёмка, затем один реальный event без участников.
 
 Офлайн-контракт Google Insert уже фиксирует минимальное событие без участников и
 `sendUpdates=none`, private draft/document binding и отдельный bounded lookup для
 read-before-retry. Ответ принимается только при точном совпадении idempotency
 binding, title, start/end и `confirmed`; live HTTP transport этим слоем запрещён.
+
+Durable sync state также реализован в append-only audit. Binding содержит только
+calendar ID, version и fingerprint credential — само credential value не читается
+и не сохраняется. `PREPARED` фиксирует exact request hash; неопределённый ответ
+переходит в `UNKNOWN`, запрещает повтор и выдаёт только bounded reconciliation
+lookup. Точное событие переводит его в `SYNCED`; подмена title/time/private binding
+отклоняется без изменения состояния.
 
 Google Calendar — параллельный канал и не является prerequisite подключения
 первого project adapter к Telegram.

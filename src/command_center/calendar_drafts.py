@@ -167,3 +167,11 @@ def list_drafts_locked(session, role, limit=10):
         raise Denied('calendar_limit_invalid')
     values = list(_states(session).values())
     return list(reversed(values[-limit:]))
+
+
+def get_draft_locked(session, draft_id):
+    _uuid(draft_id)
+    row = _states(session).get(draft_id)
+    if row is None:
+        raise Denied('calendar_draft_not_found')
+    return row

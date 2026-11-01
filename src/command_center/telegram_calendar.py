@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 
 from .attention_schedule import current as reminder_schedule
 from .calendar_drafts import create, decide, list_drafts_locked
+from .calendar_sync import sync_state
 from .models import Audit, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
 
@@ -177,8 +178,10 @@ def list_reply(session):
                 'Google Calendar ещё не подключён.')
     labels = {'DRAFT': 'ждёт подтверждения', 'CONFIRMED_LOCAL': 'подтверждено локально',
               'CANCELLED': 'отменено'}
+    sync_labels = {'NOT_PREPARED': '', 'PREPARED': ' · Google подготовлен',
+                   'UNKNOWN': ' · Google требует сверки', 'SYNCED': ' · Google синхронизирован'}
     lines = [f"• {row['document']['start']} · {row['document']['title']} · {labels[row['state']]}"
-             for row in rows]
+             f"{sync_labels[sync_state(session, row['id'])['state']]}" for row in rows]
     return ('Последние события календаря:\n' + '\n'.join(lines)
             + '\n\nGoogle Calendar ещё не подключён; просмотр ничего не отправляет.')
 
