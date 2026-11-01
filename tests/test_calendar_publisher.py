@@ -7,6 +7,7 @@ from command_center.calendar_publisher import CalendarPublisher
 from command_center.calendar_sync import configure_binding, prepare_sync
 from command_center.google_calendar_contract import insert_request
 from command_center.store import digest
+from command_center.telegram_calendar import list_reply
 
 
 def setup(store):
@@ -62,3 +63,5 @@ def test_definite_http_rejection_is_terminal_and_body_is_not_recorded(store):
 
     state = CalendarPublisher(store, Client()).publish(draft['id'], str(uuid4()))
     assert state['state'] == 'FAILED' and state['error_code'] == 'http_403'
+    with store.transaction() as session:
+        assert 'Google отклонил публикацию' in list_reply(session)

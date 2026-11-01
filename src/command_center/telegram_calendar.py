@@ -182,7 +182,8 @@ def list_reply(session, profile=None):
     labels = {'DRAFT': 'ждёт подтверждения', 'CONFIRMED_LOCAL': 'подтверждено локально',
               'CANCELLED': 'отменено'}
     sync_labels = {'NOT_PREPARED': '', 'PREPARED': ' · Google подготовлен',
-                   'UNKNOWN': ' · Google требует сверки', 'SYNCED': ' · Google синхронизирован'}
+                   'UNKNOWN': ' · Google требует сверки', 'SYNCED': ' · Google синхронизирован',
+                   'FAILED': ' · Google отклонил публикацию'}
     lines = [f"• {row['document']['start']} · {row['document']['title']} · {labels[row['state']]}"
              f"{sync_labels[sync_state(session, row['id'])['state']]}" for row in rows]
     voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.' if voices else ''
