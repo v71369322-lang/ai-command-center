@@ -1,4 +1,8 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ProjectConnection} from './ProjectConnection';
+import {ProjectSetupOverview} from './ProjectSetup';
+import {RequestReview} from './RequestReview';
+import {PreparationQueue} from './PreparationQueue';
 
 type Request=(path:string,body?:unknown,signal?:AbortSignal)=>Promise<unknown>;
 const ids=['command-center','vanilla-sugar','lnauto','capital-lab'] as const;
@@ -34,22 +38,25 @@ function parse(value:unknown,filter:Filter):View{
  return {projects,requests:rows,counts:counts as Record<string,number>,total_pending:Number(value.total_pending),filter};
 }
 
-function SavedRow({row,projects,disabled,save}:{row:Row;projects:View['projects'];disabled:boolean;save:(row:Row,project:Project|null)=>void}){
+function SavedRow({row,projects,disabled,save,request,onSaved}:{row:Row;projects:View['projects'];disabled:boolean;save:(row:Row,project:Project|null)=>void;request:Request;onSaved:()=>Promise<void>}){
  const [chosen,setChosen]=useState<Project|null>(row.project_id);
  const number=row.id.split(':')[1];
  return <li className="project-request">
   <h3>Запрос №{number}</h3>
   <details><summary>Текст запроса</summary><p className="telegram-request-text">{row.text}</p></details>
-  <p>Ожидает планирования. Выполнение не запускалось.</p>
+  <p>Сохранённый запрос. Следующий шаг — в обзоре стадий подготовки.</p>
   <label htmlFor={'project-'+row.id}>Проект запроса №{number}</label><select id={'project-'+row.id} value={chosen??''} disabled={disabled}
    onChange={event=>setChosen(event.target.value===''?null:event.target.value as Project)}>
    <option value="">Не распределён</option>{projects.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
   </select>
   <button disabled={disabled||chosen===row.project_id} onClick={()=>save(row,chosen)}>Сохранить проект</button>
+  <RequestReview row={row} request={request} onSaved={onSaved}/>
  </li>
 }
 
 export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Promise<void>}){
+ const [setupRevision,setSetupRevision]=useState(0),[preparationRevision,setPreparationRevision]=useState(0);
+ const changed=async()=>{await onSaved();setPreparationRevision(v=>v+1)};
  const [filter,setFilter]=useState<Filter>('all');
  const [view,setView]=useState<View|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -87,9 +94,13 @@ export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Prom
  return <section className="project-inbox" aria-labelledby="projects-heading" aria-busy={loading||saving}>
   <h2 id="projects-heading">Проекты и запросы</h2>
   <p>Выбор проекта упорядочивает запросы. Он не разрешает запуск AI или доступ к CRM.</p>
+  {view&&<PreparationQueue request={request} onSaved={changed} revision={preparationRevision}/>}
+  {view&&<ProjectSetupOverview request={request} revision={setupRevision}/>}
   {view&&<ul>{view.projects.map(item=><li key={item.id}><strong>{item.label}</strong>: {view.counts[item.id]} · {
    item.connection_state==='VERIFIED_DISABLED'?'репозиторий проверен, запуск выключен':'репозиторий не подключён'
-  } · AI-разработка не подключена</li>)}</ul>}
+  } · AI-разработка не подключен<ProjectConnection projectId={item.id} label={item.label} request={request} onSaved={async()=>{
+   await changed();setSetupRevision(v=>v+1);
+  }}/></li>)}</ul>}
   <label htmlFor="project-filter">Показать запросы</label><select id="project-filter" value={filter} disabled={loading||saving} onChange={event=>setFilter(event.target.value as Filter)}>
    <option value="all">Все проекты</option><option value="unassigned">Не распределены</option>
    {(view?.projects??ids.map(id=>({id,label:id,connection_state:'DISCONNECTED' as ConnectionState}))).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
@@ -100,7 +111,7 @@ export function ProjectInbox({request,onSaved}:{request:Request;onSaved:()=>Prom
   {view&&<><p>Ожидают планирования: {view.total_pending}. Не распределены: {view.counts.unassigned}.</p>
    {view.requests.length===0?<p>В этом разделе запросов пока нет.</p>:<ul className="project-requests">
     {view.requests.map(row=><SavedRow key={row.id+':'+row.assignment_version} row={row} projects={view.projects}
-     disabled={loading||saving||Boolean(error)} save={(item,chosen)=>void save(item,chosen)}/>)}</ul>}
+     disabled={loading||saving||Boolean(error)} request={request} onSaved={changed} save={(item,chosen)=>void save(item,chosen)}/>)}</ul>}
    {view.requests.length===50&&<p>Показаны последние 50 запросов выбранного раздела.</p>}</>}
   <button disabled={loading||saving} onClick={()=>{setNotice('');void reload()}}>Обновить очередь проектов</button>
  </section>

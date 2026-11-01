@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator, SecretStr
@@ -19,6 +19,8 @@ from .store import Denied, Store
 from .worker import broker
 from .owner_auth import OwnerAuth
 from .coding.contract import CodingRequest, payload as coding_payload, template as coding_template
+from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreRequest, EVENT as PROJECT_SETUP_EVENT
+from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_DRAFT_EVENT
 
 
 class Command(BaseModel):
@@ -256,6 +258,12 @@ def create_app(settings=None, gateway_factory=None):
     @app.get("/api/state")
     def state(role=Depends(human)):
         result = store.snapshot()
+        # Keep the protected audit unchanged. Generic timelines are projections;
+        # draft values are read only through the screened owner setup/plan endpoints.
+        for item in result['events']:
+            event = item['event']
+            if event.get('kind') in {PROJECT_SETUP_EVENT, PLAN_DRAFT_EVENT}:
+                item['event'] = {'kind': event['kind'], 'details_redacted': True}
         from .coding.integration_config import IntegrationConfig
         if gateway_factory:
             gateway = external_gateway()
@@ -475,6 +483,63 @@ def create_app(settings=None, gateway_factory=None):
     def project_assignment(body: ProjectAssignment, role=Depends(identity)):
         from .project_inbox import classify
         return classify(store, role, **body.model_dump())
+
+    @app.get('/api/project-inbox/preparation')
+    def preparation_queue(project: Literal['all', 'unassigned', 'command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'] = 'all',
+                          stage: Literal['all', 'select_project', 'complete_setup', 'prepare_plan', 'refresh_plan', 'answer_questions', 'verify_scope'] = 'all',
+                          page: int = Query(default=1, ge=1, le=100),
+                          snapshot: str | None = Query(default=None, pattern=r'^[a-f0-9]{64}$'), role=Depends(identity)):
+        from .request_preparation import read
+        return read(store, role, project=project, stage=stage, page=page, snapshot=snapshot)
+
+    @app.get('/api/project-inbox/review')
+    def request_review(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
+                       role=Depends(identity)):
+        from .request_review import read
+        return read(store, role, request_id)
+
+    @app.post('/api/project-inbox/plan/preview')
+    def manual_plan_preview(body: ManualRequest, role=Depends(identity)):
+        from .manual_plan import preview
+        return preview(store, role, body)
+
+    @app.post('/api/project-inbox/plan')
+    def manual_plan_save(body: ManualSaveRequest, role=Depends(identity)):
+        from .manual_plan import save
+        return save(store, role, ManualRequest.model_validate(body.model_dump(exclude={'operation_id'})), body.operation_id)
+
+    @app.get('/api/projects/{project_id}/connection-plan')
+    def project_connection_plan(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],
+                                role=Depends(identity)):
+        from .project_connections import connection_plan
+        return connection_plan(role, project_id)
+
+    @app.get('/api/project-setup')
+    def project_setup_catalog(role=Depends(identity)):
+        from .project_setup import catalog
+        return catalog(store, role)
+
+    @app.get('/api/projects/{project_id}/setup')
+    def project_setup_read(project_id: ProjectId, version: int | None = Query(default=None, ge=0, le=500),
+                           role=Depends(identity)):
+        from .project_setup import read
+        return read(store, role, project_id, selected=version)
+
+    @app.post('/api/projects/{project_id}/setup/preview')
+    def project_setup_preview(project_id: ProjectId, body: PreviewRequest, role=Depends(identity)):
+        from .project_setup import preview
+        return preview(store, role, project_id, body.expected_version, body.draft)
+
+    @app.post('/api/projects/{project_id}/setup')
+    def project_setup_save(project_id: ProjectId, body: SaveRequest, role=Depends(identity)):
+        from .project_setup import save
+        return save(store, role, project_id, body.expected_version, body.draft, body.operation_id)
+
+    @app.post('/api/projects/{project_id}/setup/restore')
+    def project_setup_restore(project_id: ProjectId, body: RestoreRequest, role=Depends(identity)):
+        from .project_setup import restore
+        return restore(store, role, project_id, body.expected_version, body.target_version,
+                       body.target_digest, body.operation_id)
 
     @app.get('/api/telegram/requests')
     def telegram_requests(role=Depends(identity)):

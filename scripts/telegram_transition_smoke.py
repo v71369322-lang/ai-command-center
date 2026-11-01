@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import time
 from uuid import uuid4
 
 import httpx
@@ -178,6 +179,22 @@ def login(client):
     response.raise_for_status()
 
 
+def state_response(client, expected_status, *, seconds=10):
+    """Safe GET readiness only; never repeat writes or retry an HTTP verdict."""
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            response = client.get('/api/state', timeout=max(.001, deadline - time.monotonic()))
+        except httpx.TransportError:
+            if time.monotonic() >= deadline:
+                raise RuntimeError('transition_api_transport_not_ready') from None
+            time.sleep(.1)
+            continue
+        if response.status_code != expected_status:
+            raise ValueError('transition_api_state_http_status')
+        return response
+
+
 def resume(client):
     csrf = client.get('/api/auth/csrf').json()['csrf_token']
     state = request(client, 'state')
@@ -233,7 +250,11 @@ def run_drill(source, revision, engine):
     try:
         created = True
         old.apply('install', checksum(old.bundle))
-        with httpx.Client(base_url=origin, headers={'Origin': origin}, trust_env=False, timeout=10) as client:
+        # API containers are deliberately replaced below. Preserve the cookies
+        # for the old-session rejection check, but never reuse the old TCP peer.
+        with httpx.Client(base_url=origin, headers={'Origin': origin}, trust_env=False, timeout=10,
+                          limits=httpx.Limits(max_keepalive_connections=0)) as client:
+            state_response(client, 401)  # Running containers need not be serving HTTP yet.
             login(client)
             resume(client)
             original = task(client, 'before actual Telegram schema transition')
@@ -253,10 +274,9 @@ def run_drill(source, revision, engine):
             transition.reconcile(approval)
             if engine.apply_count != 1:
                 raise ValueError('migration_replayed')
-            if client.get('/api/state').status_code != 401:
-                raise ValueError('old_revision_session_was_accepted')
+            state_response(client, 401)  # Preserve the old cookie; require its actual rejection.
             login(client)
-            snapshot = request(client, 'state')
+            snapshot = state_response(client, 200).json()
             preserved = next(v for v in snapshot['tasks'] if v['id'] == original['id'])
             if not snapshot['halted'] or preserved['artifact_hash'] != original['artifact_hash']:
                 raise ValueError('state_not_preserved_or_auto_resumed')
@@ -271,7 +291,7 @@ def run_drill(source, revision, engine):
             current.compose('stop')
             current.boot()
             wait(current.postcheck)
-            snapshot = request(client, 'state')
+            snapshot = state_response(client, 200).json()
             if not snapshot['halted'] or any(
                     next(v for v in snapshot['tasks'] if v['id'] == t['id'])['artifact_hash'] != t['artifact_hash']
                     for t in (original, after)):

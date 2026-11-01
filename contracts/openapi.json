@@ -268,6 +268,68 @@
         "title": "Command",
         "type": "object"
       },
+      "Draft": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance": {
+            "items": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Acceptance",
+            "type": "array"
+          },
+          "delivery_kind": {
+            "default": "not_selected",
+            "enum": [
+              "not_selected",
+              "manual_review",
+              "pipeline_review"
+            ],
+            "title": "Delivery Kind",
+            "type": "string"
+          },
+          "deployment_target": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9-]{0,47}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Target"
+          },
+          "repository_revision": {
+            "anyOf": [
+              {
+                "pattern": "^[a-f0-9]{40}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Revision"
+          },
+          "verification_kind": {
+            "default": "not_selected",
+            "enum": [
+              "not_selected",
+              "python",
+              "node",
+              "python_node"
+            ],
+            "title": "Verification Kind",
+            "type": "string"
+          }
+        },
+        "title": "Draft",
+        "type": "object"
+      },
       "ErrorResponse": {
         "properties": {
           "detail": {
@@ -392,6 +454,155 @@
         "title": "FinalRecoveryApproval",
         "type": "object"
       },
+      "ManualContent": {
+        "additionalProperties": false,
+        "properties": {
+          "questions": {
+            "items": {
+              "maxLength": 300,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Questions",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          },
+          "summary": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "steps",
+          "questions"
+        ],
+        "title": "ManualContent",
+        "type": "object"
+      },
+      "ManualRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ManualContent"
+          },
+          "expected_assignment_version": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Expected Assignment Version",
+            "type": "integer"
+          },
+          "expected_context_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Context Digest",
+            "type": "string"
+          },
+          "expected_plan_version": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Expected Plan Version",
+            "type": "integer"
+          },
+          "expected_setup_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Setup Digest",
+            "type": "string"
+          },
+          "expected_setup_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Setup Version",
+            "type": "integer"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_context_digest",
+          "expected_assignment_version",
+          "expected_setup_version",
+          "expected_setup_digest",
+          "expected_plan_version",
+          "draft"
+        ],
+        "title": "ManualRequest",
+        "type": "object"
+      },
+      "ManualSaveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ManualContent"
+          },
+          "expected_assignment_version": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Expected Assignment Version",
+            "type": "integer"
+          },
+          "expected_context_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Context Digest",
+            "type": "string"
+          },
+          "expected_plan_version": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Expected Plan Version",
+            "type": "integer"
+          },
+          "expected_setup_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Setup Digest",
+            "type": "string"
+          },
+          "expected_setup_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Setup Version",
+            "type": "integer"
+          },
+          "operation_id": {
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_context_digest",
+          "expected_assignment_version",
+          "expected_setup_version",
+          "expected_setup_digest",
+          "expected_plan_version",
+          "draft",
+          "operation_id"
+        ],
+        "title": "ManualSaveRequest",
+        "type": "object"
+      },
       "PasswordLogin": {
         "additionalProperties": false,
         "properties": {
@@ -415,6 +626,26 @@
           "password"
         ],
         "title": "PasswordLogin",
+        "type": "object"
+      },
+      "PreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          },
+          "expected_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "draft"
+        ],
+        "title": "PreviewRequest",
         "type": "object"
       },
       "ProjectAssignment": {
@@ -463,6 +694,41 @@
         "title": "ProjectAssignment",
         "type": "object"
       },
+      "RestoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "operation_id": {
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "target_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Target Digest",
+            "type": "string"
+          },
+          "target_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Target Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "target_version",
+          "target_digest",
+          "operation_id"
+        ],
+        "title": "RestoreRequest",
+        "type": "object"
+      },
       "ResumeRequest": {
         "additionalProperties": false,
         "properties": {
@@ -482,6 +748,62 @@
           "checkpoint_digest"
         ],
         "title": "ResumeRequest",
+        "type": "object"
+      },
+      "SaveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          },
+          "expected_version": {
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "operation_id": {
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "draft",
+          "operation_id"
+        ],
+        "title": "SaveRequest",
+        "type": "object"
+      },
+      "Step": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance": {
+            "items": {
+              "maxLength": 300,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Acceptance",
+            "type": "array"
+          },
+          "description": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "acceptance"
+        ],
+        "title": "Step",
         "type": "object"
       }
     }
@@ -1762,6 +2084,343 @@
         "summary": "Project Assignment"
       }
     },
+    "/api/project-inbox/plan": {
+      "post": {
+        "operationId": "manual_plan_save_api_project_inbox_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Manual Plan Save"
+      }
+    },
+    "/api/project-inbox/plan/preview": {
+      "post": {
+        "operationId": "manual_plan_preview_api_project_inbox_plan_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Manual Plan Preview"
+      }
+    },
+    "/api/project-inbox/preparation": {
+      "get": {
+        "operationId": "preparation_queue_api_project_inbox_preparation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "unassigned",
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stage",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "select_project",
+                "complete_setup",
+                "prepare_plan",
+                "refresh_plan",
+                "answer_questions",
+                "verify_scope"
+              ],
+              "title": "Stage",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "snapshot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Snapshot"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Preparation Queue"
+      }
+    },
+    "/api/project-inbox/review": {
+      "get": {
+        "operationId": "request_review_api_project_inbox_review_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 81,
+              "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Request Review"
+      }
+    },
+    "/api/project-setup": {
+      "get": {
+        "operationId": "project_setup_catalog_api_project_setup_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Setup Catalog"
+      }
+    },
     "/api/projects/{project_id}": {
       "get": {
         "operationId": "project_status_api_projects__project_id__get",
@@ -1823,6 +2482,367 @@
           }
         },
         "summary": "Project Status"
+      }
+    },
+    "/api/projects/{project_id}/connection-plan": {
+      "get": {
+        "operationId": "project_connection_plan_api_projects__project_id__connection_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Connection Plan"
+      }
+    },
+    "/api/projects/{project_id}/setup": {
+      "get": {
+        "operationId": "project_setup_read_api_projects__project_id__setup_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 500,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Setup Read"
+      },
+      "post": {
+        "operationId": "project_setup_save_api_projects__project_id__setup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Setup Save"
+      }
+    },
+    "/api/projects/{project_id}/setup/preview": {
+      "post": {
+        "operationId": "project_setup_preview_api_projects__project_id__setup_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Setup Preview"
+      }
+    },
+    "/api/projects/{project_id}/setup/restore": {
+      "post": {
+        "operationId": "project_setup_restore_api_projects__project_id__setup_restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "enum": [
+                "command-center",
+                "vanilla-sugar",
+                "lnauto",
+                "capital-lab"
+              ],
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Project Setup Restore"
       }
     },
     "/api/simulator/commands": {

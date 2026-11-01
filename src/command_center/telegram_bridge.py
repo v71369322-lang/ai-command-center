@@ -207,6 +207,9 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value.split()[:1] == ['/queue']:
+            from .request_preparation import telegram_parse
+            return str(uid), telegram_parse(value)
         if value.split()[:1] == ['/project']:
             from .project_catalog import IDS
             parts = value.split()
@@ -225,6 +228,32 @@ class TelegramBridge:
             return str(uid), {'kind': attention_commands[value]}
         if value.split()[:1] and value.split()[0] in attention_commands:
             raise Denied('telegram_attention_arguments_forbidden')
+        if value.split()[:1] == ['/review']:
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53):
+                raise Denied('telegram_review_reference_invalid')
+            return str(uid), {'kind': 'request_review', 'number': parts[1]}
+        if value.split()[:1] == ['/plan_edit']:
+            parts = value.split()
+            from .telegram_manual_plan import number
+            if len(parts) != 2:
+                raise Denied('telegram_manual_plan_arguments_invalid')
+            number(parts[1], 2**53-1)
+            return str(uid), {'kind': 'manual_plan_template', 'number': parts[1]}
+        if value.split()[:1] == ['/draft_plan']:
+            from .telegram_manual_plan import parse
+            return str(uid), parse(value)
+        if value.split()[:1] == ['/connection']:
+            from .project_catalog import IDS
+            parts = value.split()
+            if len(parts) > 2 or len(parts) == 2 and parts[1] not in IDS:
+                raise Denied('telegram_project_connection_invalid')
+            return str(uid), {'kind': 'project_connection',
+                              'project_id': parts[1] if len(parts) == 2 else None}
+        from .telegram_project_setup import COMMANDS as setup_commands, parse as parse_setup
+        if value.split()[:1] and value.split()[0] in setup_commands:
+            return str(uid), parse_setup(value)
         if value == '/plan':
             return str(uid), {'kind': 'help'}
         if value.split()[:1] == ['/plan']:
@@ -427,6 +456,12 @@ class TelegramBridge:
                     issue(self, session, iid)
                 else:
                     confirm(self, session, iid, intent)
+        elif kind == 'project_setup_change':
+            from .telegram_project_setup import apply as apply_setup
+            apply_setup(self, iid, intent)
+        elif kind == 'manual_plan_save':
+            from .telegram_manual_plan import apply as apply_manual_plan
+            apply_manual_plan(self, iid, intent)
         elif kind == 'assign':
             from .project_inbox import classify, PROJECTS
             from .telegram_project_picker import verify
@@ -482,7 +517,9 @@ class TelegramBridge:
             from .telegram_voice_transcripts import decide
             decide(self, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
-                      'calendar_list', 'voice', 'system', 'project', 'plan_review', 'coding_plan', 'readiness', 'experiment',
+                      'calendar_list', 'voice', 'system', 'project', 'project_connection',
+                      'project_setup', 'project_setup_history', 'request_review', 'preparation_queue',
+                      'manual_plan_template', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -528,6 +565,22 @@ class TelegramBridge:
                 elif kind == 'system':
                     from .telegram_system import reply as system_reply
                     reply = system_reply(session, self.profile)
+                elif kind == 'project_connection':
+                    from .telegram_project_connection import reply as connection_reply
+                    reply = connection_reply(intent['project_id'])
+                elif kind == 'preparation_queue':
+                    from .request_preparation import telegram_reply
+                    reply = telegram_reply(self, session, intent, suffix)
+                elif kind == 'request_review':
+                    from .request_review import telegram_reply
+                    reply = telegram_reply(self, session, intent, suffix)
+                elif kind == 'manual_plan_template':
+                    from .telegram_manual_plan import template
+                    suffix = '\n'.join('# ' + line if line else '' for line in suffix.splitlines())
+                    reply = template(self, session, intent, suffix)
+                elif kind in {'project_setup', 'project_setup_history'}:
+                    from .telegram_project_setup import reply as setup_reply
+                    reply = setup_reply(self, session, intent, suffix)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
@@ -593,6 +646,9 @@ class TelegramBridge:
                         '/request номер — открыть запрос; '
                         '/plan номер — посмотреть сохранённый черновик плана; '
                         '/projects — проекты и назначение; /project project-id — подключение и границы; '
+                        '/queue — стадии подготовки, фильтры и страницы запросов; '
+                        '/connection project-id — план подключения; /setup project-id — черновик настройки; '
+                        '/review номер — обзор запроса; /plan_edit номер — ручной план; '
                         '/attention — центр внимания; /reminders — расписание сводок; '
                         '/voice — голосовые поручения до расшифровки; /system — роли и состояние компонентов; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
@@ -719,6 +775,8 @@ class TelegramBridge:
                     or not isinstance(body.get('text'), str) or not 1 <= len(body['text']) <= 4096
                     or set(body) - {'chat_id', 'text', 'reply_markup'}):
                 raise Denied('telegram_delivery_scope_or_integrity_invalid')
+            from .project_inbox import check_content
+            check_content(self.store, body['text'])
             self.store.audit(session, 'telegram_delivery_intent', 'system', delivery_id=oid)
         try:
             result = self.client.call('sendMessage', body)

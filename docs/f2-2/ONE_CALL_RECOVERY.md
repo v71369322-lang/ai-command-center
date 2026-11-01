@@ -1,6 +1,6 @@
 # Отдельный однократный восстановительный тест
 
-Владелец30октября2026 разрешил разработку отдельного восстановления после
+Владелец 30 октября 2026 разрешил разработку отдельного восстановления после
 [известной ошибки контракта первого ответа](SOURCE_SCHEMA_FAILURE_2026-10-30.md).
 Это разрешение на cloud-код, проверки и обозримую подготовку; не новый paid
 consent, host build/update, token issuance или право переоткрыть старую задачу.
@@ -16,10 +16,10 @@ JSON Schema уже ограничен двумя исполнимыми исхо
 варианты кода не добавляются в allowlist.
 
 Максимальный новый резерв — **34.7868₽** (`34786800000`nano-RUB). При подтверждённой
-границе112.5₽/$ это один вызов по прежнему консервативному тарифу. Отдельно
+границе 112.5 ₽/$ это один вызов по прежнему консервативному тарифу. Отдельно
 проверяется `старый фактический расход + новый резерв ≤ старый согласованный
 лимит ≤ 100₽`. Общие daily/monthly ledger guards и спорные резервы сохраняются.
-С observed расходом0.047840625₽ суммарная верхняя оценка34.834640625₽;
+С observed расходом 0.047840625 ₽ суммарная верхняя оценка 34.834640625 ₽;
 это расчётный предел, не фактический расход и не provider-enforced отсечка.
 
 ## Историческое основание, не перенос полномочий
@@ -31,7 +31,7 @@ original_grant_digest. Он сохраняет прежнюю сериализа
 каждым внешним действием, включая проверки после I/O.
 
 Обязательны owner task с исходным фиксированным request key/payload, FAILED/
-external_coding_blocked, одна попытка, нулевой synthetic reserve, iteration1 и
+external_coding_blocked, одна попытка, нулевой synthetic reserve, iteration 1 и
 отсутствие sandbox/verifier/publication результата. Старые creation/grant/failure/
 execution_stopped events должны быть в целой audit chain и совпадать с source,
 payload, fence и digest. Текущий source должен отличаться от исходного.
@@ -81,17 +81,49 @@ egress по-прежнему только у broker, readonly config — API/Tel
 новых mounts/networks/roles/dependencies, SQL-миграции или публичного admin URL.
 
 Для доставки нужен отдельный named transition от подтверждённого runtime
-322186d/bundleac6462b…094d, с сохранением всех прежних release pins. Runtime и
-operator pins/fresh-source CI фиксируются после реализации. Не менять старый
+`322186dc180257c618d8b159c78faa6e5bbf0b43` / bundle
+`ac6462b47f69a3cbc967ac2c9dd62064d6b3dc7813503d34782e1dd1830d094d`.
+Новый named transition `first-experiment-recovery` закрепляет runtime
+`bf91c05c754ad41e7f89223ec8d05c02c9007de1` и сохраняет все прежние 11 пар.
+Он требует уже настроенный first profile без recovery marker у предшественника
+и точный recovery marker/readiness у нового профиля. Повторный recovery→recovery
+не является допустимым переходом. models.py/admin.py идентичны установленной
+322186d, проверка migration hash в прежнем stage/apply сохраняется.
+Operator SHA и финальный fresh-source CI фиксируются в Draft PR. Не менять старый
 config/token на месте и не подменять labels уже построенных образов.
 
 Перед реальным apply/click повторно проверить owner deployment/parent digest,
 ledger anchors, актуальные funding/tariff/model/credential gates и runtime.
 Особенно подтвердить DONE исходного runtime record, отсутствие его контейнера и
 здоровье rootless daemon. Не очищать/прятать UNCERTAIN в SQLite или PG ради допуска.
-Сохранённый third-token и его evidence истекли30октября11:23:25UTC и11:18:25UTC;
+Сохранённый third-token и его evidence истекли 30 октября в 11:23:25 UTC и 11:18:25 UTC;
 нужны новая reviewed однократная выдача и свежий профиль после сборки. PEM и
 OpenAI/source keys заново не создаются при действительной прежней custody.
 
 Cloud mock/контейнерные проверки не являются новым VPS/rootless/live acceptance.
 До separate exact owner decisions ни rollout, ни paid recovery не выполняются.
+
+## Подготовленный build-only пакет
+
+[build_first_recovery.sh](../../infra/vps/build_first_recovery.sh) запускается
+локально на brain1 как acc-control UID 1000 только после нового согласия на
+точные source/operator SHA и срок до 2 часов. Перед запуском оператор получает
+проверенную точную копию operator commit; main/latest не используются.
+Переменные ACC_OPERATOR_REVISION и ACC_BUILD_APPROVED_UNTIL задаются этим
+конкретным разрешением. Unit WorkingDirectory — защищённый operator checkout
+или /home/acc-control; скрипт затем сам переходит в новый source.
+
+Скрипт сверяет VERIFIED predecessor/revision/bundle/directory, чистый operator,
+новую отсутствующую workspace, source-key custody, 25 GiB свободного места и
+оба rootless daemon. Создаёт отдельную private workspace
+/home/acc-control/first-experiment-recovery-release и build.log, получает только
+закреплённый application commit по существующему source SSH key с обязательной
+проверкой known_hosts. Сборка использует прежний build_release.sh и передаёт
+исполнительные образы второму daemon. Уже существующую workspace не повторяет.
+
+Пакет не меняет binding/config, не создаёт token, не применяет deployment и не
+вызывает OpenAI. Итоговый marker: FIRST_EXPERIMENT_RECOVERY_IMAGES_BUILT_NOT_DEPLOYED.
+Образы привязаны к runtime bf91c05; последующие operator-only commits не требуют
+пересборки приложения. Новый private recovery config, offline inspection,
+точные candidate/previous digests и apply approval — следующий этап после
+успешного build. Не запускать прежний stage от d932baa или mobile candidate.

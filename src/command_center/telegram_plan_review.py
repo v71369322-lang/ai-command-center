@@ -18,11 +18,11 @@ def reply(bridge, session, intent, suffix):
     if result['state'] == 'MISSING':
         return (f'Черновик плана для запроса №{number} пока не сохранён. '
                 'AI-планирование обычных запросов ещё не подключено. Просмотр не запускает генерацию. '
-                f'Запрос: /request {number}')
+                f'Ручной план: /plan_edit {number}. Запрос: /request {number}')
     if result['state'] == 'STALE':
         return (f'Сохранённый черновик для запроса №{number} устарел: запрос, проект или условия изменились. '
                 'Новый план автоматически не создавался. '
-                f'Запрос: /request {number}')
+                f'Ручной план: /plan_edit {number}. Запрос: /request {number}')
     plan = result['proposal']
     lines = [f'Кратко: {plan["summary"]}', 'Статус: ' + (
         'нужны уточнения.' if plan['disposition'] == 'needs_clarification' else 'можно рассмотреть предложение.')]
@@ -38,8 +38,11 @@ def reply(bridge, session, intent, suffix):
     project = dict(PROJECTS).get(result['project_id'], 'Не распределён')
 
     def body(content, index, total, following=True):
+        origin = ('Автор: владелец. Это ручной черновик, не разрешение на действия.\n'
+                  if result.get('origin') == 'owner_authored' else
+                  'Источник AI-ответа не подтверждён. Это предложение, не разрешение на действия.\n')
         text = (f'План запроса №{number}. Черновик {result["version"]}.\nПроект: {project}.\n'
-                'Источник AI-ответа не подтверждён. Это предложение, не разрешение на действия.\n'
+                + origin +
                 f'Страница {index}/{total}.\n\n' + '\n'.join(content))
         if following:
             text += f'\n\nДалее: /plan {number} {result["version"]} {index + 1}'

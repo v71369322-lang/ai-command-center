@@ -8,6 +8,63 @@
 reviewer. Независимый verifier результатов исполнения — отдельный механизм и
 не заменяет независимое review значимого изменения H-D05/H-I10.
 
+## Совместный локальный запуск inspection и disabled draft
+
+Это review выполняющего агента. Новый wrapper не расширяет authority предыдущих
+инструментов: фиксированный brain1/control UID, чистый exact operator и bounded
+operator-asserted window; VERIFIED322186d/ac6462b predecessor и private config pin.
+Shared lock существующего deployment.lock блокирует конкурирующий apply без
+создания/изменения lock file. Rootless Engine и immutable broker image/ID,
+compose labels, critical env, read-only root и mounts проверяются перед exec.
+Диагностический stdin-код берётся только из checked operator source; новые
+команды не принимаются из модели, отчёта или CLI. Нет shell exec или provider API.
+
+Единственный child exec — старый read-only inspector. Его exit2 не маскируется:
+принимается только schema/scope, допускаемая предыдущим disabled builder.
+До сохранения report повторно валидируется и минимизируется; unknown nested
+fields и stderr не попадают в artifacts. Проверки journal/container повторяются
+после I/O и после записи draft. Source/receipt/plan pins и финансовый cap прежние.
+Любая неопределённость сохраняет intent/partial disabled result и блокирует replay;
+нет cleanup, token refresh, task retry или apply. Low B110 относится только к
+невозможности дополнительно записать BLOCKED journal: исходная ошибка всё равно
+передаётся вверх, а существующий каталог/intent запрещает повтор.
+
+## Отключённый черновик recovery-профиля
+
+Это review выполняющего агента. Новый operator-only helper не создаёт F1 tasks,
+grants, tokens или deployment и не конструирует HTTP/DB clients. Исторический
+профиль связывается с local inspection по digest, report age и фиксированной
+задаче. Отчёт не превращается в authority: будущий RecoveryExperiment.verify_parent
+и observed owner consent остаются обязательными. Расход плюс один новый резерв
+должны помещаться в старый grant budget и прежний общий потолок.
+
+В output принудительно disabled mode, live_authorized=false, tariff.confirmed=false,
+пустые финансовые/evidence references и неподтверждённый баланс. Сохраняются
+исторические числовые параметры, не свежесть или полномочия. Создаётся новый
+private каталог вне active state/source, по plan pin входных bytes и output path;
+0600 exclusive writes не повторяются поверх полного или частичного результата.
+Путь к provider credential принимается только как прежний фиксированный container
+reference; значение credential не читается. CLI скрывает validation/IO/argument
+text. Это cloud preparation, не owner host/paid authorization.
+
+## Операторский read-only отчёт перед восстановлением
+
+Это review выполняющего агента. Reader принимает только фиксированный task ID
+и существующий локальный broker environment. В PG применяются READ ONLY и
+REPEATABLE READ; RuntimeLedger constructor, Store.transaction, mutating methods,
+heartbeat, grants, provider HTTP и token issuance не вызываются. SQLite использует
+mode=ro/query_only и старый verifier; неподдерживаемый WAL отклоняется до открытия.
+Docker ограничен прежним Unix/rootless preflight и точным ps -a. Ошибка daemon
+или отсутствие runtime evidence не подтверждают очистку.
+
+Ответ содержит только fixed flags, числовой учёт и hashes. Model response,
+config references, credentials и exception text не выводятся. Provider key values
+не читаются; DB settings остаются в trusted broker. Диагностика не является
+RecoveryExperiment.verify_parent и всегда оставляет authority/consent false.
+Проверки с настоящим PG и SQLite подтверждают запрет записи; это не новое host
+acceptance. Low B110 используется только для редактирования ошибок декодирования;
+внешние ошибки не становятся положительным результатом.
+
 ## Однократный восстановительный тест, 30 октября 2026
 
 Это review выполняющего агента. Новый фиксированный recovery scope использует
@@ -304,6 +361,118 @@ external effects через container reconcile. Watchdog сохраняет unk
 для нового kind; его container-absence proof не является provider-outcome proof.
 Новых schema/mount/egress/runtime/deployment transitions нет; live планировщик
 требует отдельной реализации и проверки всех interlocks.
+
+## Планы подключения проектов
+
+Новый GET connection-plan использует прежнюю owner identity и ограничен четырьмя
+существующими project IDs. Фиксированные имена репозиториев — ожидаемые цели,
+не evidence доступа или проверенные runtime bindings. PLAN_ONLY/NOT_CHECKED,
+пустые actions и отсутствие checked_at не позволяют объявить живое подключение.
+Нет сетевых probes, credential reads, записи конфигурации или новых полномочий.
+UI загружает план отдельно по раскрытию, отбрасывает несовпадающие IDs и признаки
+live/verified/connected, не выводит raw errors. Logout/закрытие прерывают запрос;
+ошибка плана не блокирует прежнюю очередь или назначение. Состояние grants,
+бюджета, admission, source pins и deployment transitions не меняется.
+
+## Telegram readback плана подключения
+
+`/connection` — прежний owner-private query path с фиксированными project IDs.
+Shared catalog остаётся PLAN_ONLY. Query пишет только durable inbox/audit/reply,
+не выдаёт Task/Approval/grant или финансовых полномочий. Никаких новых
+callbacks/markup/transport методов. Source/integrity проверки pending и
+UNCERTAIN no-resend сохраняются; disabled connection блокирует queued send.
+Ни модель, ни репозиторий/сервер не опрашиваются ради текста плана. Обычная
+остановка сохраняется; AI configuration не требуется для просмотра.
+
+## Versioned project setup drafts
+
+Новая owner-only область хранит только строгие декларации в прежнем Audit/F1
+Control lock. Ни complete draft, ни preview/restore, ни операция UUID не являются
+grant. Нет произвольного repository/URL/command/credential selector, probe или
+нового execution path. Typed models и readers воспроизводят последовательность
+save/patch/clear/restore, canonical/hash/project bindings, exact versions и
+UUID conflicts. Global500 events/12288 bytes/8 bounded criteria ограничивают
+retention. Данные экрануются при записи и чтении; неизвестные секреты/DLP не
+гарантируются. Удаления/сокрытия защищённой истории ради допуска нет.
+
+Telegram edit + DONE + reply атомарны; current profile/source/receive audit
+anchor/runtime guard проверяются повторно внутри commit. Модель содержимое не
+интерпретирует, CLI вложенных commands не исполняется. Revocation/rollback и
+UNCERTAIN no-repeat сохраняются. Оба канала используют одну optimistic version.
+Client write uncertainty требует чтения, не автоматического POST retry.
+Queued Bot API replies повторно проверяются по текущим известным credentials
+перед sending intent/HTTP, включая ротацию после формирования текста.
+
+Generic /state скрывает raw draft/action values для всех ролей, оставляя явно
+redacted проекцию и неизменный checkpoint/hash. Полные документы — только
+screened owner readers. Legacy raw-audit API readers не являются безопасной
+границей privacy при downgrade; host migration/apply сюда не входят. Новых
+schema/roles/mounts/egress и изменений старых F1 grants/финансового ledger нет.
+
+## Единая карточка запроса после PR #64
+
+request_review — owner-only read composition, без новых таблиц, journal events,
+writer endpoints или полномочий. Существующий F1 Control lock охватывает intake,
+assignment, setup и plan readers; их integrity/credential/size guards сохранены.
+Неизвестный, повреждённый или sensitive record не даёт частичного/пустого ответа.
+snapshot_digest — content binding наблюдения, не grant или future execution key.
+GET сохраняет no-store и прежние session/revocation boundaries.
+
+CURRENT proposal не включает setup в исходный PlanningContext. Review явно
+оставляет setup_binding_verified=false и plan_setup_binding=NOT_CHECKED, скрывает
+stale content и не выдаёт заполненный draft за подключённый проект. Все внешние
+проверки и execution/provider flags остаются false. Нет provider config/secret
+reads или egress. Telegram ограничен текущим private-owner profile и прежним
+durable delivery; web проверяет assignment binding, отменяет late requests и
+не интерпретирует произвольный текст как HTML, URLs или commands. Mutation controls
+в карточке отсутствуют. Rootful cloud proof не заменяет host acceptance.
+
+## Ручные планы после PR #65
+
+Owner-only preview/save используют прежние session/revocation/CSRF/origin и
+F1 Control lock. Schema 2 — документ владельца, без model/response_id/usage;
+не выдаёт фактов provider billing или AI provenance. Existing schema 1 и mock
+planning gateway сохранены. Оба формата имеют общий лимит 100 records и 32768
+canonical JSON bytes; точные envelope/version/UUID/digest/source bindings и
+повторный credential screen обязательны. Историческая ссылка setup сверяется
+с protected setup reader, а смена версии/assignment/context скрывает stale plan.
+DECLARED_MATCH не означает external verification; все authority/provider flags false.
+
+Telegram использует прежний private-owner/source/receive-anchor/runtime guard
+до записи и повторно внутри атомарных save + DONE + reply. UUIDv5 связан с inbox,
+HTTP — UUIDv4. Version conflicts не затирают данные; потерянный HTTP save response
+требует readback. Вложенные commands/HTML остаются текстом, placeholder-шаблон
+не сохраняется. Preview не пишет draft; save не создаёт Task/Approval/Grant,
+ExternalAction, execution Outbox или финансовый reserve. Изменения source pins,
+broker/watchdog/ledger/deployment interlocks отсутствуют.
+
+Raw plans скрыты в generic /api/state для всех ролей, как setup; protected audit
+и checkpoint не переписываются. Full content доступен screened owner readers.
+Известные credentials обнаруживаются, полная DLP неизвестных секретов не
+гарантируется. Downgrade к legacy raw-audit API reader нельзя считать безопасной
+privacy boundary. UI abort/logout/late responses, optimistic concurrency и
+checkpoint refresh проверяются с настоящим PG/API и Chromium 320/390.
+Host/rootless/iPhone/live-provider acceptance этим не доказаны.
+
+## Очередь стадий подготовки после PR #66
+
+Новый owner-only GET и private-profile `/queue` читают существующие records под
+одним Control lock. Bulk intake query выбирает тот же earliest owner receive
+anchor; pure intake/context/plan validators общие с индивидуальными readers.
+Все pending inputs проверяются до фильтра/страницы. Setup replay и plan history
+загружаются один раз, memoization живёт только внутри проверенной транзакции.
+Неполный, sensitive или повреждённый снимок не заменяется пустым/готовым ответом.
+Новые tables/writers/permission grants отсутствуют; provider/ledger/executor не вызываются.
+
+Snapshot digest связывает ordered rows, source/Control context, versions и filters,
+не является approval/capability. Web pagination требует совпадения digest, после
+conflict начинает чтение заново. TG выдаёт явно датированные свежие pages, profile
+не выбирается пользовательским аргументом. Прежние guards durable query/reply и
+rotation screen сохраняются. Composite reply отдельно ограничен Bot API bytes/
+characters; input snippets сохраняют прежний guard. Новый UI validates false
+flags/counts/stages, отменяет late responses и не исполняет текст. Одновременные
+редакторы одного запроса имеют разные HTML IDs. Source/recovery/build/deployment
+pins и все F1 financial/execution boundaries сохранены. Cloud CI не host acceptance.
 
 ## Не закрывать без внешнего evidence
 
