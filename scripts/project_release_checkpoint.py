@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 BASE = '322186dc180257c618d8b159c78faa6e5bbf0b43'
-TARGET = 'c3619ea0b94efcc0f0acae462bebefd3c4808eea'
+TARGET = '85c0696ca5df946903d6f9c11f62c58a22e284af'
 PROTECTED = ('src/command_center/models.py', 'requirements.lock', 'uv.lock', 'Dockerfile',
              'Dockerfile.executor', 'compose.yaml', 'web/package-lock.json')
 REQUIRED = ('src/command_center/telegram_voice_requests.py',

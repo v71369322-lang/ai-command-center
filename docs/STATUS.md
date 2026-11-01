@@ -1,6 +1,6 @@
 # Текущий контекст и облачный handoff
 
-Operator checkpoint **1 ноября 2026**: приложение `c3619ea` закреплено для
+Operator checkpoint **1 ноября 2026**: приложение `85c0696` закреплено для
 будущего единого mobile/project release относительно runtime checkpoint `322186d`.
 Офлайн-проверка подтверждает отсутствие изменений DB models/lockfiles/Dockerfiles/
 compose и наличие voice/system/project modules. Это ещё не release profile и не

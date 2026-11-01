@@ -1,6 +1,6 @@
 # Mobile/project release checkpoint — 1 ноября 2026
 
-Application target `c3619ea0b94efcc0f0acae462bebefd3c4808eea` объединяет изменения после
+Application target `85c0696ca5df946903d6f9c11f62c58a22e284af` объединяет изменения после
 runtime checkpoint `322186dc180257c618d8b159c78faa6e5bbf0b43`: центр внимания,
 напоминания, календарные черновики, голосовые поручения, status компонентов,
 project connection registry и bounded repair preparation.
