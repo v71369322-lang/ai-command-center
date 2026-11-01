@@ -30,6 +30,43 @@ class Blocked(Exception):
     pass
 
 
+SAFE_ERRORS = {
+    "app_identity_invalid",
+    "installation_binding_invalid",
+    "token_scope_invalid",
+    "repository_preflight_invalid",
+    "baseline_invalid",
+    "existing_attempt_requires_inspection",
+    "exact_plan_approval_required",
+}
+
+
+def error_code(error):
+    value = str(error)
+    return value if value in SAFE_ERRORS else "operator_check_failed"
+
+
+def repository_checks(metadata, branch, baseline):
+    protection = branch.get("protection", {})
+    status = protection.get("required_status_checks", {})
+    contexts = status.get("contexts", [])
+    permissions = metadata.get("permissions", {})
+    return {
+        "repository_id": metadata.get("id") == REPOSITORY_ID,
+        "repository_name": metadata.get("full_name") == REPOSITORY,
+        "default_branch": metadata.get("default_branch") == "main",
+        "active": metadata.get("archived") is False and metadata.get("disabled") is False,
+        "admin_false": permissions.get("admin") is False,
+        "push_true": permissions.get("push") is True,
+        "branch_name": branch.get("name") == "main",
+        "baseline": branch.get("commit", {}).get("sha") == baseline,
+        "protection_enabled": protection.get("enabled") is True,
+        "protection_everyone": status.get("enforcement_level") == "everyone",
+        "offline_required": isinstance(contexts, list) and "offline" in contexts,
+        "synthetic_required": isinstance(contexts, list) and "synthetic" in contexts,
+    }
+
+
 def configure():
     github_token.REPOSITORY, github_token.REPOSITORY_ID = REPOSITORY, REPOSITORY_ID
     github_token.REPO = "/repos/" + REPOSITORY
@@ -129,23 +166,9 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
             raise Blocked("token_scope_invalid")
         metadata = client.call("GET", github_token.REPO, token)
         branch = client.call("GET", github_token.REPO + "/branches/main", token)
-        protection = branch.get("protection", {})
-        checks = protection.get("required_status_checks", {})
-        permissions = metadata.get("permissions", {})
-        if (
-            metadata.get("id") != REPOSITORY_ID
-            or metadata.get("full_name") != REPOSITORY
-            or metadata.get("default_branch") != "main"
-            or metadata.get("archived") is not False
-            or metadata.get("disabled") is not False
-            or permissions.get("admin") is not False
-            or permissions.get("push") is not True
-            or branch.get("name") != "main"
-            or branch.get("commit", {}).get("sha") != baseline
-            or protection.get("enabled") is not True
-            or checks.get("enforcement_level") != "everyone"
-            or not {"offline", "synthetic"} <= set(checks.get("contexts", []))
-        ):
+        journal["repository_checks"] = repository_checks(metadata, branch, baseline)
+        checkpoint("repository_preflight")
+        if not all(journal["repository_checks"].values()):
             raise Blocked("repository_preflight_invalid")
         evidence = {
             "project_id": "command-center",
@@ -176,7 +199,7 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
         }
     except Exception as error:
         journal.update(
-            stage="requires_inspection_no_retry", error_code=type(error).__name__, http_events=client.events
+            stage="requires_inspection_no_retry", error_code=error_code(error), http_events=client.events
         )
         atomic_json(output / "receipt.json", journal)
         raise
@@ -209,7 +232,7 @@ def main():
             json.dumps(
                 {
                     "status": "BLOCKED_REQUIRES_INSPECTION",
-                    "error_code": type(error).__name__,
+                    "error_code": error_code(error),
                     "repository_changes": False,
                     "application_configuration_changed": False,
                     "paid_calls": 0,
