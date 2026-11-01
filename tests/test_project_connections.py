@@ -3,7 +3,14 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from command_center.project_connections import PERMISSIONS, connection_plan, register, validate
+from command_center.project_connections import (
+    PERMISSIONS,
+    REPOSITORIES,
+    connection_plan,
+    register,
+    validate,
+    validate_provenance,
+)
 from command_center.project_inbox import PROJECTS, classify, inbox
 from command_center.project_repair_control import prepare
 from command_center.store import Denied
@@ -13,7 +20,7 @@ from test_telegram_task_status import authority, response
 
 
 def manifest(project='command-center'):
-    return {'project_id': project, 'repository': 'owner/example-project', 'repository_id': 123456,
+    return {'project_id': project, 'repository': REPOSITORIES[project], 'repository_id': 123456,
             'installation_id': 78910, 'default_branch': 'main', 'baseline_sha': 'a' * 40,
             'permissions': dict(PERMISSIONS), 'repository_selection': 'selected',
             'repository_count_verified': True, 'binding_verified': True,
@@ -49,6 +56,24 @@ def test_incomplete_or_broad_connection_evidence_is_rejected(change):
     value = manifest() | change
     with pytest.raises(Denied, match='manifest_invalid'):
         validate(value)
+
+
+def test_project_identity_is_bound_to_fixed_repository_catalog():
+    with pytest.raises(Denied, match='manifest_invalid'):
+        validate(manifest() | {'repository': 'owner/other-valid-repository'})
+
+
+def test_connection_provenance_is_strict_and_idempotency_bound(store):
+    operation = str(uuid4())
+    provenance = {'evidence_sha256': 'b' * 64, 'operator_revision': 'c' * 40,
+                  'plan_digest': 'd' * 64}
+    first = register(store, 'owner', manifest(), operation, provenance)
+    assert register(store, 'owner', manifest(), operation, provenance) == first
+    with pytest.raises(Denied, match='idempotency_conflict'):
+        register(store, 'owner', manifest(), operation, provenance | {'plan_digest': 'e' * 64})
+    for bad in ({}, provenance | {'extra': 'x'}, provenance | {'evidence_sha256': 'x'}):
+        with pytest.raises(Denied, match='provenance_invalid'):
+            validate_provenance(bad)
 
 
 def test_connection_cannot_be_silently_rebound(store):

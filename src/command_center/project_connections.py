@@ -17,6 +17,7 @@ REPOSITORIES = {
     'lnauto': 'v71369322-lang/LNAuto',
     'capital-lab': 'v71369322-lang/Capital-Lab',
 }
+OPERATION = re.compile(r'[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}')
 
 
 def connection_plan(role, project_id):
@@ -41,6 +42,7 @@ def validate(manifest):
             or not isinstance(manifest.get('repository'), str)
             or not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}', manifest['repository'])
             or '..' in manifest['repository']
+            or manifest['repository'] != REPOSITORIES[manifest['project_id']]
             or type(manifest.get('repository_id')) is not int or manifest['repository_id'] <= 0
             or type(manifest.get('installation_id')) is not int or manifest['installation_id'] <= 0
             or not re.fullmatch(r'[A-Za-z0-9._/-]{1,120}', str(manifest.get('default_branch', '')))
@@ -56,6 +58,18 @@ def validate(manifest):
     return manifest
 
 
+def validate_provenance(provenance):
+    if provenance is None:
+        return None
+    if (not isinstance(provenance, dict)
+            or set(provenance) != {'evidence_sha256', 'operator_revision', 'plan_digest'}
+            or any(not re.fullmatch(r'[a-f0-9]{64}', str(provenance.get(key, '')))
+                   for key in ('evidence_sha256', 'plan_digest'))
+            or not re.fullmatch(r'[a-f0-9]{40}', str(provenance.get('operator_revision', '')))):
+        raise Denied('project_connection_provenance_invalid')
+    return provenance
+
+
 def history(session):
     rows = session.execute(select(Audit).where(Audit.event['kind'].as_string() == EVENT)
                            .order_by(Audit.sequence).limit(MAX_EVENTS + 1)).scalars().all()
@@ -66,8 +80,9 @@ def history(session):
         event = row.event
         manifest, operation = event.get('manifest'), event.get('operation_id')
         validate(manifest)
+        validate_provenance(event.get('provenance'))
         if (event.get('actor') != 'owner' or event.get('manifest_hash') != digest(manifest)
-                or not isinstance(operation, str) or not re.fullmatch(r'[a-f0-9-]{36}', operation)
+                or not isinstance(operation, str) or not OPERATION.fullmatch(operation)
                 or operation in operations):
             raise Denied('project_connection_history_invalid')
         latest[manifest['project_id']] = event
@@ -75,19 +90,21 @@ def history(session):
     return latest, operations
 
 
-def register(store, role, manifest, operation_id):
+def register(store, role, manifest, operation_id, provenance=None):
     """Record already verified operator evidence; this function performs no probe."""
     if role != 'owner':
         raise Denied('owner_required')
     validate(manifest)
-    if not isinstance(operation_id, str) or not re.fullmatch(r'[a-f0-9-]{36}', operation_id):
+    validate_provenance(provenance)
+    if not isinstance(operation_id, str) or not OPERATION.fullmatch(operation_id):
         raise Denied('project_connection_operation_invalid')
     with store.transaction() as session:
         store.check_audit(session)
         latest, operations = history(session)
         previous = operations.get(operation_id)
         if previous:
-            if previous['manifest_hash'] != digest(manifest):
+            if (previous['manifest_hash'] != digest(manifest)
+                    or previous.get('provenance') != provenance):
                 raise Denied('project_connection_idempotency_conflict')
             return receipt(previous)
         current = latest.get(manifest['project_id'])
@@ -96,6 +113,7 @@ def register(store, role, manifest, operation_id):
         if len(operations) >= MAX_EVENTS:
             raise Denied('project_connection_history_limit')
         event = {'manifest': manifest, 'manifest_hash': digest(manifest), 'operation_id': operation_id,
+                 'provenance': provenance,
                  'execution_enabled': False, 'paid_ai_enabled': False, 'merge_enabled': False,
                  'deployment_enabled': False}
         store.audit(session, EVENT, 'owner', **event)
