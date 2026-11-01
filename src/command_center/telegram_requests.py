@@ -1,6 +1,6 @@
 """Owner-only saved-request views; no planner, task creation or external calls."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from .models import Audit, TelegramInbox
 from .store import Denied, canonical, digest
@@ -9,18 +9,32 @@ from .store import Denied, canonical, digest
 def captured_text(session, row):
     """Validate immutable intake before any reader copies its contents."""
     number = row.id.removeprefix(row.profile + ':')
-    if (row.state != 'NEEDS_PLANNING' or not isinstance(row.intent, dict)
-            or set(row.intent) != {'kind', 'text'} or row.intent.get('kind') != 'capture'
-            or row.task_id is not None or row.fingerprint != digest(row.intent)
-            or not isinstance(row.intent.get('text'), str) or not 1 <= len(row.intent['text'].encode()) <= 2000
-            or not session.execute(select(Audit).where(
+    anchored = session.execute(select(Audit).where(
                 Audit.event['kind'].as_string() == 'telegram_update_received',
                 Audit.event['actor'].as_string() == 'owner',
                 Audit.event['profile'].as_string() == row.profile,
                 Audit.event['update_id'].as_string() == number,
-                Audit.event['intent_hash'].as_string() == row.fingerprint)).first()):
+                Audit.event['intent_hash'].as_string() == row.fingerprint)).first()
+    if (row.state != 'NEEDS_PLANNING' or not isinstance(row.intent, dict)
+            or row.task_id is not None or row.fingerprint != digest(row.intent) or not anchored):
         raise Denied('telegram_saved_request_integrity')
-    return row.intent['text']
+    if set(row.intent) == {'kind', 'text'} and row.intent.get('kind') == 'capture':
+        value = row.intent.get('text')
+    elif row.intent.get('kind') == 'voice_confirm' and row.intent.get('confirm') is True:
+        accepted = session.execute(select(Audit).where(
+            Audit.event['kind'].as_string() == 'telegram_voice_transcript_accepted',
+            Audit.event['actor'].as_string() == 'owner',
+            Audit.event['profile'].as_string() == row.profile,
+            Audit.event['request_id'].as_string() == row.id,
+            Audit.event['request_fingerprint'].as_string() == row.fingerprint)).scalar_one_or_none()
+        value = accepted.event.get('text') if accepted else None
+        if not accepted or accepted.event.get('text_hash') != digest(value):
+            raise Denied('telegram_saved_request_integrity')
+    else:
+        raise Denied('telegram_saved_request_integrity')
+    if not isinstance(value, str) or not 1 <= len(value.encode()) <= 2000:
+        raise Denied('telegram_saved_request_integrity')
+    return value
 
 
 def capture_receipt(inbox_id):
@@ -37,7 +51,9 @@ def project_queue(bridge, session, project='all'):
         raise Denied('telegram_project_filter_invalid')
     assigned, _ = history(session)
     rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
-        TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
+        TelegramInbox.state == 'NEEDS_PLANNING', or_(
+            TelegramInbox.intent['kind'].as_string() == 'capture',
+            TelegramInbox.intent['kind'].as_string() == 'voice_confirm'))
         .order_by(TelegramInbox.created_at.desc(), TelegramInbox.id.desc()).limit(1001)).scalars().all()
     if len(rows) > 1000:
         raise Denied('telegram_inbox_capacity')
@@ -69,7 +85,9 @@ def projects_reply(bridge, session):
 def request_reply(bridge, session, intent, *, suffix=''):
     """Called under the existing admission/audit lock after audit validation."""
     query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
-        TelegramInbox.state == 'NEEDS_PLANNING', TelegramInbox.intent['kind'].as_string() == 'capture')
+        TelegramInbox.state == 'NEEDS_PLANNING', or_(
+            TelegramInbox.intent['kind'].as_string() == 'capture',
+            TelegramInbox.intent['kind'].as_string() == 'voice_confirm'))
     if intent['kind'] == 'request':
         query = query.where(TelegramInbox.id == bridge.profile + ':' + intent['number'])
     from .project_inbox import history, PROJECTS

@@ -5,6 +5,8 @@ from command_center.models import TelegramInbox
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
 from command_center.telegram_voice_requests import transcription_contract, verify_transcript
+from command_center.telegram_voice_transcripts import propose
+from command_center.project_inbox import inbox
 from test_telegram_bridge import BotHTTP, OWNER
 from test_telegram_task_status import authority, response
 
@@ -85,3 +87,40 @@ def test_system_status_is_read_only_and_names_all_roles(bridge, store):
         assert value in text
     assert 'обычные проекты ещё не подключены' in text
     assert authority(store) == before
+
+
+def transcript_callback(service, fake, proposal_id, choice='y', uid=3):
+    while service.deliver_one():
+        pass
+    data = f'vr:{proposal_id}:{choice}'
+    index = next(i for i, body in enumerate(fake.sent, 1)
+                 if any(button.get('callback_data') == data
+                        for row in body.get('reply_markup', {}).get('inline_keyboard', []) for button in row))
+    return {'update_id': uid, 'callback_query': {'id': 'voice-fixture',
+        'from': {'id': OWNER, 'is_bot': False}, 'data': data,
+        'message': {'message_id': index, 'chat': {'id': OWNER, 'type': 'private'}}}}
+
+
+def test_verified_transcript_requires_observed_owner_confirmation_before_request(bridge, store):
+    service, fake = bridge
+    original = service.receive(voice())
+    request = transcription_contract({'kind': 'voice_request'}, 'a' * 64)
+    proposal = propose(service, original['inbox_id'], {'audio_sha256': 'a' * 64, 'language': 'ru',
+        'text': 'Проверь проект и подготовь исправление', 'duration_seconds': 20.5}, request)
+    assert inbox(store, 'owner')['total_pending'] == 0
+    result = service.receive(transcript_callback(service, fake, proposal['proposal_id']))
+    assert result['state'] == 'NEEDS_PLANNING' and result['task_id'] is None
+    saved = inbox(store, 'owner')['requests'][0]
+    assert saved['text'] == 'Проверь проект и подготовь исправление'
+    assert saved['project_id'] is None
+
+
+def test_rejected_transcript_never_enters_project_queue(bridge, store):
+    service, fake = bridge
+    original = service.receive(voice())
+    request = transcription_contract({'kind': 'voice_request'}, 'b' * 64)
+    proposal = propose(service, original['inbox_id'], {'audio_sha256': 'b' * 64, 'language': 'ru',
+        'text': 'Ошибочная расшифровка', 'duration_seconds': 20.5}, request)
+    result = service.receive(transcript_callback(service, fake, proposal['proposal_id'], 'n'))
+    assert result['state'] == 'DONE'
+    assert inbox(store, 'owner')['total_pending'] == 0
