@@ -2,13 +2,14 @@ import httpx
 import pytest
 from sqlalchemy import select
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from command_center.attention_schedule import configure
 from command_center.calendar_drafts import create, decide, list_drafts
 from command_center.models import TelegramDelivery
 from command_center.store import Denied
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
-from command_center.telegram_calendar import collect_reminders
+from command_center.telegram_calendar import collect_reminders, parse_command
 from test_telegram_bridge import BotHTTP, OWNER, message
 from test_telegram_task_status import authority, response
 from uuid import uuid4
@@ -64,6 +65,27 @@ def test_cancel_and_list_never_call_provider(bridge, store):
     reply = response(service, message(3, '/calendar'))
     assert 'отменено' in reply and 'Google Calendar ещё не подключён' in reply
     assert list_drafts(store, 'owner')[0]['state'] == 'CANCELLED'
+
+
+def test_bounded_russian_phrase_creates_tomorrow_draft(bridge, store):
+    service, _ = bridge
+    with store.transaction() as session:
+        expected = (store.now(session).astimezone(ZoneInfo('Asia/Almaty')).date()
+                    + timedelta(days=1)).isoformat()
+    service.receive(message(1, '/calendar завтра в 15:00 на 30 минут, '
+                               'напомни за 20 минут — Созвон по проекту'))
+    draft = list_drafts(store, 'owner')[0]
+    assert draft['document']['start'] == expected + 'T15:00:00+05:00'
+    assert draft['document']['end'] == expected + 'T15:30:00+05:00'
+    assert draft['document']['telegram_reminder_minutes'] == 20
+
+
+def test_russian_phrase_supports_hours_without_guessing():
+    intent = parse_command('/calendar 2026-11-05 в 09:00 на 2 часа, '
+                           'напомни за 1 час — Встреча с командой')
+    assert intent == {'kind': 'calendar_create', 'date': '2026-11-05', 'clock': '09:00',
+                      'duration_minutes': 120, 'reminder_minutes': 60,
+                      'title': 'Встреча с командой'}
 
 
 @pytest.mark.parametrize('value', [

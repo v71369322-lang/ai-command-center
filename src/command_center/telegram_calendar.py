@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from .attention_schedule import current as reminder_schedule
 from .calendar_drafts import create, decide, list_drafts_locked
@@ -19,20 +19,39 @@ LABEL_CANCEL = 'Отмена'
 
 
 def parse_command(value):
-    """Parse a deterministic interim command; natural language remains a later boundary."""
+    """Parse bounded Russian or deterministic input without guessing missing fields."""
     if value == '/calendar':
         return {'kind': 'calendar_list'}
     match = re.fullmatch(
         r'/calendar ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-2][0-9]:[0-5][0-9]) '
         r'([1-9][0-9]{0,2}) ([1-9][0-9]{0,3}) (.{1,120})', value, re.DOTALL)
-    if not match or match[2][:2] > '23':
+    if match:
+        if match[2][:2] > '23':
+            raise Denied('telegram_calendar_format_invalid')
+        duration, reminder, title = int(match[3]), int(match[4]), match[5]
+        if duration > 1440 or not 5 <= reminder <= 1440 or title != title.strip():
+            raise Denied('telegram_calendar_format_invalid')
+        return {'kind': 'calendar_create', 'date': match[1], 'clock': match[2],
+                'duration_minutes': duration, 'reminder_minutes': reminder, 'title': title}
+    natural = re.fullmatch(
+        r'/calendar (сегодня|завтра|[0-9]{4}-[0-9]{2}-[0-9]{2}) в '
+        r'([0-2][0-9]:[0-5][0-9]) на ([1-9][0-9]{0,2}) '
+        r'(минуту|минуты|минут|час|часа|часов),? напомни за ([1-9][0-9]{0,2}) '
+        r'(минуту|минуты|минут|час|часа|часов)\s+[—-]\s+(.{1,120})', value, re.IGNORECASE | re.DOTALL)
+    if not natural or natural[2][:2] > '23':
         raise Denied('telegram_calendar_format_invalid')
-    duration, reminder = int(match[3]), int(match[4])
-    title = match[5]
+    duration = _quantity_minutes(natural[3], natural[4])
+    reminder = _quantity_minutes(natural[5], natural[6])
+    title = natural[7]
     if duration > 1440 or not 5 <= reminder <= 1440 or title != title.strip():
         raise Denied('telegram_calendar_format_invalid')
-    return {'kind': 'calendar_create', 'date': match[1], 'clock': match[2],
+    return {'kind': 'calendar_create', 'date': natural[1].lower(), 'clock': natural[2],
             'duration_minutes': duration, 'reminder_minutes': reminder, 'title': title}
+
+
+def _quantity_minutes(value, unit):
+    number = int(value)
+    return number * 60 if unit.lower().startswith('час') else number
 
 
 def parse_callback(value):
@@ -59,13 +78,20 @@ def _document(session, intent):
     if not schedule.get('configured'):
         raise Denied('calendar_timezone_not_configured')
     zone = ZoneInfo(schedule['timezone'])
+    date = intent['date']
+    if date in {'сегодня', 'завтра'}:
+        # Derive the owner date from the database clock, never from the Telegram client.
+        today = session.execute(text('SELECT clock_timestamp()')).scalar_one().astimezone(zone).date()
+        date = (today + timedelta(days=date == 'завтра')).isoformat()
     try:
-        start = datetime.strptime(intent['date'] + ' ' + intent['clock'], '%Y-%m-%d %H:%M').replace(tzinfo=zone)
+        start = datetime.strptime(date + ' ' + intent['clock'], '%Y-%m-%d %H:%M').replace(tzinfo=zone)
     except ValueError:
         raise Denied('telegram_calendar_format_invalid') from None
     # Round trip rejects nonexistent local wall times during a DST transition.
     if start.astimezone(ZoneInfo('UTC')).astimezone(zone).replace(fold=start.fold) != start:
         raise Denied('calendar_local_time_nonexistent')
+    if start.replace(fold=0).utcoffset() != start.replace(fold=1).utcoffset():
+        raise Denied('calendar_local_time_ambiguous')
     end = start + timedelta(minutes=intent['duration_minutes'])
     return {'title': intent['title'], 'start': start.isoformat(), 'end': end.isoformat(),
             'timezone': schedule['timezone'], 'note': '',
@@ -146,8 +172,8 @@ def apply_decision(bridge, iid, intent):
 def list_reply(session):
     rows = list_drafts_locked(session, 'owner', 5)
     if not rows:
-        return ('Черновиков календаря пока нет. Формат временного ввода:\n'
-                '/calendar ГГГГ-ММ-ДД ЧЧ:ММ длительность_мин напомнить_за_мин название\n\n'
+        return ('Черновиков календаря пока нет. Пример:\n'
+                '/calendar завтра в 15:00 на 30 минут, напомни за 20 минут — Созвон\n\n'
                 'Google Calendar ещё не подключён.')
     labels = {'DRAFT': 'ждёт подтверждения', 'CONFIRMED_LOCAL': 'подтверждено локально',
               'CANCELLED': 'отменено'}
