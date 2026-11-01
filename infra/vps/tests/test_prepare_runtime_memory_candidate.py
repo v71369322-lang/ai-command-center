@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from command_center.deployment_profile import checksum
+from command_center.deployment_profile import atomic_json, checksum
 from command_center.store import digest
 from command_center.telegram_transport import TelegramConnection
 
@@ -66,3 +66,67 @@ def test_candidate_rejects_scope_expansion(monkeypatch, change):
     monkeypatch.setattr(operator, 'render', lambda compose, manifest: rendered)
     with pytest.raises(ValueError):
         operator.candidate(old, disabled, active, checksum(old), '1' * 40, '2' * 40)
+
+
+@pytest.fixture
+def prepared_host(tmp_path, monkeypatch):
+    uid = operator.os.getuid()
+    root = tmp_path / 'state'
+    telegram = root / 'telegram'
+    previous_directory = tmp_path / 'previous'
+    disabled_directory = tmp_path / 'disabled'
+    parent = tmp_path / 'candidates'
+    for path in (root, telegram, previous_directory, disabled_directory, parent):
+        path.mkdir(mode=0o700)
+    active = TelegramConnection(mode='live', owner_id=10, bot_id=20,
+        source_revision='1' * 40, token_file='/run/telegram/token')
+    atomic_json(telegram / 'connection.json', active.model_dump())
+    images = {key: 'sha256:' + str(index) * 64 for index, key in enumerate(
+        ('api', 'worker', 'broker', 'executor', 'coding'), 1)}
+    old = {'manifest': {'revision': '1' * 40, 'control_uid': uid,
+        'execution_uid': uid + 1, 'data_root': str(root), 'images': images}, 'compose': {}}
+    disabled = {'manifest': {**old['manifest'], 'revision': '2' * 40}, 'compose': {}}
+    target = {'manifest': disabled['manifest'], 'compose': {'services': {}}}
+    approved = 'a' * 64
+    atomic_json(root / 'deployment.json', {'phase': 'VERIFIED', 'bundle': approved,
+        'revision': '1' * 40, 'directory': str(previous_directory)})
+    staged = active.model_copy(update={'source_revision': '2' * 40})
+
+    class FakeEngine:
+        def __init__(self, value):
+            self.uid = value
+
+        def preflight(self):
+            pass
+
+    monkeypatch.setattr(operator, 'exact_bundle', lambda *args: old)
+    monkeypatch.setattr(operator, 'load_bundle', lambda *args: disabled)
+    monkeypatch.setattr(operator, 'candidate', lambda *args: (target, staged))
+    monkeypatch.setattr(operator, 'source_check', lambda *args: None)
+    monkeypatch.setattr(operator, 'Engine', FakeEngine)
+    monkeypatch.setattr(operator, 'image_check', lambda *args: None)
+    monkeypatch.setattr(operator.time, 'time', lambda: 1234)
+    return root, previous_directory, disabled_directory, parent, approved, target
+
+
+def test_prepare_writes_disabled_candidate_only_after_all_checks(prepared_host):
+    root, previous, disabled, parent, approved, target = prepared_host
+    output = parent / 'candidate'
+    result = operator.prepare(previous, disabled, output, approved, '1' * 40, '2' * 40)
+    assert result['candidate_bundle'] == checksum(target)
+    assert result['telegram_memory_bytes'] == result['watchdog_memory_bytes'] == 268435456
+    assert result['deployment_authorized'] is False
+    assert result['task_admission_resumed'] is False and result['paid_calls'] == 0
+    assert sorted(path.name for path in output.iterdir()) == [
+        'bundle.json', 'compose.json', 'connection.candidate.json', 'preparation.json']
+    assert not (root / 'activation.json').exists()
+
+
+def test_prepare_intent_state_has_no_candidate_side_effect(prepared_host):
+    root, previous, disabled, parent, approved, _ = prepared_host
+    atomic_json(root / 'deployment.json', {'phase': 'INTENT', 'bundle': approved,
+        'revision': '1' * 40, 'directory': str(previous)})
+    output = parent / 'candidate'
+    with pytest.raises(ValueError, match='verified_predecessor'):
+        operator.prepare(previous, disabled, output, approved, '1' * 40, '2' * 40)
+    assert not output.exists()
