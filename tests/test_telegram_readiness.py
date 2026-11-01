@@ -61,6 +61,8 @@ def test_summary_reads_control_without_changing_authority(bridge, store, state):
     assert store.settings.source_revision in result['text']
     assert 'Состояние gateway неизвестно' in result['text']
     assert 'Синтетический бюджет не является балансом OpenAI' in result['text']
+    assert 'Голосовые поручения до расшифровки: 0' in result['text']
+    assert 'Проверенные подключения проектов: 0 из 4; execution не включён' in result['text']
     assert result['chat_id'] == OWNER and 'reply_markup' not in result
     assert len(canonical(result).encode()) <= 8192 and len(result['text']) <= 4096
     assert (authority(store), ledger(store)) == before

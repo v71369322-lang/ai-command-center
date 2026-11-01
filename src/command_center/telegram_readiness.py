@@ -6,6 +6,9 @@ from sqlalchemy import func, select
 
 from .coding.integration_config import IntegrationConfig
 from .models import Control, Task, TelegramInbox
+from .project_catalog import PROJECTS
+from .project_connections import statuses
+from .telegram_voice_requests import pending_count as voice_pending
 
 
 GATES = {
@@ -34,9 +37,13 @@ def reply(bridge, session):
         Task.state.in_(['RUNNING', 'VERIFYING', 'CANCEL_REQUESTED', 'RECONCILING', 'SECURITY_BLOCKED'])))
     revision = store.settings.source_revision
     revision = revision if re.fullmatch('[a-f0-9]{40}', revision) else 'не подтверждена'
+    connected = len(statuses(session))
+    voices = voice_pending(session, bridge.profile)
     lines = ['Состояние AI Commander', f'Снимок UTC: {now.isoformat()}', f'Версия обработчика: {revision}',
              f'Управление: {state}.', f'Исполнения, требующие сверки перед resume: {unresolved}.',
              f'Запросы этого Telegram-подключения, ожидающие планирования: {pending}.',
+             f'Голосовые поручения до расшифровки: {voices}.',
+             f'Проверенные подключения проектов: {connected} из {len(PROJECTS)}; execution не включён.',
              'AI-планирование этих запросов пока не подключено. /coding_plan — только mock-упражнение.']
     # Only the opt-in deployment shares the pinned config, never credential files.
     # Absence here must NOT be advertised as global live-disabled.
