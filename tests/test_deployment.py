@@ -113,6 +113,12 @@ def test_legacy_external_telegram_bundle_remains_without_ai_config(external_rele
     assert not any(k.startswith('F2_') for k in profile['services']['telegram']['environment'])
 
 
+def test_runtime_safety_services_have_production_oom_headroom(release):
+    """Both owner messaging and independent runtime shutdown stay available."""
+    bundle, _ = release
+    assert str(bundle['compose']['services']['watchdog']['mem_limit']) == '268435456'
+
+
 @pytest.mark.parametrize('flag', [False, 'true', 1, None])
 def test_mobile_profile_flag_must_be_explicit_true(external_release, flag):
     manifest, profile, _ = external_release
