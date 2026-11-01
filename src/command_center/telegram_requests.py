@@ -78,9 +78,9 @@ def projects_reply(bridge, session):
     from .project_connections import statuses
     _, counts = project_queue(bridge, session)
     connections = statuses(session)
-    parts = [f'{label}: {counts[key]} · '
+    parts = [f'{label}: {counts[key]}\n/requests {key}\n/project {key} · '
              f'{"репозиторий проверен, запуск выключен" if key in connections else "не подключён"}'
-             f'\n/project {key}\n/requests {key}' for key, label in PROJECTS]
+             for key, label in PROJECTS]
     parts.append(f'Не распределены: {counts["unassigned"]}\n/requests unassigned')
     return (f'Сохранённые запросы этого Telegram-подключения: {sum(counts.values())}.\n'
             'Ожидают планирования; выполнение не запускалось.\n\n' + '\n\n'.join(parts))
