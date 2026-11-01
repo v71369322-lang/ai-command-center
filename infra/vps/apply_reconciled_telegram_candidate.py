@@ -32,7 +32,8 @@ def validate_transition(old, target, old_digest, target_digest):
         raise ValueError('separate_scope_or_migration_required')
     if ('telegram' not in before or 'telegram' not in after
             or 'first_experiment' in after
-            or target['compose']['services']['telegram'].get('mem_limit') != '256m'):
+            or target['compose']['services']['telegram'].get('mem_limit') != '256m'
+            or str(target['compose']['services']['watchdog'].get('mem_limit')) != '268435456'):
         raise ValueError('telegram_memory_candidate_scope_invalid')
     for key in ('mode', 'owner_id', 'bot_id'):
         if before['telegram'][key] != after['telegram'][key]:

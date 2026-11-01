@@ -31,7 +31,10 @@ def manifests():
     old = {'manifest': {**fixed, 'revision': '1' * 40, 'telegram': telegram}, 'compose': {}}
     new = {'manifest': {**fixed, 'revision': '2' * 40,
                         'telegram': {**telegram, 'connection_digest': 'c' * 64}},
-           'compose': {'services': {'telegram': {'mem_limit': '256m'}}}}
+           'compose': {'services': {
+               'telegram': {'mem_limit': '256m'},
+               'watchdog': {'mem_limit': '268435456'},
+           }}}
     return old, new
 
 
@@ -41,13 +44,16 @@ def test_transition_accepts_only_memory_candidate(monkeypatch):
     assert operator.validate_transition(old, new, 'old', 'new') == (old['manifest'], new['manifest'])
 
 
-@pytest.mark.parametrize('change', ['migration_hash', 'owner_id', 'memory', 'integration'])
+@pytest.mark.parametrize('change', ['migration_hash', 'owner_id', 'memory',
+                                    'watchdog_memory', 'integration'])
 def test_transition_rejects_scope_expansion(monkeypatch, change):
     old, new = manifests()
     if change == 'owner_id':
         new['manifest']['telegram']['owner_id'] = 9
     elif change == 'memory':
         new['compose']['services']['telegram']['mem_limit'] = '128m'
+    elif change == 'watchdog_memory':
+        new['compose']['services']['watchdog']['mem_limit'] = '134217728'
     elif change == 'integration':
         new['manifest']['first_experiment'] = {}
     else:
@@ -92,7 +98,10 @@ def staged_update(tmp_path, monkeypatch):
     new = {'manifest': {**fixed, 'revision': staged.source_revision,
                         'telegram': {'mode': 'live', 'owner_id': 10, 'bot_id': 20,
                                      'connection_digest': digest(staged.model_dump())}},
-           'compose': {'services': {'telegram': {'mem_limit': '256m'}}}}
+           'compose': {'services': {
+               'telegram': {'mem_limit': '256m'},
+               'watchdog': {'mem_limit': '268435456'},
+           }}}
     atomic_json(root / 'deployment.json', {
         'phase': 'VERIFIED', 'bundle': old_digest, 'directory': str(previous_directory),
     })

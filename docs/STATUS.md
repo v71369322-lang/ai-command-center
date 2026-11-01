@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+VPS reconciliation **1 ноября 2026**: активный журнал найден в
+`/home/acc-control/f30/state/deployment.json`; он по-прежнему фиксирует bundle
+`ac6462b…094d`, revision `322186d`, phase `INTENT`. Telegram работает при
+временном лимите 256 MiB, но watchdog повторно завершён OOM/137 при 128 MiB,
+несмотря на 6.2 GiB доступной памяти хоста. Поэтому старый кандидат
+`1d7ab452…04d21`, меняющий только Telegram, признан неполным и не подлежит apply.
+Следующий кандидат обязан закрепить 256 MiB одновременно для Telegram и watchdog;
+task admission, paid AI, merge и deployment остаются выключенными до отдельных
+проверок и разрешений.
+
 Operator checkpoint **1 ноября 2026**: приложение `85c0696` закреплено для
 будущего единого mobile/project release относительно runtime checkpoint `322186d`.
 Офлайн-проверка подтверждает отсутствие изменений DB models/lockfiles/Dockerfiles/

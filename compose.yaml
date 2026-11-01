@@ -154,7 +154,11 @@ services:
     tmpfs: ['/tmp:size=16m,mode=1777']
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    mem_limit: 128m
+    # The watchdog imports the same runtime stack as the broker. Production
+    # evidence showed the 128 MiB cgroup being OOM-killed while the host still
+    # had ample memory, which silently closes task admission. Keep it bounded
+    # but give it the same headroom as the broker and worker.
+    mem_limit: 256m
     cpus: 0.25
     pids_limit: 32
     logging: *bounded_logging
