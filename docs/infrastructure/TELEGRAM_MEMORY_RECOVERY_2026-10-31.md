@@ -5,6 +5,10 @@
 > OOM-killed at 128 MiB. Candidate `1d7ab452…04d21` therefore must not be applied.
 > A replacement release must bound **both** Telegram and watchdog at 256 MiB and
 > pass the same exact reconciliation, rootless image and postcheck interlocks.
+> `infra/vps/prepare_runtime_memory_candidate.py` now prepares that replacement
+> from a verified exact predecessor and a disabled target bundle. Preparation
+> writes a new private candidate only; it cannot deploy, resume admission or
+> authorize paid calls.
 
 This checkpoint records the owner-observed VPS state and the reviewed recovery
 path. It is not deployment authorization and does not extend an expired approval.
