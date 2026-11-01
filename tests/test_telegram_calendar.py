@@ -1,0 +1,140 @@
+import httpx
+import pytest
+from sqlalchemy import select
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+
+from command_center.attention_schedule import configure
+from command_center.calendar_drafts import create, decide, list_drafts
+from command_center.models import TelegramDelivery
+from command_center.store import Denied
+from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
+from command_center.telegram_calendar import collect_reminders, parse_command
+from test_telegram_bridge import BotHTTP, OWNER, message
+from test_telegram_task_status import authority, response
+from uuid import uuid4
+
+
+@pytest.fixture
+def bridge(store):
+    fake = BotHTTP()
+    client = MockTelegramHTTP(httpx.MockTransport(fake))
+    service = TelegramBridge(store, client, OWNER)
+    configure(store, 'owner', {'enabled': True, 'timezone': 'Asia/Almaty',
+              'report_times': ['09:00'], 'quiet_start': '23:00', 'quiet_end': '08:00'},
+              0, str(uuid4()))
+    yield service, fake
+    client.close()
+
+
+def callback(service, fake, choice='y', uid=2):
+    while service.deliver_one():
+        pass
+    index, card = next((i, body) for i, body in enumerate(fake.sent, 1)
+                       if body.get('reply_markup', {}).get('inline_keyboard', [[{}]])[0][0]
+                       .get('callback_data', '').startswith('cl:'))
+    data = next(button['callback_data'] for button in card['reply_markup']['inline_keyboard'][0]
+                if button['callback_data'].endswith(':' + choice))
+    return {'update_id': uid, 'callback_query': {'id': 'calendar-fixture',
+            'from': {'id': OWNER, 'is_bot': False}, 'data': data,
+            'message': {'message_id': index, 'chat': {'id': OWNER, 'type': 'private'}}}}
+
+
+def test_calendar_card_confirmation_is_local_and_replay_safe(bridge, store):
+    service, fake = bridge
+    before = authority(store)
+    command = message(1, '/calendar 2026-11-03 15:00 30 20 Созвон по проекту')
+    service.receive(command)
+    result = service.receive(callback(service, fake))
+    assert result['state'] == 'DONE'
+    drafts = list_drafts(store, 'owner')
+    assert len(drafts) == 1 and drafts[0]['state'] == 'CONFIRMED_LOCAL'
+    assert drafts[0]['document']['start'] == '2026-11-03T15:00:00+05:00'
+    assert drafts[0]['external_sync'] is False
+    # Calendar audit and transport bookkeeping cannot create execution authority.
+    after = authority(store)
+    assert after[0] == before[0] and after[1:] == before[1:]
+    assert service.receive(command)['state'] == 'DONE'
+    assert len(list_drafts(store, 'owner')) == 1
+
+
+def test_cancel_and_list_never_call_provider(bridge, store):
+    service, fake = bridge
+    service.receive(message(1, '/calendar 2026-12-01 09:30 45 10 Встреча'))
+    service.receive(callback(service, fake, 'n'))
+    reply = response(service, message(3, '/calendar'))
+    assert 'отменено' in reply and 'Google Calendar ещё не подключён' in reply
+    assert list_drafts(store, 'owner')[0]['state'] == 'CANCELLED'
+
+
+def test_bounded_russian_phrase_creates_tomorrow_draft(bridge, store):
+    service, _ = bridge
+    with store.transaction() as session:
+        expected = (store.now(session).astimezone(ZoneInfo('Asia/Almaty')).date()
+                    + timedelta(days=1)).isoformat()
+    service.receive(message(1, '/calendar завтра в 15:00 на 30 минут, '
+                               'напомни за 20 минут — Созвон по проекту'))
+    draft = list_drafts(store, 'owner')[0]
+    assert draft['document']['start'] == expected + 'T15:00:00+05:00'
+    assert draft['document']['end'] == expected + 'T15:30:00+05:00'
+    assert draft['document']['telegram_reminder_minutes'] == 20
+
+
+def test_russian_phrase_supports_hours_without_guessing():
+    intent = parse_command('/calendar 2026-11-05 в 09:00 на 2 часа, '
+                           'напомни за 1 час — Встреча с командой')
+    assert intent == {'kind': 'calendar_create', 'date': '2026-11-05', 'clock': '09:00',
+                      'duration_minutes': 120, 'reminder_minutes': 60,
+                      'title': 'Встреча с командой'}
+
+
+@pytest.mark.parametrize('value', [
+    '/calendar завтра в три встреча', '/calendar 2026-11-03 25:00 30 20 Встреча',
+    '/calendar 2026-11-03 15:00 0 20 Встреча', '/calendar 2026-11-03 15:00 30 2 Встреча',
+])
+def test_ambiguous_or_invalid_calendar_input_is_not_captured(bridge, store, value):
+    service, _ = bridge
+    before = authority(store)
+    with pytest.raises(Denied, match='telegram_calendar_format_invalid'):
+        service.receive(message(1, value))
+    assert authority(store) == before
+
+
+def test_forged_or_unobserved_callback_cannot_decide(bridge, store):
+    service, fake = bridge
+    service.receive(message(1, '/calendar 2026-11-03 15:00 30 20 Встреча'))
+    update = callback(service, fake)
+    with store.transaction() as session:
+        delivery = session.scalar(select(TelegramDelivery).where(TelegramDelivery.state == 'SENT'))
+        delivery.state = 'UNCERTAIN'
+    with pytest.raises(Denied, match='calendar_card_not_observed'):
+        service.receive(update)
+    assert list_drafts(store, 'owner')[0]['state'] == 'DRAFT'
+
+
+def test_calendar_requires_an_explicit_owner_timezone(store):
+    fake = BotHTTP()
+    client = MockTelegramHTTP(httpx.MockTransport(fake))
+    service = TelegramBridge(store, client, OWNER)
+    with pytest.raises(Denied, match='timezone_not_configured'):
+        service.receive(message(1, '/calendar 2026-11-03 15:00 30 20 Встреча'))
+    client.close()
+
+
+def test_confirmed_local_event_queues_one_independent_telegram_reminder(bridge, store):
+    service, _ = bridge
+    with store.transaction() as session:
+        now = store.now(session)
+    start = now.replace(microsecond=0) + timedelta(minutes=20)
+    end = now.replace(microsecond=0) + timedelta(minutes=50)
+    document = {'title': 'Проверить первый проект', 'start': start.isoformat(), 'end': end.isoformat(),
+                'timezone': 'UTC', 'note': '', 'telegram_reminder_minutes': 30}
+    draft = create(store, 'owner', document, str(uuid4()), 'a' * 64)
+    decide(store, 'owner', draft['id'], 1, str(uuid4()), True)
+    with store.transaction() as session:
+        first = collect_reminders(service, session)
+        second = collect_reminders(service, session)
+        assert len(first) == 1 and second == []
+        delivery = session.get(TelegramDelivery, first[0])
+        assert 'Проверить первый проект' in delivery.body['text']
+        assert delivery.state == 'NEW'
