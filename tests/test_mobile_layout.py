@@ -33,6 +33,10 @@ def test_mobile_control_buttons_fit_with_large_text(width, font_size):
                 if url.path in responses:
                     route.fulfill(content_type='application/json',
                                   body=json.dumps(responses[url.path]))
+                elif url.path.startswith('/api/'):
+                    # Unrelated panels load independently; a missing optional API
+                    # must not invalidate the control-layout assertion.
+                    route.fulfill(status=404, content_type='application/json', body='{}')
                 else:
                     file = (dist / url.path.lstrip('/')).resolve() if url.path != '/' else dist / 'index.html'
                     assert file.is_relative_to(dist) and file.is_file()
