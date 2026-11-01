@@ -66,8 +66,13 @@ Telegram-напоминания. Только отдельное подтвер�
 
 1. Голосовая расшифровка с явным readback.
 2. OAuth-привязка выделенного Google Calendar при участии владельца.
-3. Idempotent publisher, reconciliation неизвестного результата и status view.
+3. Durable publisher state и status view.
 4. Синтетическая приёмка, затем один реальный event без участников.
+
+Офлайн-контракт Google Insert уже фиксирует минимальное событие без участников и
+`sendUpdates=none`, private draft/document binding и отдельный bounded lookup для
+read-before-retry. Ответ принимается только при точном совпадении idempotency
+binding, title, start/end и `confirmed`; live HTTP transport этим слоем запрещён.
 
 Google Calendar — параллельный канал и не является prerequisite подключения
 первого project adapter к Telegram.
