@@ -156,5 +156,14 @@ def list_drafts(store, role, limit=10):
         raise Denied('calendar_limit_invalid')
     with store.transaction() as session:
         store.check_audit(session)
-        values = list(_states(session).values())
-        return list(reversed(values[-limit:]))
+        return list_drafts_locked(session, role, limit)
+
+
+def list_drafts_locked(session, role, limit=10):
+    """Bounded projection for callers that already hold the global lock."""
+    if role != 'owner':
+        raise Denied('owner_required')
+    if type(limit) is not int or not 1 <= limit <= MAX_RESULTS:
+        raise Denied('calendar_limit_invalid')
+    values = list(_states(session).values())
+    return list(reversed(values[-limit:]))

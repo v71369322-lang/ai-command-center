@@ -113,6 +113,9 @@ class TelegramBridge:
             elif token.startswith(('fx:', 'rx:')):
                 from .telegram_experiment_authorize import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('cl:'):
+                from .telegram_calendar import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             else:
                 if not re.fullmatch(r'tg:[A-Za-z0-9_-]{32}', token):
                     raise Denied('telegram_callback_invalid')
@@ -194,6 +197,9 @@ class TelegramBridge:
             return str(uid), {'kind': 'requests', 'project': parts[1]}
         if value == '/projects':
             return str(uid), {'kind': 'projects'}
+        if value == '/calendar' or value.split()[:1] == ['/calendar']:
+            from .telegram_calendar import parse_command
+            return str(uid), parse_command(value)
         attention_commands = {'/attention': 'attention', '/reminders': 'reminders'}
         if value in attention_commands:
             return str(uid), {'kind': attention_commands[value]}
@@ -436,8 +442,14 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
+        elif kind == 'calendar_create':
+            from .telegram_calendar import create_card
+            create_card(self, iid, intent)
+        elif kind == 'calendar_decide':
+            from .telegram_calendar import apply_decision
+            apply_decision(self, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
-                      'plan_review', 'coding_plan', 'readiness', 'experiment',
+                      'calendar_list', 'plan_review', 'coding_plan', 'readiness', 'experiment',
                       'watch_experiment', 'unwatch_experiment', 'recovery', 'watch_recovery', 'unwatch_recovery'}:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
@@ -471,6 +483,9 @@ class TelegramBridge:
                 elif kind == 'reminders':
                     from .attention_schedule import telegram_reply
                     reply = telegram_reply(session)
+                elif kind == 'calendar_list':
+                    from .telegram_calendar import list_reply
+                    reply = list_reply(session)
                 elif kind == 'plan_review':
                     from .telegram_plan_review import reply as plan_reply
                     reply = plan_reply(self, session, intent, suffix)
