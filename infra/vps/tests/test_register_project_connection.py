@@ -177,3 +177,15 @@ def test_source_digest_allows_gitless_container_and_rejects_tampering(monkeypatc
     assert operator.check_source('1' * 40, value) == value
     with pytest.raises(operator.Blocked, match='operator_source_changed'):
         operator.check_source('1' * 40, '0' * 64)
+
+
+def test_rootless_operator_identity_requires_explicit_non_root_host_mapping():
+    assert operator.operator_identity(uid=1000, uid_map='', rootless_enabled=False) is True
+    assert operator.operator_identity(uid=0, uid_map='0 1000 1\n1 100000 65536\n',
+                                      rootless_enabled=True) is True
+    assert operator.operator_identity(uid=0, uid_map='0 0 4294967295\n',
+                                      rootless_enabled=True) is False
+    assert operator.operator_identity(uid=0, uid_map='0 1000 1\n',
+                                      rootless_enabled=False) is False
+    assert operator.operator_identity(uid=0, uid_map='invalid\n',
+                                      rootless_enabled=True) is False

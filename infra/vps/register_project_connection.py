@@ -52,6 +52,22 @@ def safe_error(error):
     return 'operator_check_failed'
 
 
+def operator_identity(uid=None, uid_map=None, rootless_enabled=None):
+    uid = os.geteuid() if uid is None else uid
+    if uid != 0:
+        return True
+    enabled = os.environ.get('F1_ROOTLESS_OPERATOR') == '1' if rootless_enabled is None else rootless_enabled
+    if not enabled:
+        return False
+    try:
+        value = Path('/proc/self/uid_map').read_text() if uid_map is None else uid_map
+        rows = [[int(part) for part in line.split()] for line in value.splitlines()]
+    except (OSError, ValueError):
+        return False
+    return (bool(rows) and all(len(row) == 3 and row[1] > 0 and row[2] > 0 for row in rows)
+            and rows[0][0] == 0)
+
+
 def runtime_source_digest():
     files = [Path(__file__).resolve()]
     files.extend(sorted((ROOT / 'src/command_center').rglob('*.py')))
@@ -135,7 +151,7 @@ def evidence(value):
 
 def describe(evidence_file, operator_revision, operation_id, source_digest=None):
     source_digest = check_source(operator_revision, source_digest)
-    if os.geteuid() == 0:
+    if not operator_identity():
         raise Blocked('dedicated_unprivileged_operator_required')
     if not isinstance(operation_id, str) or not OPERATION.fullmatch(operation_id):
         raise Blocked('project_connection_operation_invalid')
