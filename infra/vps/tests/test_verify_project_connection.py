@@ -38,7 +38,7 @@ def test_repository_checks_are_fixed_and_complete():
         "default_branch",
         "active",
         "admin_false",
-        "push_true",
+        "write_capability",
         "branch_name",
         "baseline",
         "protection_enabled",
@@ -51,6 +51,39 @@ def test_repository_checks_are_fixed_and_complete():
 def test_repository_checks_identify_each_missing_guard():
     checks = operator.repository_checks({}, {}, "a" * 40)
     assert not any(checks.values())
+
+
+def test_protected_branch_accepts_exact_receive_pack_advertisement():
+    metadata = {
+        "id": operator.REPOSITORY_ID,
+        "full_name": operator.REPOSITORY,
+        "default_branch": "main",
+        "archived": False,
+        "disabled": False,
+        "permissions": {"admin": False, "push": False},
+    }
+    branch = {
+        "name": "main",
+        "commit": {"sha": "a" * 40},
+        "protection": {
+            "enabled": True,
+            "required_status_checks": {"enforcement_level": "everyone", "contexts": ["offline", "synthetic"]},
+        },
+    }
+    discovery = {
+        "service": "git-receive-pack",
+        "repository": operator.REPOSITORY,
+        "main_sha": "a" * 40,
+        "refs_count": 1,
+    }
+    checks = operator.repository_checks(metadata, branch, "a" * 40, discovery)
+    assert all(checks.values())
+    assert (
+        operator.repository_checks(metadata, branch, "a" * 40, discovery | {"main_sha": "b" * 40})[
+            "write_capability"
+        ]
+        is False
+    )
 
 
 def test_error_codes_do_not_leak_exception_text():

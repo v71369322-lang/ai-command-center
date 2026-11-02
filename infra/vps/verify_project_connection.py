@@ -49,7 +49,7 @@ def error_code(error):
     return value if value in SAFE_ERRORS else "operator_check_failed"
 
 
-def repository_checks(metadata, branch, baseline):
+def repository_checks(metadata, branch, baseline, discovery=None):
     protection = branch.get("protection", {})
     status = protection.get("required_status_checks", {})
     contexts = status.get("contexts", [])
@@ -60,7 +60,15 @@ def repository_checks(metadata, branch, baseline):
         "default_branch": metadata.get("default_branch") == "main",
         "active": metadata.get("archived") is False and metadata.get("disabled") is False,
         "admin_false": permissions.get("admin") is False,
-        "push_true": permissions.get("push") is True,
+        "write_capability": permissions.get("push") is True
+        or (
+            isinstance(discovery, dict)
+            and discovery.get("service") == "git-receive-pack"
+            and discovery.get("repository") == REPOSITORY
+            and discovery.get("main_sha") == baseline
+            and type(discovery.get("refs_count")) is int
+            and discovery["refs_count"] >= 1
+        ),
         "branch_name": branch.get("name") == "main",
         "baseline": branch.get("commit", {}).get("sha") == baseline,
         "protection_enabled": protection.get("enabled") is True,
@@ -213,7 +221,12 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
             raise Blocked("token_scope_invalid")
         metadata = client.call("GET", github_token.REPO, token)
         branch = client.call("GET", github_token.REPO + "/branches/main", token)
-        journal["repository_checks"] = repository_checks(metadata, branch, baseline)
+        discovery = None
+        if metadata.get("permissions", {}).get("push") is not True:
+            checkpoint("git_discovery")
+            discovery = client.git_discovery(token)
+            journal["git_discovery"] = discovery
+        journal["repository_checks"] = repository_checks(metadata, branch, baseline, discovery)
         checkpoint("repository_preflight")
         if not all(journal["repository_checks"].values()):
             raise Blocked("repository_preflight_invalid")
