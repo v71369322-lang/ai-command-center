@@ -20,6 +20,7 @@ from command_center.store import Denied, Store, digest
 
 ROOT = Path(__file__).resolve().parents[2]
 MAX_EVIDENCE_BYTES = 32768
+MAX_SOURCE_BYTES = 16 * 1024 * 1024
 SAFE_ERRORS = {
     'dedicated_unprivileged_operator_required', 'evidence_file_invalid',
     'evidence_file_outside_source_required', 'evidence_file_mode_required',
@@ -51,20 +52,50 @@ def safe_error(error):
     return 'operator_check_failed'
 
 
-def check_source(revision):
+def runtime_source_digest():
+    files = [Path(__file__).resolve()]
+    files.extend(sorted((ROOT / 'src/command_center').rglob('*.py')))
+    value = hashlib.sha256()
+    total = 0
+    for path in files:
+        metadata = path.lstat()
+        if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+            raise Blocked('operator_source_changed')
+        raw = path.read_bytes()
+        total += len(raw)
+        if total > MAX_SOURCE_BYTES:
+            raise Blocked('operator_source_changed')
+        relative = path.relative_to(ROOT).as_posix().encode()
+        value.update(len(relative).to_bytes(4, 'big'))
+        value.update(relative)
+        value.update(stat.S_IMODE(metadata.st_mode).to_bytes(4, 'big'))
+        value.update(len(raw).to_bytes(8, 'big'))
+        value.update(raw)
+    return value.hexdigest()
+
+
+def check_source(revision, expected_digest=None):
     if not isinstance(revision, str) or not re.fullmatch(r'[a-f0-9]{40}', revision):
         raise Blocked('exact_operator_revision_required')
+    digest_value = runtime_source_digest()
+    if expected_digest is not None:
+        if (not isinstance(expected_digest, str)
+                or not re.fullmatch(r'[a-f0-9]{64}', expected_digest)
+                or digest_value != expected_digest):
+            raise Blocked('operator_source_changed')
+        return digest_value
     environment = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
-    for arguments, expected in ((('rev-parse', 'HEAD'), revision), (('status', '--porcelain'), '')):
-        try:
+    try:
+        for arguments, expected in ((('rev-parse', 'HEAD'), revision), (('status', '--porcelain'), '')):
             result = subprocess.run(
                 ['git', '-C', str(ROOT), *arguments], env=environment, capture_output=True,
                 check=True, timeout=10,
             )
-        except (OSError, subprocess.SubprocessError):
-            raise Blocked('operator_check_failed') from None
-        if result.stdout.decode().strip() != expected:
-            raise Blocked('operator_source_changed')
+            if result.stdout.decode().strip() != expected:
+                raise Blocked('operator_source_changed')
+    except (OSError, subprocess.SubprocessError):
+        raise Blocked('operator_check_failed') from None
+    return digest_value
 
 
 def evidence(value):
@@ -102,8 +133,8 @@ def evidence(value):
     return manifest, hashlib.sha256(raw).hexdigest()
 
 
-def describe(evidence_file, operator_revision, operation_id):
-    check_source(operator_revision)
+def describe(evidence_file, operator_revision, operation_id, source_digest=None):
+    source_digest = check_source(operator_revision, source_digest)
     if os.geteuid() == 0:
         raise Blocked('dedicated_unprivileged_operator_required')
     if not isinstance(operation_id, str) or not OPERATION.fullmatch(operation_id):
@@ -112,11 +143,13 @@ def describe(evidence_file, operator_revision, operation_id):
     scope = {
         'schema': 1, 'action': 'register_project_connection',
         'operator_revision': operator_revision, 'operation_id': operation_id,
+        'source_digest': source_digest,
         'evidence_file': str(evidence_file), 'evidence_sha256': evidence_sha256,
         'manifest': manifest,
     }
     return manifest, {
         'schema': 1, 'action': scope['action'], 'operator_revision': operator_revision,
+        'source_digest': source_digest,
         'operation_id': operation_id, 'project_id': manifest['project_id'],
         'repository': manifest['repository'], 'repository_id': manifest['repository_id'],
         'baseline_sha': manifest['baseline_sha'], 'evidence_sha256': evidence_sha256,
@@ -134,13 +167,13 @@ def deadline(approved_until):
         raise Blocked('fresh_owner_deadline_required')
 
 
-def apply(evidence_file, operator_revision, operation_id, approved_plan, approved_until):
+def apply(evidence_file, operator_revision, operation_id, source_digest, approved_plan, approved_until):
     deadline(approved_until)
-    manifest, report = describe(evidence_file, operator_revision, operation_id)
+    manifest, report = describe(evidence_file, operator_revision, operation_id, source_digest)
     if not isinstance(approved_plan, str) or approved_plan != report['plan_digest']:
         raise Blocked('exact_plan_approval_required')
     deadline(approved_until)
-    check_source(operator_revision)
+    check_source(operator_revision, source_digest)
     provenance = {
         'evidence_sha256': report['evidence_sha256'],
         'operator_revision': operator_revision,
@@ -156,8 +189,8 @@ def apply(evidence_file, operator_revision, operation_id, approved_plan, approve
     }
 
 
-def inspect(operator_revision, operation_id):
-    check_source(operator_revision)
+def inspect(operator_revision, operation_id, source_digest):
+    check_source(operator_revision, source_digest)
     if not isinstance(operation_id, str) or not OPERATION.fullmatch(operation_id):
         raise Blocked('project_connection_operation_invalid')
     settings = Settings.load()
@@ -186,6 +219,7 @@ def main():
     parser.add_argument('--evidence-file')
     parser.add_argument('--operator-revision', required=True)
     parser.add_argument('--operation-id', required=True)
+    parser.add_argument('--source-digest')
     parser.add_argument('--approved-plan')
     parser.add_argument('--approved-until', type=int)
     try:
@@ -194,15 +228,22 @@ def main():
             if (args.evidence_file is not None or args.approved_plan is not None
                     or args.approved_until is not None):
                 raise Blocked('operator_arguments_invalid')
-            result = inspect(args.operator_revision, args.operation_id)
+            if args.source_digest is None:
+                raise Blocked('operator_arguments_invalid')
+            result = inspect(args.operator_revision, args.operation_id, args.source_digest)
         elif args.evidence_file is None:
             raise Blocked('operator_arguments_invalid')
         elif args.action == 'plan':
             if args.approved_plan is not None or args.approved_until is not None:
                 raise Blocked('operator_arguments_invalid')
+            if args.source_digest is not None:
+                raise Blocked('operator_arguments_invalid')
             _, result = describe(args.evidence_file, args.operator_revision, args.operation_id)
         else:
+            if args.source_digest is None:
+                raise Blocked('operator_arguments_invalid')
             result = apply(args.evidence_file, args.operator_revision, args.operation_id,
+                           args.source_digest,
                            args.approved_plan, args.approved_until)
         print(json.dumps(result, sort_keys=True))
     except Exception as error:

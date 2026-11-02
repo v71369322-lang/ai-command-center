@@ -45,7 +45,7 @@ def evidence_file(tmp_path, monkeypatch):
     path.chmod(0o600)
     monkeypatch.setattr(operator, 'ROOT', tmp_path / 'source')
     monkeypatch.setattr(operator.os, 'geteuid', lambda: os.getuid())
-    monkeypatch.setattr(operator, 'check_source', lambda revision: None)
+    monkeypatch.setattr(operator, 'check_source', lambda revision, expected=None: 'f' * 64)
     return path
 
 
@@ -77,7 +77,8 @@ def test_apply_requires_exact_fresh_plan_and_records_disabled_connection(
             'state': 'VERIFIED_DISABLED', 'execution_enabled': False,
             'paid_ai_enabled': False, 'merge_enabled': False, 'deployment_enabled': False,
         }))
-    result = operator.apply(evidence_file, '1' * 40, operation, plan['plan_digest'],
+    result = operator.apply(evidence_file, '1' * 40, operation, plan['source_digest'],
+                            plan['plan_digest'],
                             int(time.time()) + 300)
     assert result['status'] == 'PROJECT_CONNECTION_REGISTERED_DISABLED'
     assert result['state'] == 'VERIFIED_DISABLED'
@@ -97,7 +98,8 @@ def test_apply_requires_runtime_binding_to_operator_revision(evidence_file, monk
         'Settings', (), {'source_revision': '2' * 40})())
     monkeypatch.setattr(operator, 'Store', lambda settings: pytest.fail('store accessed'))
     with pytest.raises(operator.Blocked, match='runtime_binding_revision_mismatch'):
-        operator.apply(evidence_file, '1' * 40, operation, plan['plan_digest'],
+        operator.apply(evidence_file, '1' * 40, operation, plan['source_digest'],
+                       plan['plan_digest'],
                        int(time.time()) + 300)
 
 
@@ -113,7 +115,7 @@ def test_apply_rejects_bad_authority_before_store(
     approved = plan['plan_digest'] if approved == 'plan' else approved
     monkeypatch.setattr(operator, 'Store', lambda settings: pytest.fail('store accessed'))
     with pytest.raises(operator.Blocked, match=error):
-        operator.apply(evidence_file, '1' * 40, operation, approved,
+        operator.apply(evidence_file, '1' * 40, operation, plan['source_digest'], approved,
                        int(time.time()) + seconds)
 
 
@@ -153,7 +155,7 @@ def test_inspect_verifies_audit_provenance_without_external_calls(monkeypatch):
         def check_audit(self, session):
             assert session == 'session'
 
-    monkeypatch.setattr(operator, 'check_source', lambda revision: None)
+    monkeypatch.setattr(operator, 'check_source', lambda revision, expected=None: 'f' * 64)
     monkeypatch.setattr(operator.Settings, 'load', lambda: type(
         'Settings', (), {'source_revision': '1' * 40})())
     monkeypatch.setattr(operator, 'Store', lambda settings: FakeStore())
@@ -162,7 +164,16 @@ def test_inspect_verifies_audit_provenance_without_external_calls(monkeypatch):
         'project_id': 'command-center', 'state': 'VERIFIED_DISABLED',
         'execution_enabled': False, 'paid_ai_enabled': False,
         'merge_enabled': False, 'deployment_enabled': False})
-    result = operator.inspect('1' * 40, operation)
+    result = operator.inspect('1' * 40, operation, 'f' * 64)
     assert result['status'] == 'PROJECT_CONNECTION_REGISTRATION_VERIFIED'
     assert result['provenance'] == provenance and result['external_calls'] == 0
     assert result['execution_enabled'] is result['paid_ai_enabled'] is False
+
+
+def test_source_digest_allows_gitless_container_and_rejects_tampering(monkeypatch):
+    value = operator.runtime_source_digest()
+    monkeypatch.setattr(operator.subprocess, 'run', lambda *args, **kwargs:
+                        pytest.fail('git accessed'))
+    assert operator.check_source('1' * 40, value) == value
+    with pytest.raises(operator.Blocked, match='operator_source_changed'):
+        operator.check_source('1' * 40, '0' * 64)
