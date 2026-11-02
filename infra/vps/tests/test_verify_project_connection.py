@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+import json
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -57,3 +58,25 @@ def test_error_codes_do_not_leak_exception_text():
         "repository_preflight_invalid"
     )
     assert operator.error_code(RuntimeError("secret provider response")) == "operator_check_failed"
+
+
+def test_inspect_returns_only_fixed_receipt_fields(tmp_path, monkeypatch):
+    output = tmp_path / "attempt"
+    output.mkdir(mode=0o700)
+    receipt = {
+        "stage": "requires_inspection_no_retry",
+        "error_code": "fixed",
+        "token_request_attempted": True,
+        "secret": "hidden",
+        "repository_checks": {"baseline": False, "unknown": True},
+        "http_events": [{"method": "GET", "endpoint": "/app", "http_status": 200, "body": "hidden"}],
+    }
+    path = output / "receipt.json"
+    path.write_text(json.dumps(receipt))
+    path.chmod(0o600)
+    monkeypatch.setattr(operator.github_token, "check_source", lambda revision: None)
+    monkeypatch.setattr(operator.github_token, "private_path", lambda value: Path(value))
+    result = operator.inspect(output, "a" * 40)
+    assert result["repository_checks"] == {"baseline": False}
+    assert result["http_events"] == [{"method": "GET", "endpoint": "/app", "http_status": 200}]
+    assert "secret" not in result and result["external_calls"] == 0

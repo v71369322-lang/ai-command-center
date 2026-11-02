@@ -70,6 +70,42 @@ def repository_checks(metadata, branch, baseline):
     }
 
 
+def inspect(output, revision):
+    github_token.check_source(revision)
+    output = github_token.private_path(output)
+    info = output.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise Blocked("private_attempt_invalid")
+    stream, metadata = github_token._open_private(output / "receipt.json", os.geteuid(), 32768)
+    with stream:
+        if stat.S_IMODE(metadata.st_mode) != 0o600:
+            raise Blocked("private_attempt_invalid")
+        receipt = json.loads(stream.read(32769))
+    checks = receipt.get("repository_checks", {})
+    safe_checks = {
+        key: checks[key] for key in repository_checks({}, {}, "0" * 40) if type(checks.get(key)) is bool
+    }
+    events = receipt.get("http_events", [])
+    safe_events = [
+        {key: event.get(key) for key in ("method", "endpoint", "http_status")}
+        for event in events
+        if isinstance(event, dict) and type(event.get("http_status")) is int
+    ]
+    return {
+        "status": "PROJECT_CONNECTION_OFFLINE_INSPECTION",
+        "stage": receipt.get("stage"),
+        "error_code": receipt.get("error_code"),
+        "repository_checks": safe_checks,
+        "http_events": safe_events,
+        "token_request_attempted": receipt.get("token_request_attempted") is True,
+        "external_calls": 0,
+        "credential_values_read": False,
+        "repository_changes": False,
+        "application_configuration_changed": False,
+        "paid_calls": 0,
+    }
+
+
 def configure():
     github_token.REPOSITORY, github_token.REPOSITORY_ID = REPOSITORY, REPOSITORY_ID
     github_token.REPO = "/repos/" + REPOSITORY
@@ -221,16 +257,24 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
 def main():
     configure()
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=("plan", "verify"))
-    p.add_argument("--key-file", required=True)
+    p.add_argument("action", choices=("plan", "verify", "inspect"))
+    p.add_argument("--key-file")
     p.add_argument("--output", required=True)
     p.add_argument("--operator-revision", required=True)
-    p.add_argument("--baseline", required=True)
+    p.add_argument("--baseline")
     p.add_argument("--approved-plan")
     p.add_argument("--approved-until", type=int)
     a = p.parse_args()
     try:
-        if a.action == "plan":
+        if a.action == "inspect":
+            if any(
+                value is not None for value in (a.key_file, a.baseline, a.approved_plan, a.approved_until)
+            ):
+                raise Blocked("operator_arguments_invalid")
+            result = inspect(a.output, a.operator_revision)
+        elif a.key_file is None or a.baseline is None:
+            raise Blocked("operator_arguments_invalid")
+        elif a.action == "plan":
             _, _, result = scope(a.key_file, a.output, a.operator_revision, a.baseline)
             result.update(status="OFFLINE_PLAN_NOT_AUTHORIZED", external_calls=0)
         else:
