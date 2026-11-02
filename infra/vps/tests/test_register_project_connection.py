@@ -1,4 +1,5 @@
 import importlib.util
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -136,3 +137,32 @@ def test_evidence_requires_private_mode_and_canonical_operation(evidence_file):
     evidence_file.chmod(0o600)
     with pytest.raises(operator.Blocked, match='operation_invalid'):
         operator.describe(evidence_file, '1' * 40, '0' * 36)
+
+
+def test_inspect_verifies_audit_provenance_without_external_calls(monkeypatch):
+    operation = str(uuid4())
+    provenance = {'evidence_sha256': 'a' * 64, 'operator_revision': '1' * 40,
+                  'plan_digest': 'b' * 64}
+    event = {'manifest': manifest(), 'provenance': provenance}
+
+    class FakeStore:
+        @contextmanager
+        def transaction(self):
+            yield 'session'
+
+        def check_audit(self, session):
+            assert session == 'session'
+
+    monkeypatch.setattr(operator, 'check_source', lambda revision: None)
+    monkeypatch.setattr(operator.Settings, 'load', lambda: type(
+        'Settings', (), {'source_revision': '1' * 40})())
+    monkeypatch.setattr(operator, 'Store', lambda settings: FakeStore())
+    monkeypatch.setattr(operator, 'history', lambda session: ({}, {operation: event}))
+    monkeypatch.setattr(operator, 'receipt', lambda value: {
+        'project_id': 'command-center', 'state': 'VERIFIED_DISABLED',
+        'execution_enabled': False, 'paid_ai_enabled': False,
+        'merge_enabled': False, 'deployment_enabled': False})
+    result = operator.inspect('1' * 40, operation)
+    assert result['status'] == 'PROJECT_CONNECTION_REGISTRATION_VERIFIED'
+    assert result['provenance'] == provenance and result['external_calls'] == 0
+    assert result['execution_enabled'] is result['paid_ai_enabled'] is False

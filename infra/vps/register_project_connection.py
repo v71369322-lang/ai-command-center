@@ -12,7 +12,9 @@ import subprocess
 import time
 
 from command_center.config import Settings
-from command_center.project_connections import OPERATION, REPOSITORIES, register, validate
+from command_center.project_connections import (
+    OPERATION, REPOSITORIES, history, receipt, register, validate,
+)
 from command_center.store import Denied, Store, digest
 
 
@@ -30,6 +32,7 @@ SAFE_ERRORS = {
     'project_connection_idempotency_conflict',
     'project_connection_replacement_requires_disconnect',
     'project_connection_history_invalid', 'project_connection_history_limit',
+    'project_connection_registration_missing', 'project_connection_provenance_mismatch',
 }
 
 
@@ -153,17 +156,48 @@ def apply(evidence_file, operator_revision, operation_id, approved_plan, approve
     }
 
 
+def inspect(operator_revision, operation_id):
+    check_source(operator_revision)
+    if not isinstance(operation_id, str) or not OPERATION.fullmatch(operation_id):
+        raise Blocked('project_connection_operation_invalid')
+    settings = Settings.load()
+    if settings.source_revision != operator_revision:
+        raise Blocked('runtime_binding_revision_mismatch')
+    store = Store(settings)
+    with store.transaction() as session:
+        store.check_audit(session)
+        _, operations = history(session)
+        event = operations.get(operation_id)
+        if event is None:
+            raise Blocked('project_connection_registration_missing')
+        provenance = event.get('provenance')
+        if not isinstance(provenance, dict) or provenance.get('operator_revision') != operator_revision:
+            raise Blocked('project_connection_provenance_mismatch')
+        result = receipt(event)
+    return {**result, 'status': 'PROJECT_CONNECTION_REGISTRATION_VERIFIED',
+            'operation_id': operation_id, 'provenance': provenance,
+            'external_calls': 0, 'credential_values_read': False,
+            'repository_changes': False, 'application_configuration_changed': False}
+
+
 def main():
     parser = Arguments(description=__doc__)
-    parser.add_argument('action', choices=('plan', 'apply'))
-    parser.add_argument('--evidence-file', required=True)
+    parser.add_argument('action', choices=('plan', 'apply', 'inspect'))
+    parser.add_argument('--evidence-file')
     parser.add_argument('--operator-revision', required=True)
     parser.add_argument('--operation-id', required=True)
     parser.add_argument('--approved-plan')
     parser.add_argument('--approved-until', type=int)
     try:
         args = parser.parse_args()
-        if args.action == 'plan':
+        if args.action == 'inspect':
+            if (args.evidence_file is not None or args.approved_plan is not None
+                    or args.approved_until is not None):
+                raise Blocked('operator_arguments_invalid')
+            result = inspect(args.operator_revision, args.operation_id)
+        elif args.evidence_file is None:
+            raise Blocked('operator_arguments_invalid')
+        elif args.action == 'plan':
             if args.approved_plan is not None or args.approved_until is not None:
                 raise Blocked('operator_arguments_invalid')
             _, result = describe(args.evidence_file, args.operator_revision, args.operation_id)
