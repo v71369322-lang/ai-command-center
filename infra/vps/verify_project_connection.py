@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import time
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import jwt  # noqa: E402
 from cryptography.hazmat.primitives import serialization  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: E402
 
 import prepare_github_token as github_token  # noqa: E402
 from command_center.deployment_profile import atomic_json  # noqa: E402
@@ -31,6 +33,7 @@ class Blocked(Exception):
 
 
 SAFE_ERRORS = {
+    "app_key_custody_invalid",
     "app_identity_invalid",
     "installation_binding_invalid",
     "token_scope_invalid",
@@ -130,7 +133,13 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
         atomic_json(output / "receipt.json", journal)
 
     try:
-        key = serialization.load_pem_private_key(key_file.read_bytes(), password=None)
+        stream, metadata = github_token._open_private(key_file, os.geteuid(), 16384, minimum=1024)
+        with stream:
+            if stat.S_IMODE(metadata.st_mode) != 0o600:
+                raise Blocked("app_key_custody_invalid")
+            key = serialization.load_pem_private_key(stream.read(16385), password=None)
+        if not isinstance(key, rsa.RSAPrivateKey) or not 2048 <= key.key_size <= 4096:
+            raise Blocked("app_key_custody_invalid")
         now = int(time.time())
         assertion = jwt.encode(
             {"iat": now - 60, "exp": now + 300, "iss": str(APP_ID)}, key, algorithm="RS256"
@@ -152,6 +161,8 @@ def verify(key_file, output, revision, baseline, approved_plan, approved_until, 
             if (
                 row.get("id") != INSTALLATION_ID
                 or row.get("app_id") != APP_ID
+                or row.get("account", {}).get("id") != ACCOUNT_ID
+                or row.get("account", {}).get("login") != OWNER
                 or row.get("repository_selection") != "selected"
                 or row.get("permissions") != PERMISSIONS
                 or row.get("suspended_at") is not None
