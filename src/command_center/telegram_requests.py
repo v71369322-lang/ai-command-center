@@ -6,10 +6,10 @@ from .models import Audit, TelegramInbox
 from .store import Denied, canonical, digest
 
 
-def _captured_text(row, anchor, session=None):
+def _captured_text(row, anchor, session=None, *, states=frozenset({'NEEDS_PLANNING'})):
     """Validate one checked intake, including accepted voice transcripts."""
     number = row.id.removeprefix(row.profile + ':')
-    if (row.state != 'NEEDS_PLANNING' or not isinstance(row.intent, dict)
+    if (row.state not in states or not isinstance(row.intent, dict)
             or row.task_id is not None or row.fingerprint != digest(row.intent)
             or not isinstance(anchor, dict) or anchor.get('kind') != 'telegram_update_received'
             or anchor.get('actor') != 'owner' or anchor.get('profile') != row.profile
@@ -35,7 +35,7 @@ def _captured_text(row, anchor, session=None):
     return value
 
 
-def captured_text(session, row):
+def captured_text(session, row, *, states=frozenset({'NEEDS_PLANNING'})):
     """Validate immutable intake before any reader copies its contents."""
     number = row.id.removeprefix(row.profile + ':')
     anchored = session.scalar(select(Audit).where(
@@ -45,7 +45,7 @@ def captured_text(session, row):
                 Audit.event['update_id'].as_string() == number,
                 Audit.event['intent_hash'].as_string() == row.fingerprint)
                 .order_by(Audit.sequence).limit(1))
-    return _captured_text(row, anchored.event if anchored else None, session)
+    return _captured_text(row, anchored.event if anchored else None, session, states=states)
 
 
 def capture_receipt(inbox_id):
