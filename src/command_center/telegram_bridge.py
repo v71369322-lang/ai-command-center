@@ -282,6 +282,12 @@ class TelegramBridge:
             if not re.fullmatch(r'0|[1-9][0-9]{0,15}', number) or int(number) >= 2**53:
                 raise Denied('telegram_request_number_invalid')
             return str(uid), {'kind': 'request', 'number': number}
+        if value.split()[:1] and value.split()[0] in {'/archive_request', '/restore_request'}:
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53):
+                raise Denied('telegram_request_lifecycle_reference_invalid')
+            return str(uid), {'kind': value[1:value.index('_request')] + '_request', 'number': parts[1]}
         if value.startswith('/status '):
             try:
                 task_id = str(UUID(value[8:]))
@@ -290,7 +296,14 @@ class TelegramBridge:
             return str(uid), {'kind': 'status', 'task_id': task_id}
         if value in {'/start', '/help', '/menu', '/status', '/request', '/assign'}:
             return str(uid), {'kind': 'help'}
-        captured = value.removeprefix('/task ')
+        if value.startswith('/task '):
+            captured = value[6:]
+            if not captured.strip():
+                raise Denied('telegram_empty_request')
+            return str(uid), {'kind': 'capture', 'text': captured}
+        if value.startswith('/'):
+            return str(uid), {'kind': 'unknown_command'}
+        captured = value
         if not captured.strip():
             raise Denied('telegram_empty_request')
         return str(uid), {'kind': 'capture', 'text': captured}
@@ -325,7 +338,7 @@ class TelegramBridge:
             if row:
                 if row.fingerprint != digest(intent):
                     raise Denied('telegram_update_reused_with_different_content')
-                if row.state in {'DONE', 'NEEDS_PLANNING'}:
+                if row.state in {'DONE', 'NEEDS_PLANNING', 'ARCHIVED'}:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
             else:
                 admission = {}
@@ -618,7 +631,10 @@ class TelegramBridge:
         else:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
-                if kind == 'capture':
+                if kind in {'archive_request', 'restore_request'}:
+                    from .request_lifecycle import apply
+                    apply(self, session, iid, intent)
+                elif kind == 'capture':
                     row = session.get(TelegramInbox, iid)
                     if row.state == 'NEEDS_PLANNING':
                         return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
@@ -633,6 +649,14 @@ class TelegramBridge:
                     number = iid.rsplit(':', 1)[1]
                     delivery = self.enqueue(session, iid + ':reply', capture_receipt(iid), picker_keyboard(number, 0))
                     issue(self, session, delivery, number, 0)
+                elif kind == 'unknown_command':
+                    row = session.get(TelegramInbox, iid)
+                    if row.state == 'DONE':
+                        return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
+                    if row.state != 'RECEIVED':
+                        raise Denied('telegram_help_not_pending')
+                    self.finish(session, iid, 'Неизвестная команда. Она не сохранена как запрос. '
+                        'Откройте /menu или отправьте обычный текст без символа / в начале.')
                 else:
                     row = session.get(TelegramInbox, iid)
                     if row.state == 'DONE':

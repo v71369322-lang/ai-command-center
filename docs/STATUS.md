@@ -1,5 +1,13 @@
 # Текущий контекст и облачный handoff
 
+Cloud continuation **3 ноября 2026, Telegram inbox control**: отдельная ветка
+`feat/telegram-request-inbox-control` закрывает обнаруженный live UX-дефект:
+неизвестная slash-команда больше не сохраняется как обычный запрос. Добавлены
+обратимые `/archive_request номер` и `/restore_request номер` для запросов без
+плана/задачи. Архив исключается из очереди, но intake, назначение и append-only
+история сохраняются; AI, execution, grants и внешние вызовы не включаются.
+Описание: [REQUEST_INBOX_CONTROL.md](telegram/REQUEST_INBOX_CONTROL.md).
+
 Cloud continuation **1 ноября 2026, registration operator**: отдельная ветка
 `feat/project-connection-registration` добавляет двухшаговую локальную запись
 уже проверенного repository evidence. Фиксированный project catalog теперь
