@@ -1,5 +1,11 @@
 # Текущий контекст и облачный handoff
 
+Cloud continuation **3 ноября 2026, Telegram planning admission**: ветка
+`feat/telegram-ai-planning-admission` добавляет `/plan_prepare номер`. Команда
+создаёт только идемпотентную F1 planning-задачу `WAITING_APPROVAL`, закреплённую
+к проверенному intake/context. Provider, credential, grant, расход и execution
+не вызываются; при normal stop задача не создаётся.
+
 Cloud continuation **3 ноября 2026, Telegram inbox control**: отдельная ветка
 `feat/telegram-request-inbox-control` закрывает обнаруженный live UX-дефект:
 неизвестная slash-команда больше не сохраняется как обычный запрос. Добавлены

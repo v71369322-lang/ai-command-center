@@ -241,6 +241,12 @@ class TelegramBridge:
                 raise Denied('telegram_manual_plan_arguments_invalid')
             number(parts[1], 2**53-1)
             return str(uid), {'kind': 'manual_plan_template', 'number': parts[1]}
+        if value.split()[:1] == ['/plan_prepare']:
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53):
+                raise Denied('telegram_plan_preparation_reference_invalid')
+            return str(uid), {'kind': 'plan_prepare', 'number': parts[1]}
         if value.split()[:1] == ['/draft_plan']:
             from .telegram_manual_plan import parse
             return str(uid), parse(value)
@@ -529,6 +535,9 @@ class TelegramBridge:
         elif kind == 'voice_confirm':
             from .telegram_voice_transcripts import decide
             decide(self, iid, intent)
+        elif kind == 'plan_prepare':
+            from .telegram_planning import prepare
+            prepare(self, iid, intent)
         elif kind in {'tasks', 'status', 'requests', 'request', 'projects', 'attention', 'reminders',
                       'calendar_list', 'voice', 'system', 'project', 'project_connection',
                       'project_setup', 'project_setup_history', 'request_review', 'preparation_queue',
