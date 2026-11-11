@@ -1,5 +1,18 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, planning candidate / activation operator**:
+parent #93 exact full CI SUCCESS. Ветка `feat/planning-candidate-preparation`
+добавляет [подготовку целостного кандидата и адаптер активации](planning/CANDIDATE_ACTIVATION.md)
+поверх прежних Deployment.apply/reconcile interlocks. Отдельный exact digest
+для control-socket capability, normal stop до смены binding, дополнительные
+worker/runtime/financial gates; legacy memory apply planning не принимает.
+Подготовка/inspect не читают provider key bytes, не меняют live binding/journals,
+не запускают контейнеры и не разрешают paid calls. Owner подтвердил: реального
+operator profile пока нет. Никакие production значения не придуманы.
+Initial scopes: 136 candidate/binding/release; 51 candidate/activation/legacy
+(пересекаются); отдельно 9 PG/SQLite health. Final evidence — dependent Draft PR.
+[Checkpoint](handoff/PLANNING_CANDIDATE_2026-11-11.md).
+
 Local continuation **11 ноября 2026, planning deployment binding**: parent #91 и
 #92 exact CI SUCCESS в обоих workflows. Зависимая ветка
 `feat/planning-deployment-binding` добавляет [защищённый manifest binding и
