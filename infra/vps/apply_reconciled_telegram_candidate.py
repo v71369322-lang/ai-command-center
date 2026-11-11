@@ -22,10 +22,12 @@ def deadline(value):
         raise ValueError('fresh_bounded_update_approval_required')
 
 
-def validate_transition(old, target, old_digest, target_digest):
+def validate_transition(old, target, old_digest, target_digest, *, planning=False):
     before, after = old['manifest'], target['manifest']
     if checksum(old) != old_digest or checksum(target) != target_digest:
         raise ValueError('exact_bundle_approvals_required')
+    if 'planning' in after and not planning:
+        raise ValueError('separate_planning_access_approval_required')
     fixed = ('migration_hash', 'database_image', 'redis_image', 'data_root',
              'control_uid', 'execution_uid', 'owner_login')
     if any(before.get(key) != after.get(key) for key in fixed):
@@ -50,7 +52,7 @@ class ReconciledUpdate(Deployment):
 
 
 def apply(previous_directory, candidate_directory, approved_previous, approved_candidate,
-          approved_until):
+          approved_until, *, _planning=None):
     deadline(approved_until)
     if not all(re.fullmatch('[a-f0-9]{64}', value)
                for value in (approved_previous, approved_candidate)):
@@ -58,7 +60,7 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
     previous = exact_bundle(previous_directory, approved_previous)
     target = load_bundle(candidate_directory)
     old, new = validate_transition(
-        previous, target, approved_previous, approved_candidate)
+        previous, target, approved_previous, approved_candidate, planning=_planning is not None)
     root = Path(old['data_root'])
     state_file = root / 'deployment.json'
     live_file = root / 'telegram/connection.json'
@@ -67,11 +69,15 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
     if activation.exists() or activation.is_symlink():
         raise ValueError('existing_activation_requires_reconciliation')
     preparation = json.loads((directory / 'preparation.json').read_text())
-    if (preparation.get('state') != 'STAGED_NOT_ACTIVATED'
+    if _planning is not None:
+        extra_record = _planning.validate(previous, target, directory, preparation)
+    elif (preparation.get('state') != 'STAGED_NOT_ACTIVATED'
             or preparation.get('candidate_bundle') != approved_candidate
             or preparation.get('expected_incomplete_predecessor') != approved_previous
             or preparation.get('external_ai_profile_enabled') is not False):
         raise ValueError('candidate_preparation_changed')
+    else:
+        extra_record = {}
     original = connection(live_file)
     staged = connection(directory / 'connection.candidate.json')
     if (digest(original.model_dump()) != old['telegram']['connection_digest']
@@ -80,7 +86,11 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
         raise ValueError('exact_candidate_binding_required')
 
     controller = Deployment(previous, previous_directory)
-    controller.preflight()
+    if _planning is None:
+        controller.preflight()
+    else:
+        # Expired previous planning evidence must not prevent a quiesced update.
+        controller.preflight(planning_check=False)
     source_check(new)
     for uid, names in ((new['control_uid'], {'api', 'worker', 'broker'}),
                        (new['execution_uid'], {'executor', 'coding'})):
@@ -89,7 +99,7 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
         image_check(engine, {key: new['images'][key] for key in names}, new['revision'])
     deadline(approved_until)
 
-    record = {'schema': 1, 'phase': 'PREPARED', 'previous': approved_previous,
+    record = {'schema': 1, **extra_record, 'phase': 'PREPARED', 'previous': approved_previous,
               'target': approved_candidate, 'approved_until': approved_until,
               'task_admission_resumed': False, 'paid_calls': 0}
     lock = os.open(root / 'deployment.lock', os.O_CREAT | os.O_RDWR, 0o600)
@@ -101,6 +111,9 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
                 or connection(live_file) != original):
             raise ValueError('verified_predecessor_changed')
         atomic_json(activation, record)
+        if _planning is not None:
+            controller.quiesce()
+            deadline(approved_until)
         controller.compose('stop', 'telegram')
         if controller.engine.run(
                 'ps', '-q', '--filter', 'name=^' + PROJECT + '-telegram-1$').strip():
@@ -113,10 +126,11 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
 
     deadline(approved_until)
     atomic_json(activation, {**record, 'phase': 'DEPLOYMENT_ATTEMPTED'})
-    result = ReconciledUpdate(target, directory).apply(
+    update = ReconciledUpdate(target, directory) if _planning is None else _planning.controller(target, directory)
+    result = update.apply(
         'update', approved_candidate, expected_previous=approved_previous)
     atomic_json(activation, {**record, 'phase': 'VERIFIED', 'checks': result})
-    return {'status': 'TELEGRAM_MEMORY_FIX_APPLIED', 'bundle': approved_candidate,
+    return {'status': 'TELEGRAM_MEMORY_FIX_APPLIED' if _planning is None else 'PLANNING_CANDIDATE_APPLIED', 'bundle': approved_candidate,
             'revision': new['revision'], 'task_admission_resumed': False,
             'paid_calls': 0, 'checks': result}
 

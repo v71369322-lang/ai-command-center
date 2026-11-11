@@ -1,5 +1,8 @@
 # Planning deployment binding and production factory
 
+Consistent input/candidate construction and exact activation workflow:
+[CANDIDATE_ACTIVATION.md](CANDIDATE_ACTIVATION.md).
+
 This opt-in composition extends the existing deployment manifest and interlocks.
 No enabled flag, RPC endpoint or second permission mechanism is added. A release
 without `planning` renders no planning files, key mount, control socket or broker
