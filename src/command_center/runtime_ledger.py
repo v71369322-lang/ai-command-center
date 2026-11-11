@@ -163,8 +163,9 @@ class RuntimeLedger:
             columns = {r[1] for r in db.execute('PRAGMA table_info(runs)')}
             if ('kind' in columns) != ('returned' in columns):
                 raise ValueError('runtime_operation_schema_incomplete')
-            projection = 'kind,returned' if 'kind' in columns else "'container' AS kind,0 AS returned"
-            for row in db.execute('SELECT id,fence,' + projection + ' FROM runs'):
+            query = ('SELECT id,fence,kind,returned FROM runs' if 'kind' in columns
+                     else "SELECT id,fence,'container' AS kind,0 AS returned FROM runs")
+            for row in db.execute(query):
                 key = (row['id'], row['fence'])
                 if (row['kind'] != kinds.get(key) or row['returned'] != int(key in returned)
                         or row['kind'] not in {'container', 'planning_http'}):
