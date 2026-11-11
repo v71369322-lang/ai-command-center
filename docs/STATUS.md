@@ -6,7 +6,9 @@ Local continuation **11 ноября 2026, planning host lifecycle**: завис
 для watchdog. Отсутствие контейнера не считается остановкой HTTP. Read-only
 инспектор старого ledger не запускает миграцию. Parent #90 CI SUCCESS.
 Final local PG/control scope: 383 passed; read-only infra: 23 passed;
-Ruff/API contract/diff checks passed. Полный infra повторяется на clean Linux source.
+Ruff/API contract/diff checks passed. Clean Linux infra под UID 1000: 1013 passed.
+Свежий read-only VPS probe: rootless/cgroup-v2/systemd, watchdog/worker ready,
+unresolved runtime runs=0; действующий f5ff8b2/deployment VERIFIED сохранён.
 Default production factory остаётся закрытой; VPS, реальные ключи, deployment
 и paid calls не включались. [Checkpoint](handoff/PLANNING_HOST_2026-11-11.md).
 

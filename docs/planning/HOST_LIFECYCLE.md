@@ -82,8 +82,16 @@ separate read-only infrastructure scope: 23 passed. API contract/Ruff/diff check
 passed. A clean committed Linux source rerun addresses the minimal helper's
 missing Docker CLI/Compose prerequisite; its result is recorded by the PR.
 
-No VPS/daemon/credential change, production planning host, paid call, deployment
-or merge was performed. Next is protected release-package prepare/inspect wiring
+A clean committed LF snapshot with pinned Docker CLI/Compose and unprivileged
+UID 1000 passed all 1013 infrastructure cases. Earlier root-helper/missing-CLI
+failures were environment failures; dedicated-user guards were kept intact.
+
+A subsequent read-only VPS probe confirmed rootless/cgroup-v2/systemd and the
+running broker's bounded UDS/read-only/cap-drop policy, fresh watchdog/worker
+and zero unresolved runtime runs. The installed source is still f5ff8b2 and its
+deployment journal VERIFIED; this does not accept the new lifecycle source.
+No VPS runtime/daemon/credential change, production planning host, paid call,
+deployment or merge was performed. Next is protected release-package prepare/inspect wiring
 and independently observed rootless host acceptance under a separate exact owner
 deployment decision. Key presence or an enabled flag alone cannot activate a
 staged grant.
