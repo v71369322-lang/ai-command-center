@@ -128,10 +128,15 @@ def create_broker_app(service=None, token=None):
     stop = Event()
     queue = None
     if service is None:
+        from .planning_host import configured_host
+        planning_host = configured_host()
         settings = Settings.load(identities_required=False)
         store = Store(settings)
+        ledger, backend = RuntimeLedger(os.environ['F1_RUNTIME_LEDGER']), RuntimeBackend()
+        if planning_host is not None:
+            planning_host.preflight(store, ledger, backend)
         queue = broker(settings)
-        service = RuntimeBroker(store, RuntimeLedger(os.environ['F1_RUNTIME_LEDGER']), RuntimeBackend(), RuntimeLimits.load())
+        service = RuntimeBroker(store, ledger, backend, RuntimeLimits.load(), planning_host=planning_host)
         token = Path(os.environ['F1_BROKER_TOKEN_FILE']).read_text().strip()
 
     def dispatch():

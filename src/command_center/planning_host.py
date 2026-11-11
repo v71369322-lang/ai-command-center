@@ -23,6 +23,7 @@ class HostDeclaration(Strict):
     container_name: str = Field(pattern=r'^acc-(?:f1|f23)-runtime-broker-1$')
     image_id: str = Field(pattern=r'^sha256:[a-f0-9]{64}$')
     endpoint: str = Field(pattern=r'^unix:///(?:var/run/docker\.sock|run/user/[0-9]+/docker\.sock)$')
+    attestation_endpoint: str | None = Field(default=None, pattern=r'^unix:///run/user/[0-9]+/docker\.sock$')
     ledger_path: str = Field(min_length=1, max_length=300)
     metadata_digest: str = Field(pattern=HEX)
 
@@ -41,7 +42,8 @@ def metadata_document(info):
         'environment': public_environment(config),
         'policy': {k: host.get(k) for k in ('ReadonlyRootfs', 'Privileged', 'CapDrop', 'CapAdd',
             'SecurityOpt', 'Memory', 'NanoCpus', 'PidsLimit', 'NetworkMode', 'PidMode', 'IpcMode',
-            'UsernsMode', 'Devices', 'DeviceRequests', 'PortBindings')},
+            'UsernsMode', 'Devices', 'DeviceRequests', 'PortBindings', 'Tmpfs')},
+        'networks': sorted(info.get('NetworkSettings', {}).get('Networks', {})),
         'mounts': sorted([{'source': m['Source'], 'target': m['Destination'], 'rw': m['RW']}
                           for m in info.get('Mounts', [])], key=lambda v: (v['target'], v['source']))}
 
@@ -73,6 +75,10 @@ class PlanningHost:
                 or not Path(declaration.ledger_path).is_absolute()
                 or Path(declaration.ledger_path).resolve() != ledger.path.resolve()):
             raise Denied('planning_host_binding_changed')
+        if declaration.attestation_endpoint is not None:
+            from .deployment_planning import PROFILE, KEY, private_directory
+            private_directory(Path(PROFILE).parent, os.geteuid(), {'profile.json', 'host.json'})
+            private_directory(Path(KEY).parent, os.geteuid(), {'openai.key'})
         return profile
 
     def preflight(self, store, ledger, backend):
@@ -82,8 +88,15 @@ class PlanningHost:
         proof = backend.preflight()
         if proof.get('mode') != 'rootless-required' or proof.get('rootless_verified') is not True:
             raise Denied('planning_rootless_required')
+        inspector = backend
+        if self.declaration.attestation_endpoint is not None:
+            from .runtime_policy import RuntimeBackend
+            inspector = RuntimeBackend(self.declaration.attestation_endpoint, 'rootless-required')
+            proof = inspector.preflight()
+            if proof.get('rootless_verified') is not True or proof.get('mode') != 'rootless-required':
+                raise Denied('planning_control_rootless_required')
         try:
-            result = backend.call('inspect', self.declaration.container_name)
+            result = inspector.call('inspect', self.declaration.container_name)
             if result.returncode or len(result.stdout) > 262144:
                 raise ValueError()
             info = json.loads(result.stdout)[0]
@@ -114,7 +127,7 @@ class PlanningHost:
                            for m in info.get('Mounts', []))
                     or digest(metadata_document(info)) != self.declaration.metadata_digest):
                 raise ValueError()
-            image = backend.call('image', 'inspect', self.declaration.image_id)
+            image = inspector.call('image', 'inspect', self.declaration.image_id)
             if image.returncode or len(image.stdout) > 262144:
                 raise ValueError()
             image = json.loads(image.stdout)[0]
@@ -145,3 +158,33 @@ class PlanningHost:
                 and ledger.worker_fresh(store.settings.source_revision, limits.heartbeat_seconds))
         except (Denied, ValueError, OSError):
             return False
+
+
+def configured_host():
+    """Exact installed composition only. Missing configuration stays disabled."""
+    from .deployment_planning import PROFILE, HOST, KEY, private_directory, key_metadata
+    names = {'F1_PLANNING_PROFILE_FILE', 'F1_PLANNING_PROFILE_SHA256',
+             'F1_PLANNING_HOST_FILE', 'F1_PLANNING_HOST_SHA256', 'F1_PLANNING_OPENAI_KEY_FILE'}
+    supplied = {k for k in os.environ if k.startswith('F1_PLANNING_')}
+    if not supplied:
+        return None
+    try:
+        if (supplied != names or os.environ['F1_PLANNING_PROFILE_FILE'] != PROFILE
+                or os.environ['F1_PLANNING_HOST_FILE'] != HOST
+                or os.environ['F1_PLANNING_OPENAI_KEY_FILE'] != KEY
+                or not re.fullmatch('[a-f0-9]{64}', os.environ['F1_PLANNING_HOST_SHA256'])):
+            raise ValueError()
+        private_directory(Path(PROFILE).parent, os.geteuid(), {'profile.json', 'host.json'})
+        private_directory(Path(KEY).parent, os.geteuid(), {'openai.key'})
+        key_metadata(KEY, os.geteuid())
+        profile = load()
+        host = PlanningHost(HOST, os.environ['F1_PLANNING_HOST_SHA256'])
+        if (profile is None or profile.runtime is None or host.declaration.attestation_endpoint is None
+                or host.declaration.attestation_endpoint == host.declaration.endpoint
+                or profile.runtime.binding_digest != digest(host.declaration.model_dump())
+                or profile.runtime.source_revision != host.declaration.source_revision
+                or not profile.evidence.observed_at <= time.time() < profile.evidence.expires_at):
+            raise ValueError()
+        return host
+    except (OSError, ValueError, Denied, RecursionError):
+        raise Denied('planning_installed_binding_invalid') from None

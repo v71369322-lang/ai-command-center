@@ -97,7 +97,12 @@ def image_check(engine, images, revision):
 def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_password_origin=None,
             password_loopback_http=False, telegram_connection_digest=None,
             first_experiment_config=None, openai_key_file=None, github_token_file=None,
-            first_experiment_telegram_readiness=False):
+            first_experiment_telegram_readiness=False, planning_profile_directory=None,
+            planning_key_directory=None):
+    if (planning_profile_directory is None) != (planning_key_directory is None):
+        raise ValueError('planning_all_bindings_required')
+    if planning_profile_directory is not None and first_experiment_config is not None:
+        raise ValueError('separate_planning_release_required')
     external_files = (first_experiment_config, openai_key_file, github_token_file)
     if first_experiment_telegram_readiness and first_experiment_config is None:
         raise ValueError('first_experiment_config_required')
@@ -131,6 +136,9 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
         from .deployment_integrations import prepare_binding
         manifest['first_experiment'] = prepare_binding(manifest, first_experiment_config,
             openai_key_file, github_token_file, telegram_readiness=first_experiment_telegram_readiness)
+    if planning_profile_directory is not None:
+        from .deployment_planning import prepare_binding
+        manifest['planning'] = prepare_binding(manifest, planning_profile_directory, planning_key_directory)
     source_check(manifest)
     image_check(engine, images, revision)
     bundle = {'manifest': manifest, 'compose': render(base, manifest)}
@@ -164,7 +172,7 @@ class Deployment:
     def compose(self, *args):
         return self.engine.run('compose', '--project-name', PROJECT, '-f', str(self.directory / 'compose.json'), *args)
 
-    def preflight(self, *, fresh=False):
+    def preflight(self, *, fresh=False, planning_check=True):
         if os.getuid() != self.m['control_uid']:
             raise ValueError('dedicated_control_user_required')
         self.engine.preflight()
@@ -174,6 +182,9 @@ class Deployment:
         source_check(self.m)
         if 'first_experiment' in self.m:
             from .deployment_integrations import check_binding
+            check_binding(self.m)
+        if 'planning' in self.m and planning_check:
+            from .deployment_planning import check_binding
             check_binding(self.m)
         image_check(self.engine, {k: v for k, v in self.m['images'].items() if k not in {'executor', 'coding'}}, self.m['revision'])
         image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
@@ -375,6 +386,9 @@ class Deployment:
         return {'state': 'BOOTED_ADMISSION_HALTED', 'go_live': False}
 
     def postcheck(self):
+        if 'planning' in self.m:
+            from .deployment_planning import check_binding
+            check_binding(self.m)
         # Does not require an owner assertion or manufacture a session/MFA claim.
         if 'first_experiment' in self.m:
             from .deployment_integrations import CONFIG_TARGET, check_binding
@@ -404,6 +418,21 @@ class Deployment:
                 expected = {(v['source'], v['target'], False) for v in mounts(self.m, name)}
                 if actual != expected:
                     raise ValueError('first_experiment_runtime_mount_mismatch')
+            if 'planning' in self.m:
+                from .deployment_planning import check_runtime
+                check_runtime(self.m, name, metadata, self.bundle['compose']['services'][name])
+        if 'planning' in self.m:
+            self.engine.run('exec', PROJECT + '-telegram-1', 'python', '-c',
+                'from command_center.planning_profile import load;from command_center.store import digest;'
+                f'assert digest(load().model_dump())=={self.m["planning"]["profile_digest"]!r}')
+            self.engine.run('exec', PROJECT + '-runtime-broker-1', 'python', '-c',
+                'import os;from command_center.planning_host import configured_host;'
+                'from command_center.config import Settings;from command_center.store import Store;'
+                'from command_center.runtime_ledger import RuntimeLedger;'
+                'from command_center.runtime_policy import RuntimeBackend;'
+                'h=configured_host();assert h is not None;'
+                'h.preflight(Store(Settings.load(identities_required=False)),'
+                'RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]),RuntimeBackend())')
         self.engine.run('exec', PROJECT + '-watchdog-1', 'python', '-c',
             'import os;from command_center.runtime_ledger import RuntimeLedger;'
             'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);l.verify();assert l.watchdog_ready()')
@@ -526,7 +555,11 @@ def main():
     parser.add_argument('--openai-key-file')
     parser.add_argument('--github-token-file')
     parser.add_argument('--first-experiment-telegram-readiness', action='store_true')
+    parser.add_argument('--planning-profile-directory')
+    parser.add_argument('--planning-key-directory')
     args = parser.parse_args()
+    if args.action != 'prepare' and (args.planning_profile_directory is not None or args.planning_key_directory is not None):
+        parser.error('planning bindings only apply to prepare')
     if args.action != 'prepare' and (args.first_experiment_telegram_readiness or any(v is not None for v in (
             args.first_experiment_config, args.openai_key_file, args.github_token_file))):
         parser.error('first experiment file bindings only apply to prepare')
@@ -554,7 +587,9 @@ def main():
             telegram_connection_digest=args.telegram_connection_digest,
             first_experiment_config=args.first_experiment_config, openai_key_file=args.openai_key_file,
             github_token_file=args.github_token_file,
-            first_experiment_telegram_readiness=args.first_experiment_telegram_readiness)}))
+            first_experiment_telegram_readiness=args.first_experiment_telegram_readiness,
+            planning_profile_directory=args.planning_profile_directory,
+            planning_key_directory=args.planning_key_directory)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())
@@ -569,7 +604,9 @@ def main():
     elif args.action == 'boot':
         print(json.dumps(deployment.boot()))
     else:
-        deployment.preflight()
+        # Optional planning expiry must not disable independent backup/inspection.
+        # Install/update/boot/postcheck always retain the admission gate.
+        deployment.preflight(planning_check=args.action not in {'backup', 'backup-status', 'verify-backup', 'restore-check'})
         if args.action == 'backup':
             print(json.dumps({'file': str(deployment.backup()), 'offsite_verified': False}))
         elif args.action == 'backup-status':

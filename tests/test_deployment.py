@@ -396,7 +396,7 @@ def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys,
     assert calls[0][1] == dict(owner_password_origin=None, password_loopback_http=False,
         telegram_connection_digest=None, first_experiment_config='/private/config',
         openai_key_file='/private/openai', github_token_file='/private/github',
-        first_experiment_telegram_readiness=telegram)
+        first_experiment_telegram_readiness=telegram, planning_profile_directory=None, planning_key_directory=None)
 
 
 @pytest.mark.parametrize('arguments', [['--first-experiment-config', '/private/config'],
