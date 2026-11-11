@@ -34,13 +34,17 @@ Important capability boundary: the additional read-only control socket bind is
 to the control user's rootless daemon. This exact addition must be included in
 separate deployment/access authorization; no live access was widened here.
 
-Local locked checks completed before checkpoint: binding/release offline 104
-passed; factory/host Linux/PG 58 passed. These suites are disjoint. An earlier
-Offline binding/release also passed under UID 1001; fixtures use the current
-operator UID instead of assuming UID 1000, retaining the actual ownership gate.
-broader PG/control run passed 399 (overlaps factory/host, do not add). Ruff and
-API contract passed. Full clean-source infra/deployment regression and exact
-final CI are recorded with the resulting Draft PR; pending is not SUCCESS.
+Locked Linux checks on production-code commit `16753d0` completed:
+clean LF snapshot under UID 1000, `infra/vps/tests`, `tests/test_deployment.py`,
+`tests/test_deployment_planning.py`, `tests/test_planning_release.py`: 1272 passed.
+Separate factory/host Linux/PG scope: 58 passed (disjoint from offline scope).
+Binding/release subset also passed 104 cases under UID 1001 with the portable
+fixture in `6392083`; it uses the current operator UID and retains custody checks.
+Do not add that subset to the full count. An earlier broader PG/control run
+passed 399 and overlaps factory/host. Ruff, API contract, existing Bandit triage
+and diff checks passed. No production code changed after `16753d0`; later commits
+only fix test-fixture portability and checkpoint wording. Exact final CI is
+recorded with Draft #93; pending is not SUCCESS.
 Invalid operator JSON returns a stable error code without echoing input values;
 two negative tests retain this property. All Docker metadata, provider credentials
 and HTTP in these tests are synthetic.
