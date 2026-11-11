@@ -113,6 +113,9 @@ class TelegramBridge:
             elif token.startswith(('fx:', 'rx:')):
                 from .telegram_experiment_authorize import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('pa:'):
+                from .telegram_planning_authorize import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('cl:'):
                 from .telegram_calendar import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
@@ -247,6 +250,12 @@ class TelegramBridge:
                     or int(parts[1]) >= 2**53):
                 raise Denied('telegram_plan_preparation_reference_invalid')
             return str(uid), {'kind': 'plan_prepare', 'number': parts[1]}
+        if value.split()[:1] == ['/plan_authorize']:
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
+                    or int(parts[1]) >= 2**53):
+                raise Denied('telegram_plan_authorization_reference_invalid')
+            return str(uid), {'kind': 'plan_authorize_request', 'number': parts[1]}
         if value.split()[:1] == ['/draft_plan']:
             from .telegram_manual_plan import parse
             return str(uid), parse(value)
@@ -374,7 +383,17 @@ class TelegramBridge:
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
-        if kind in {'experiment_authorize_request', 'recovery_authorize_request'}:
+        if kind == 'plan_authorize_request':
+            from .telegram_planning_authorize import issue
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state != 'DONE':
+                    issue(self, session, iid)
+        elif kind == 'plan_authorize_confirm':
+            from .telegram_planning_authorize import confirm
+            confirm(self, iid, intent)
+        elif kind in {'experiment_authorize_request', 'recovery_authorize_request'}:
             from .telegram_experiment_authorize import issue
             with self.store.transaction() as session:
                 self.guard()
@@ -672,12 +691,13 @@ class TelegramBridge:
                         return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                     if row.state != 'RECEIVED':
                         raise Denied('telegram_help_not_pending')
-                    self.finish(session, iid, 'Выберите кнопку меню или напишите запрос обычным текстом. '
+                    self.finish(session, iid, 'Выберите кнопку меню или напишите запрос. '
                         'Текст сохраняется и ожидает планирования.\n\n'
                         '/menu — показать меню; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
-                        '/plan номер — посмотреть сохранённый черновик плана; '
+                        '/plan номер — черновик; /plan_prepare номер — задача плана; '
+                        '/plan_authorize номер — условия AI-плана; '
                         '/projects — проекты и назначение; /project project-id — подключение и границы; '
                         '/queue — стадии подготовки, фильтры и страницы запросов; '
                         '/connection project-id — план подключения; /setup project-id — черновик настройки; '

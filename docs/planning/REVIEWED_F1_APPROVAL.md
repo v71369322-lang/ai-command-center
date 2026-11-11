@@ -1,5 +1,9 @@
 # Reviewed planning approval on existing F1
 
+Continuation: [observed Telegram planning cards](../telegram/PLANNING_AUTHORIZATION.md)
+compose this internal boundary with authenticated owner callbacks. The original
+stage below remains the client-free F1/ledger contract.
+
 `PlanningApproval` is an internal, client-free composition of
 [exact review](TRUSTED_PLANNING_REVIEW.md) with `Store.approve`. It does not expose
 an API or Telegram command, read credentials, construct an HTTP client, dispatch

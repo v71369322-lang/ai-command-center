@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, Telegram planning consent**: зависимая
+ветка `feat/telegram-planning-consent` поверх Draft #88 добавляет
+[`/plan_authorize номер`](telegram/PLANNING_AUTHORIZATION.md): полная карточка
+request/model/максимального резерва/expiry, подтверждённая SENT-доставка и owner
+callback, атомарное расходование карточки вместе с прежним F1 approval.
+Core locked Linux/PG scope: 251 passed; отдельно menu/help: 29 passed.
+API contract и Ruff прошли.
+Профиль evidence читается только из явно закреплённого private file; default
+disabled. Production broker остаётся закрытым для planning, provider/ключи/
+deployment не подключались. [Checkpoint](handoff/TELEGRAM_PLANNING_CONSENT_2026-11-11.md).
+
 Local continuation **11 ноября 2026, reviewed F1 approval**: owner screenshots
 подтвердили `/resume` и live `/plan_prepare 131179169`: проект AI Commander,
 задача `f3ac4e07-c72e-4f47-9149-bfdb21e3207e`, версия 1, WAITING_APPROVAL.
