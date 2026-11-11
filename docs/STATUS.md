@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, trusted live planning adapter**: зависимая
+ветка `feat/trusted-live-planning-gateway` поверх #89 добавляет
+[внутренний Responses gateway](planning/TRUSTED_LIVE_GATEWAY.md): runtime/key
+identity закреплены до consent; перед I/O повторно проверяются observed Telegram
+card, F1 authority, финансовый ledger и funding. Неизвестный исход не повторяется;
+ответ сохраняется только как advisory draft. Parent #89 CI SUCCESS.
+Final locked Linux/PG scope: 335 passed; Ruff/API contract/diff checks passed.
+Production broker остаётся закрытым; profile/key/VPS/deployment/paid calls
+не включались. [Checkpoint](handoff/TRUSTED_LIVE_PLANNING_2026-11-11.md).
+
 Local continuation **11 ноября 2026, Telegram planning consent**: зависимая
 ветка `feat/telegram-planning-consent` поверх Draft #88 добавляет
 [`/plan_authorize номер`](telegram/PLANNING_AUTHORIZATION.md): полная карточка

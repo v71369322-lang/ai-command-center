@@ -51,6 +51,8 @@ class MockCredentials:
 
 
 class PlanningGateway(Gateway):
+    operation_scope = SCOPE
+
     def __init__(self, store, config=None, *, transport=None):
         config = config or PlanningConfig()
         if not isinstance(config, PlanningConfig) or not config.connected() or not isinstance(transport, httpx.MockTransport):
@@ -139,7 +141,7 @@ class PlanningGateway(Gateway):
         return tariff.maximum()
 
     def perform(self, task_id, fence):
-        """A closed mock operation, invoked explicitly in tests; never by the production broker."""
+        """Explicit planning operation; production dispatch requires a separate trusted host integration."""
         with self.store.transaction() as session:
             task, _ = self.authority(session, task_id, fence)
             snapshot = check_context(self.store, session, task.payload)
@@ -147,7 +149,7 @@ class PlanningGateway(Gateway):
         body = request_document(snapshot, tariff.model, context_tokens=tariff.context_tokens,
                                 max_output_tokens=tariff.max_output_tokens)
         data = self.request(task_id, fence, KEY, 'openai', 'POST', '/v1/responses', body)
-        artifact = canonical({'operation': SCOPE, 'mode': 'http_mock', 'request_id': snapshot.request_id,
+        artifact = canonical({'operation': self.operation_scope, 'mode': self.config.mode, 'request_id': snapshot.request_id,
                               'context_digest': snapshot.binding, 'business_execution': False})
         checksum = hashlib.sha256(artifact.encode()).hexdigest()
         receipt = None
@@ -161,9 +163,10 @@ class PlanningGateway(Gateway):
                 raise Denied('planning_response_not_anchored')
             receipt = _save_locked(self.store, session, snapshot, data, tariff.model,
                 context_tokens=tariff.context_tokens, max_output_tokens=tariff.max_output_tokens)
-            task.coding_evidence = {'planning_result': receipt, 'mode': 'http_mock'}
+            task.coding_evidence = {'planning_result': receipt, 'mode': self.config.mode}
             self.store.audit(session, 'planning_proposal_bound', 'gateway', task_id,
                              action_id=action.id, proposal_id=receipt['proposal_id'], artifact_hash=checksum)
+            self.authority(session, task_id, fence)  # Slow result writes must not carry stale consent forward.
         self.store.finish(task_id, fence, artifact, checksum, actual_cost=1, _scope_installer=compose)
         return receipt
 
@@ -175,8 +178,8 @@ class PlanningGateway(Gateway):
                 raise Denied('planning_task_scope_invalid')
             rows = session.scalars(select(ExternalAction).where(ExternalAction.task_id == task_id)).all()
             self.check_ledger(session, rows)
-            return {'mode': 'http_mock', 'live_supported': False, 'task_state': task.state,
+            return {'mode': self.config.mode, 'live_supported': self.config.mode == 'live', 'task_state': task.state,
                     'calls': len(rows), 'actual_nano_rub': sum(row.actual for row in rows),
                     'uncertain_nano_rub': sum(row.reserved for row in rows),
                     'result_uncertain': any(row.state in UNRESOLVED_ACTION_STATES for row in rows),
-                    'financial_values_are_mock': True}
+                    'financial_values_are_mock': self.config.mode == 'http_mock'}

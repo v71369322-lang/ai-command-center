@@ -28,12 +28,24 @@ class Gateway:
         if self.config.mode != 'http_mock' and transport is not None:
             raise Denied('transport_override_forbidden')
         self.client = httpx.Client(transport=transport, follow_redirects=False, timeout=8,
-                                   trust_env=self.config.mode != 'http_mock')
+                                   trust_env=getattr(self.config, 'trust_env', self.config.mode != 'http_mock'))
         self.credentials = credentials or FileCredentials(self.config)
         self.runtime_guard = None
 
     def close(self):
         self.client.close()
+
+    def default_pricing_required(self):
+        return bool(self.config.first_experiment and self.config.mode == 'live')
+
+    def before_external_io(self, task_id, fence):
+        """Purpose-specific final admission after durable INTENT, before any I/O."""
+
+    def decode_external_json(self, raw):
+        return json.loads(raw)
+
+    def validate_external_data(self, data, token):
+        """Purpose-specific screen before any decoded provider data enters the ledger."""
 
     @staticmethod
     def action_digest(row):
@@ -287,7 +299,7 @@ class Gateway:
             if kind == 'openai':
                 amount = self.admit_provider_request(task, doc, body, count)
                 admitted_tariff = self.config.tariff.model_copy(deep=True)
-                require_default_tier = bool(self.config.first_experiment and self.config.mode == 'live')
+                require_default_tier = self.default_pricing_required()
                 self._reserve(s, task_id, doc, amount)
             action = ExternalAction(id=str(uuid4()), task_id=task_id, key=opkey, kind=kind,
                                     request_hash=fingerprint, state='INTENT', reserved=amount,
@@ -301,6 +313,7 @@ class Gateway:
         # No DB transaction is held during I/O. Intent/reservation is already durable.
         request_id = ''
         try:
+            self.before_external_io(task_id, fence)
             headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/json'}
             if kind == 'github_git':
                 headers = {'Authorization': 'Basic ' + base64.b64encode(('x-access-token:' + token).encode()).decode(),
@@ -326,7 +339,8 @@ class Gateway:
                     from .git_capability import advertisement
                     data = advertisement(raw, response.headers.get('content-type', ''), self.config.synthetic_repository)
                 else:
-                    data = json.loads(raw)
+                    data = self.decode_external_json(raw)
+            self.validate_external_data(data, token)
             with self.store.transaction() as s:
                 self.store.check_audit(s)
                 operation = s.get(ExternalAction, action_id)

@@ -1,5 +1,10 @@
 # Exact owner confirmation for one advisory AI plan
 
+Continuation: the [trusted live adapter](../planning/TRUSTED_LIVE_GATEWAY.md)
+adds optional pre-consent runtime/key identity and rechecks the same consumed
+card/delivery proof at provider admission. Staged unbound cards do not become
+live permissions when such a binding is installed later.
+
 Continuation of [reviewed F1 approval](../planning/REVIEWED_F1_APPROVAL.md).
 `/plan_authorize NUMBER` requests a card for an existing `/plan_prepare NUMBER`
 task in this Telegram profile. Requesting or delivering the card grants nothing.

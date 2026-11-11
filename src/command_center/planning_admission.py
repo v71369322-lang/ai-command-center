@@ -27,6 +27,13 @@ class OperatorEvidence(Strict):
         return self
 
 
+class PlanningRuntimeBinding(Strict):
+    source_revision: str = Field(pattern=r'^[a-f0-9]{40}$')
+    binding_digest: str = Field(pattern=HEX)
+    credential_sha256: str = Field(pattern=HEX)
+    credential_ref: Literal['planning-openai'] = 'planning-openai'
+
+
 class PlanningProfile(Strict):
     schema_version: Literal[1] = 1
     purpose: Literal['saved-request-live-planning.v1'] = 'saved-request-live-planning.v1'
@@ -36,6 +43,7 @@ class PlanningProfile(Strict):
     available_nano_rub: int = Field(gt=0, le=100 * NANO_RUB)
     daily_nano_rub: int = Field(gt=0, le=100 * NANO_RUB)
     monthly_nano_rub: int = Field(gt=0, le=100 * NANO_RUB)
+    runtime: PlanningRuntimeBinding | None = None
 
     @model_validator(mode='after')
     def bounded(self):
@@ -71,6 +79,7 @@ def _quote(profile, snapshot, task_id, task_version, issued_at, expires_at):
         if str(UUID(task_id, version=4)) != task_id:
             raise ValueError()
         if (snapshot.halted or snapshot.recovery or snapshot.project_id != profile.project_id
+                or profile.runtime is not None and profile.runtime.source_revision != snapshot.source_revision
                 or type(issued_at) is not int or type(expires_at) is not int
                 or not profile.evidence.observed_at <= issued_at < expires_at <= profile.evidence.expires_at
                 or not 0 < expires_at - issued_at <= 120):
