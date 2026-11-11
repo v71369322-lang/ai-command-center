@@ -29,32 +29,41 @@ class Request(BaseModel):
 
 
 class RuntimeBroker:
-    def __init__(self, store, ledger, backend, limits=None, gateway_factory=None):
+    def __init__(self, store, ledger, backend, limits=None, gateway_factory=None, planning_host=None):
         self.store, self.ledger, self.backend = store, ledger, backend
         self.limits = limits or RuntimeLimits()
         self.lock = Lock()
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.last_future = None
         self.gateway_factory = gateway_factory
+        self.planning_host = planning_host
 
     def submit(self, task_id, revision):
         with self.lock:
             self.ledger.verify()
             if revision != self.store.settings.source_revision:
                 raise Denied('broker_revision_mismatch')
-            if self.store.get(task_id)['payload']['kind'] == 'saved_request_plan':
+            planning = self.store.get(task_id)['payload']['kind'] == 'saved_request_plan'
+            if planning and self.planning_host is None:
                 raise Denied('planning_runtime_not_connected')
             if not self.ledger.watchdog_ready(self.limits.watchdog_seconds):
                 raise Denied('watchdog_unavailable')
             if self.ledger.runs():
                 raise Denied('runtime_busy_or_uncertain')
             self.backend.preflight()
+            if planning:
+                self.planning_host.preflight(self.store, self.ledger, self.backend)
+                if not self.ledger.worker_fresh(revision, self.limits.heartbeat_seconds):
+                    raise Denied('planning_worker_unavailable')
             task = self.store.claim(task_id)
             if not task:
                 return {'phase': 'NOT_ADMITTED', 'fence': 0}
             task['revision'] = revision
             try:
-                self.ledger.register(task, Runner.name(task), self.limits.wall_seconds)
+                if planning:
+                    self.ledger.register(task, Runner.name(task), self.limits.wall_seconds, kind='planning_http')
+                else:
+                    self.ledger.register(task, Runner.name(task), self.limits.wall_seconds)
             except Exception:
                 self.store.abort(task_id, task['fence'], 'verified_no_effect', True)
                 raise
@@ -62,6 +71,14 @@ class RuntimeBroker:
             return {'phase': 'INTENT', 'fence': task['fence']}
 
     def execute(self, task):
+        if task['payload']['kind'] == 'saved_request_plan':
+            from .planning_host_runner import PlanningHostRunner
+            try:
+                PlanningHostRunner(self.store, self.ledger, self.backend, self.limits, self.planning_host).execute(task)
+            except Exception:
+                self.ledger.phase(task['id'], task['fence'], 'UNCERTAIN')
+                self.ledger.record('planning_runner_failed', task_id=task['id'], fence=task['fence'])
+            return
         if task['payload']['kind'] == 'coding_synthetic':
             if task['payload']['coding']['provider'] == 'openai':
                 from .coding.http_runner import HttpCodingRunner

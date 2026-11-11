@@ -24,6 +24,21 @@ class Watchdog:
     def emergency(self, row, reason):
         self.ledger.record('watchdog_emergency', task_id=row['id'], fence=row['fence'], reason=reason)
         self.ledger.stop_attempt(row['id'], row['fence'])
+        if row.get('kind') == 'planning_http':
+            # Docker absence proves nothing about a broker-owned HTTP operation.
+            self.ledger.phase(row['id'], row['fence'], 'STOPPING')
+            current = self.ledger.get(row['id'], row['fence'])
+            confirmed = bool(current['returned'])
+            self.ledger.phase(row['id'], row['fence'], 'STOPPED' if confirmed else 'UNCERTAIN')
+            self.ledger.record('watchdog_planning_stop_result', task_id=row['id'], fence=row['fence'], confirmed=confirmed)
+            self.store.abort(row['id'], row['fence'], 'watchdog_' + reason, confirmed, usage_unknown=True)
+            with self.store.transaction() as session:
+                session.get(Control, 1).halted = True
+                self.store.check_audit(session)
+                self.store.audit(session, 'watchdog_stop', 'watchdog', row['id'], confirmed=confirmed, reason=reason)
+            if confirmed:
+                self.ledger.phase(row['id'], row['fence'], 'DONE')
+            return
         if row['phase'] == 'INTENT':
             # An absent container with an in-flight create is NOT proof of no effect.
             self.ledger.phase(row['id'], row['fence'], 'UNCERTAIN')
@@ -101,6 +116,17 @@ class Watchdog:
     def reconcile_confirmed(self, task_id, fence):
         """Trusted operator only; does NOT resume or grant another attempt."""
         row = self.ledger.get(task_id, fence)
+        if row.get('kind') == 'planning_http':
+            self.ledger.verify()
+            if not row['returned'] or row['phase'] not in {'UNCERTAIN', 'STOPPED'}:
+                raise Denied('planning_return_evidence_required')
+            self.store.abort(task_id, fence, 'planning_operation_closed', True, usage_unknown=True)
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                session.get(Control, 1).halted = True
+                self.store.audit(session, 'runtime_operator_reconciled', 'operator', task_id, fence=fence)
+            self.ledger.phase(task_id, fence, 'DONE')
+            return
         if not row['observed'] or row['phase'] not in {'UNCERTAIN', 'STOPPED'}:
             raise Denied('manual_investigation_required')
         with self.ledger.launch_lock(blocking=False):
