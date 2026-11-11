@@ -276,3 +276,17 @@ def test_backup_preflight_remains_independent_of_planning_expiry(planning_releas
     with pytest.raises(ValueError, match='planning_operator_evidence_expired'):
         operator.preflight()
     operator.preflight(planning_check=False)
+
+
+@pytest.mark.parametrize('name', ['profile', 'host'])
+def test_invalid_operator_documents_do_not_echo_input(planning_release, name):
+    m, _, _, _ = planning_release
+    directory = Path(m['planning']['profile_directory'])
+    path = directory / (name + '.json')
+    data = json.loads(path.read_bytes())
+    marker = 'PUBLIC_MARKER_MUST_NOT_APPEAR_IN_ERROR'
+    data['credential'] = marker
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match='planning_private_documents_invalid') as error:
+        binding.prepare_binding(m, directory, m['planning']['key_directory'])
+    assert marker not in str(error.value)

@@ -34,12 +34,14 @@ Important capability boundary: the additional read-only control socket bind is
 to the control user's rootless daemon. This exact addition must be included in
 separate deployment/access authorization; no live access was widened here.
 
-Local locked checks completed before checkpoint: binding/release offline 102
+Local locked checks completed before checkpoint: binding/release offline 104
 passed; factory/host Linux/PG 58 passed. These suites are disjoint. An earlier
 broader PG/control run passed 399 (overlaps factory/host, do not add). Ruff and
 API contract passed. Full clean-source infra/deployment regression and exact
 final CI are recorded with the resulting Draft PR; pending is not SUCCESS.
-All Docker metadata, provider credentials and HTTP in these tests are synthetic.
+Invalid operator JSON returns a stable error code without echoing input values;
+two negative tests retain this property. All Docker metadata, provider credentials
+and HTTP in these tests are synthetic.
 No rootless/systemd/VPS acceptance or real provider call is claimed.
 
 Operator workflow and security properties:

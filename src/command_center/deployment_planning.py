@@ -11,7 +11,7 @@ from .deployment_profile import absolute
 from .planning_admission import PlanningProfile
 from .planning_host import HostDeclaration
 from .request_planning import _unique
-from .store import digest
+from .store import Denied, digest
 from .telegram_transport import private_read
 
 PROFILE = '/run/planning/profile.json'
@@ -46,10 +46,16 @@ def documents(m):
     b, uid = m['planning'], m['control_uid']
     private_directory(b['profile_directory'], uid, {'profile.json', 'host.json'})
     private_directory(b['key_directory'], uid, {'openai.key'})
-    raw = private_read(Path(b['profile_directory']) / 'profile.json', 16384)
-    host_raw = private_read(Path(b['profile_directory']) / 'host.json', 16384)
-    profile = PlanningProfile.model_validate(json.loads(raw, object_pairs_hook=_unique))
-    host = HostDeclaration.model_validate(json.loads(host_raw, object_pairs_hook=_unique))
+    try:
+        raw = private_read(Path(b['profile_directory']) / 'profile.json', 16384)
+        host_raw = private_read(Path(b['profile_directory']) / 'host.json', 16384)
+        if max(len(raw), len(host_raw)) > 16384:
+            raise ValueError()
+        profile = PlanningProfile.model_validate(json.loads(raw, object_pairs_hook=_unique))
+        host = HostDeclaration.model_validate(json.loads(host_raw, object_pairs_hook=_unique))
+    except (OSError, ValueError, Denied, RecursionError):
+        # Pydantic validation errors can contain operator input. Never echo it.
+        raise ValueError('planning_private_documents_invalid') from None
     if (profile.runtime is None or profile.runtime.source_revision != m['revision']
             or profile.runtime.binding_digest != digest(host.model_dump())
             or host.source_revision != m['revision'] or host.image_id != m['images']['broker']

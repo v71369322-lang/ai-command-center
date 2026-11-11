@@ -8,7 +8,7 @@ profile только Telegram/broker, key и planning egress только broker
 использует отдельный control daemon, execution backend сохранён. Дополнительный
 control socket — административная capability, требует отдельного exact разрешения
 при реальном deployment; live доступ здесь не расширялся.
-Offline binding/release: 102 passed; factory/host PG: 58 passed (disjoint).
+Offline binding/release: 104 passed; factory/host PG: 58 passed (disjoint).
 Ruff/API contract passed; полный regression и final CI сверять по Draft PR/HEAD.
 Provider key bytes, VPS, deployment, paid calls не затрагивались.
 [Checkpoint](handoff/PLANNING_BINDING_2026-11-11.md).
