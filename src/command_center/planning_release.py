@@ -14,8 +14,8 @@ from .telegram_transport import private_read
 FILES = {'previous.json', 'candidate.json', 'plan.json'}
 FIXED = ('migration_hash', 'database_image', 'redis_image', 'control_uid',
          'execution_uid', 'data_root', 'owner_login')
-BLOCKERS = ['planning_deployment_binding_not_implemented',
-            'broker_factory_planning_host_not_connected',
+BLOCKERS = ['exact_built_source_and_images_required',
+            'live_rootless_host_acceptance_required',
             'fresh_operator_tariff_funding_and_data_sharing_evidence_required',
             'private_profile_host_and_credential_identity_required',
             'exact_deployment_authorization_required']
@@ -54,6 +54,8 @@ def plan(previous, candidate, predecessor_pin, candidate_pin):
             'paid_calls_authorized': False, 'previous_bundle': predecessor_pin,
             'candidate_bundle': candidate_pin, 'previous_revision': old['revision'],
             'target_revision': new['revision'], 'images': new['images'],
+            'planning_pins': ({k: v for k, v in new['planning'].items() if k.endswith(('_sha256', '_digest'))}
+                              if 'planning' in new else None),
             'migration_hash': new['migration_hash'], 'blockers': BLOCKERS.copy(),
             'preconditions': PRECHECK.copy(), 'postconditions': POSTCHECK.copy(),
             'activation_mechanism': 'existing_prepare_inspect_exact_approval_update_postcheck',

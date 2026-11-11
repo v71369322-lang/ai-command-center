@@ -2,14 +2,15 @@
 
 The internal RuntimeBroker can now receive an explicitly supplied PlanningHost.
 Without it the existing planning_runtime_not_connected gate remains unchanged,
-before claim or runtime access. create_broker_app does not load or install a
-planning host automatically. The RPC schema has no host, key, endpoint or
+before claim or runtime access. The production factory now loads a host only
+through the exact protected [deployment binding](DEPLOYMENT_BINDING.md); default
+remains disabled. The RPC schema has no host, key, endpoint or
 Docker-policy override.
 
 ## Rootless attestation
 
 A private raw-byte-pinned HostDeclaration binds source revision, fixed broker
-name, exact image ID, permitted local Unix endpoint, runtime ledger path and a
+name, exact image ID, execution and separate control-attestation Unix endpoints, runtime ledger path and a
 policy metadata digest. Its semantic digest must already be in the operator
 planning profile before the owner review. Container name/image/policy can be
 prepared before deployment; the actual container ID is measured and recorded
@@ -91,7 +92,8 @@ running broker's bounded UDS/read-only/cap-drop policy, fresh watchdog/worker
 and zero unresolved runtime runs. The installed source is still f5ff8b2 and its
 deployment journal VERIFIED; this does not accept the new lifecycle source.
 No VPS runtime/daemon/credential change, production planning host, paid call,
-deployment or merge was performed. Next is protected release-package prepare/inspect wiring
+deployment or merge was performed. Release-package prepare/inspect wiring is now
+implemented in the dependent deployment-binding stage; next is
 and independently observed rootless host acceptance under a separate exact owner
 deployment decision. Key presence or an enabled flag alone cannot activate a
 staged grant.

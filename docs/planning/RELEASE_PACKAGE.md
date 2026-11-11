@@ -49,12 +49,11 @@ passed them. The plan cannot be promoted by editing `activation_authorized`.
 
 Actual activation remains blocked on these concrete prerequisites:
 
-1. Implement and review a least-privilege planning deployment binding. Current
-   deployment validation rejects every `F1_PLANNING_*` environment injection.
-   Telegram may receive the private profile; only broker may receive provider
-   credentials and dedicated egress. Other services receive neither.
-2. Connect the production broker factory to the explicitly pinned host declaration
-   through that reviewed binding. The factory currently remains closed.
+1. Review the implemented [planning deployment binding](DEPLOYMENT_BINDING.md),
+   including its additional control-daemon socket capability. Only exact bound
+   planning environment/mount/network scope is accepted; default stays disabled.
+2. Verify the connected broker factory against independently measured rootless
+   control and execution daemons and actual self-container/image metadata.
 3. Supply fresh operator-reviewed model/tariff, account/funding and data-sharing
    evidence, bounded limits, private profile, host metadata and credential identity.
    Do not substitute test tariffs or invent a balance. Do not put credentials
@@ -74,6 +73,8 @@ On any unknown outcome halt admission, retain reserves and append-only journals,
 inspect current state, and use only existing bounded reconciliation with all
 preconditions. No automatic retry, journal substitution or blind rollback.
 
-The release review package does not remove any of these gates. A live-planning
-activation package cannot truthfully be produced from the current disabled
-factory and absent operator evidence.
+The release review package does not remove any of these gates. The deployment
+binding and factory are implemented, but live acceptance, exact built images,
+fresh operator evidence and separate deployment/access authorization are still
+required before a real activation. Existing packages retain their original
+pinned source/version; do not reinterpret them through a newer verifier.

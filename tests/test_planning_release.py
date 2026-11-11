@@ -134,7 +134,7 @@ def test_transition_pins_and_admission_cannot_be_bypassed(transition, attack):
 def test_existing_deployment_rejects_planning_environment_in_every_service(transition, service):
     _, candidate, _ = transition
     candidate['compose']['services'][service].setdefault('environment', {})['F1_PLANNING_PROFILE_FILE'] = '/profile'
-    with pytest.raises(ValueError, match='planning_deployment_binding_not_implemented'):
+    with pytest.raises(ValueError, match='planning_deployment_environment_invalid'):
         validate_profile(candidate['compose'], candidate['manifest'])
 
 

@@ -1,5 +1,20 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, planning deployment binding**: parent #91 и
+#92 exact CI SUCCESS в обоих workflows. Зависимая ветка
+`feat/planning-deployment-binding` добавляет [защищённый manifest binding и
+production factory composition](planning/DEPLOYMENT_BINDING.md). Default disabled;
+profile только Telegram/broker, key и planning egress только broker. Self-attestation
+использует отдельный control daemon, execution backend сохранён. Дополнительный
+control socket — административная capability, требует отдельного exact разрешения
+при реальном deployment; live доступ здесь не расширялся.
+Full clean LF offline infra/deployment scope: 1272 passed на production-code
+commit 16753d0; factory/host PG: 58 passed (disjoint). Binding/release subset
+104 passed также под UID 1001; не складывать с full scope. Позднее менялись только
+test fixture/checkpoint. Ruff/API contract/Bandit passed; final CI — Draft #93/HEAD.
+Provider key bytes, VPS, deployment, paid calls не затрагивались.
+[Checkpoint](handoff/PLANNING_BINDING_2026-11-11.md).
+
 Local continuation **11 ноября 2026, protected release review**: зависимая ветка
 `feat/planning-release-package` поверх #91 добавляет [private offline package и
 проверяемый план](planning/RELEASE_PACKAGE.md): exact predecessor/candidate pins,

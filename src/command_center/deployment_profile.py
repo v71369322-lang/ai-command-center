@@ -27,7 +27,7 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram', 'first_experiment'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
     if 'telegram' in m:
@@ -62,6 +62,9 @@ def validate_manifest(m):
     if 'first_experiment' in m:
         from .deployment_integrations import validate_binding
         validate_binding(m)
+    if 'planning' in m:
+        from .deployment_planning import validate_binding
+        validate_binding(m)
 
 
 def services(m):
@@ -92,6 +95,10 @@ def telegram_service(m):
         from .deployment_integrations import CONFIG_TARGET, mounts
         service['environment'].update(F2_INTEGRATION_CONFIG_FILE=CONFIG_TARGET,
             F2_INTEGRATION_CONFIG_SHA256=m['first_experiment']['config_sha256'])
+        service['volumes'] += mounts(m, 'telegram')
+    if 'planning' in m:
+        from .deployment_planning import environment, mounts
+        service['environment'].update(environment(m, 'telegram'))
         service['volumes'] += mounts(m, 'telegram')
     return service
 
@@ -181,6 +188,13 @@ def render(base, m):
             profile['services'][name]['environment']['F2_INTEGRATION_CONFIG_SHA256'] = m['first_experiment']['config_sha256']
             profile['services'][name]['volumes'] += mounts(m, name)
         profile['services']['runtime-broker']['networks']['gateway-access'] = None
+    if 'planning' in m:
+        from .deployment_planning import environment, mounts
+        profile['networks']['planning-access'] = {'internal': False}
+        service = profile['services']['runtime-broker']
+        service['environment'].update(environment(m, 'runtime-broker'))
+        service['volumes'] += mounts(m, 'runtime-broker')
+        service['networks'] = {'control': {'priority': 100}, 'planning-access': {'priority': 0}}
     validate_profile(profile, m)
     return profile
 
@@ -197,11 +211,16 @@ def validate_profile(p, m):
         from .deployment_integrations import CONFIG_TARGET, mounts, validate_binding
         validate_binding(m)
         expected_networks['gateway-access'] = {'internal': False}
+    from .deployment_planning import environment as planning_environment, mounts as planning_mounts
+    if 'planning' in m:
+        from .deployment_planning import validate_binding
+        validate_binding(m)
+        expected_networks['planning-access'] = {'internal': False}
     if p['networks'] != expected_networks:
         raise ValueError('deployment_network_scope_changed')
     for name, s in p['services'].items():
-        if any(k.startswith('F1_PLANNING_') for k in s.get('environment', {})):
-            raise ValueError('planning_deployment_binding_not_implemented')
+        if {k: v for k, v in s.get('environment', {}).items() if k.startswith('F1_PLANNING_')} != planning_environment(m, name):
+            raise ValueError('planning_deployment_environment_invalid')
         if name == 'telegram':
             if s != telegram_service(m) or p['networks'].get('telegram-access') != {'internal': False}:
                 raise ValueError('telegram_service_boundary_changed')
@@ -213,6 +232,10 @@ def validate_profile(p, m):
         expected_service_networks = {'control', 'access'} if name == 'api' else {'control'}
         if name == 'runtime-broker' and 'first_experiment' in m:
             expected_service_networks.add('gateway-access')
+        if name == 'runtime-broker' and 'planning' in m:
+            expected_service_networks.add('planning-access')
+            if s['networks'] != {'control': {'priority': 100}, 'planning-access': {'priority': 0}}:
+                raise ValueError('planning_broker_network_policy_changed')
         if s['image'] != expected_image or set(s['networks']) != expected_service_networks:
             raise ValueError('service_image_or_network_changed')
         allowed_secrets = {'db': {'db_admin_password'}, 'redis': {'redis_password'},
@@ -251,6 +274,7 @@ def validate_profile(p, m):
             allowed['api'] = {(str(root / 'secrets/owner_password'), OWNER_VERIFIER_PATH, True)}
         if 'first_experiment' in m:
             allowed[name].update((v['source'], v['target'], v['read_only']) for v in mounts(m, name))
+        allowed[name].update((v['source'], v['target'], v['read_only']) for v in planning_mounts(m, name))
         if actual != allowed[name]:
             raise ValueError('unapproved_mount')
         env = s.get('environment', {})
