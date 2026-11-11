@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, protected release review**: зависимая ветка
+`feat/planning-release-package` поверх #91 добавляет [private offline package и
+проверяемый план](planning/RELEASE_PACKAGE.md): exact predecessor/candidate pins,
+completion seal, read-only verifier, явные pre/postconditions и blockers.
+Состояние только BLOCKED_NOT_ACTIVATABLE; deployment и paid authority не выдаются.
+Deployment validator отвергает незарегистрированные F1_PLANNING_* injections.
+Locked package scope: 29 passed. Parent security repair db4337b: 24 passed,
+Ruff/Bandit passed; итоговый CI проверять по exact HEAD.
+Нет реального activatable candidate: deployment binding/factory wiring и fresh
+operator evidence ещё отсутствуют. [Checkpoint](handoff/PLANNING_RELEASE_2026-11-11.md).
+
 Local continuation **11 ноября 2026, planning host lifecycle**: зависимая ветка
 `feat/planning-host-lifecycle` поверх #90 добавляет [rootless host gate и lifecycle](planning/HOST_LIFECYCLE.md)
 в существующий broker, отдельный `planning_http` тип в прежнем ledger и return-proof

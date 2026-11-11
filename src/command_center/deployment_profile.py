@@ -200,6 +200,8 @@ def validate_profile(p, m):
     if p['networks'] != expected_networks:
         raise ValueError('deployment_network_scope_changed')
     for name, s in p['services'].items():
+        if any(k.startswith('F1_PLANNING_') for k in s.get('environment', {})):
+            raise ValueError('planning_deployment_binding_not_implemented')
         if name == 'telegram':
             if s != telegram_service(m) or p['networks'].get('telegram-access') != {'internal': False}:
                 raise ValueError('telegram_service_boundary_changed')
