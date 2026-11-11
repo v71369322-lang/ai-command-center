@@ -1,5 +1,13 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026**: [проверка VPS и checkpoint](handoff/LOCAL_RECONCILIATION_2026-11-11.md).
+Target PR #85 уже работал; exact preflight/postcheck прошли. Штатные reconcile
+закрыли deployment и activation в VERIFIED без apply/restart/binding changes.
+Normal stop сохранён; live /plan_prepare acceptance ждёт owner /resume и нового
+тестового запроса. Локально добавлен [offline контракт evidence и exact review](planning/TRUSTED_PLANNING_REVIEW.md)
+для будущего trusted planning gateway: 45 unit tests passed, без provider I/O,
+grant, расхода или production dispatch. Полный live gateway ещё не реализован.
+
 Cloud continuation **3 ноября 2026, Telegram planning admission**: ветка
 `feat/telegram-ai-planning-admission` добавляет `/plan_prepare номер`. Команда
 создаёт только идемпотентную F1 planning-задачу `WAITING_APPROVAL`, закреплённую
