@@ -1,5 +1,9 @@
 # Trusted live Responses planning adapter
 
+Continuation: [explicit rootless planning host lifecycle](HOST_LIFECYCLE.md)
+composes this adapter with the existing broker, heartbeat, runtime ledger and
+watchdog while preserving the default-closed production factory.
+
 `LivePlanningGateway` is an explicit internal adapter on the existing F1 and
 external-action ledger. It has no production factory, broker route or automatic
 activation. Default operator profile remains absent/disabled. This change does

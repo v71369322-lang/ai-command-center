@@ -47,6 +47,18 @@ def test_read_only_runtime_uses_existing_verifier_without_constructor_or_mutatio
     assert files(path.parent) == before
 
 
+def test_legacy_ledger_read_only_verification_never_migrates(ledger, monkeypatch):
+    path, _ = ledger
+    with sqlite3.connect(path) as db:
+        db.execute('ALTER TABLE runs DROP COLUMN kind')
+        db.execute('ALTER TABLE runs DROP COLUMN returned')
+    before = files(path.parent)
+    monkeypatch.setattr(RuntimeLedger, '__init__', lambda *a, **kw: pytest.fail('no read-only migration'))
+    result = probe.runtime_snapshot(path, 1)
+    assert result['audit_chain_verified'] and result['parent_run_done']
+    assert files(path.parent) == before
+
+
 @pytest.mark.parametrize('change', ['uncertain', 'other_run', 'wrong_revision', 'wrong_name', 'stale_watchdog', 'stale_worker'])
 def test_runtime_problems_remain_visible_and_are_never_reconciled(ledger, change):
     path, view = ledger

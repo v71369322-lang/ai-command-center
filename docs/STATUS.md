@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, planning host lifecycle**: зависимая ветка
+`feat/planning-host-lifecycle` поверх #90 добавляет [rootless host gate и lifecycle](planning/HOST_LIFECYCLE.md)
+в существующий broker, отдельный `planning_http` тип в прежнем ledger и return-proof
+для watchdog. Отсутствие контейнера не считается остановкой HTTP. Read-only
+инспектор старого ledger не запускает миграцию. Parent #90 CI SUCCESS.
+Final local PG/control scope: 383 passed; read-only infra: 23 passed;
+Ruff/API contract/diff checks passed. Полный infra повторяется на clean Linux source.
+Default production factory остаётся закрытой; VPS, реальные ключи, deployment
+и paid calls не включались. [Checkpoint](handoff/PLANNING_HOST_2026-11-11.md).
+
 Local continuation **11 ноября 2026, trusted live planning adapter**: зависимая
 ветка `feat/trusted-live-planning-gateway` поверх #89 добавляет
 [внутренний Responses gateway](planning/TRUSTED_LIVE_GATEWAY.md): runtime/key

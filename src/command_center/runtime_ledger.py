@@ -29,6 +29,11 @@ class RuntimeLedger:
             db.execute('CREATE TABLE IF NOT EXISTS evidence(seq INTEGER PRIMARY KEY, event TEXT, previous TEXT, digest TEXT)')
             if 'observed' not in {r[1] for r in db.execute('PRAGMA table_info(runs)')}:
                 db.execute('ALTER TABLE runs ADD COLUMN observed INTEGER NOT NULL DEFAULT 0')
+            columns = {r[1] for r in db.execute('PRAGMA table_info(runs)')}
+            if 'kind' not in columns:
+                db.execute("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'container'")
+            if 'returned' not in columns:
+                db.execute('ALTER TABLE runs ADD COLUMN returned INTEGER NOT NULL DEFAULT 0')
 
     @contextmanager
     def launch_lock(self, blocking=True):
@@ -68,16 +73,28 @@ class RuntimeLedger:
             row = db.execute('SELECT * FROM monitor WHERE id=1').fetchone()
             return bool(row and row['healthy'] and 0 <= time.time() - row['heartbeat'] <= ttl)
 
-    def register(self, task, name, seconds):
+    def register(self, task, name, seconds, *, kind='container'):
+        if kind not in {'container', 'planning_http'}:
+            raise ValueError('unknown_runtime_kind')
         with self.tx() as db:
             if db.execute("SELECT 1 FROM runs WHERE phase != 'DONE'").fetchone():
                 raise ValueError('runtime_admission_blocked')
             if db.execute('SELECT 1 FROM runs WHERE id=? AND fence>=?', (task['id'], task['fence'])).fetchone():
                 raise ValueError('runtime_replay')
-            db.execute('INSERT OR REPLACE INTO runs(id,fence,name,phase,deadline,heartbeat,revision,stops,observed) VALUES(?,?,?,?,?,?,?,0,0)',
+            db.execute('INSERT OR REPLACE INTO runs(id,fence,name,phase,deadline,heartbeat,revision,stops,observed,kind,returned) VALUES(?,?,?,?,?,?,?,0,0,?,0)',
                        (task['id'], task['fence'], name, 'INTENT', time.time() + seconds,
-                        time.time(), task['revision']))
-            self.event(db, 'launch_registered', task_id=task['id'], fence=task['fence'], revision=task['revision'])
+                        time.time(), task['revision'], kind))
+            self.event(db, 'launch_registered', task_id=task['id'], fence=task['fence'], revision=task['revision'], operation_kind=kind)
+
+    def planning_returned(self, task_id, fence):
+        """Only trusted runner calls this after its HTTP client and pulse thread have closed."""
+        with self.tx() as db:
+            row = db.execute('SELECT kind,returned FROM runs WHERE id=? AND fence=?', (task_id, fence)).fetchone()
+            if not row or row['kind'] != 'planning_http':
+                raise ValueError('planning_runtime_required')
+            if not row['returned']:
+                db.execute('UPDATE runs SET returned=1 WHERE id=? AND fence=?', (task_id, fence))
+                self.event(db, 'planning_operation_returned', task_id=task_id, fence=fence)
 
     def runs(self):
         with self.tx() as db:
@@ -131,9 +148,25 @@ class RuntimeLedger:
 
     def verify(self):
         parent = '0' * 64
+        kinds, returned = {}, set()
         with self.tx() as db:
             for row in db.execute('SELECT * FROM evidence ORDER BY seq'):
                 if row['previous'] != parent or row['digest'] != hashlib.sha256((parent + row['event']).encode()).hexdigest():
                     raise ValueError('runtime_evidence_corrupt')
                 parent = row['digest']
+                event = json.loads(row['event'])
+                key = (event.get('task_id'), event.get('fence'))
+                if event['kind'] == 'launch_registered':
+                    kinds[key] = event.get('operation_kind', 'container')
+                elif event['kind'] == 'planning_operation_returned':
+                    returned.add(key)
+            columns = {r[1] for r in db.execute('PRAGMA table_info(runs)')}
+            if ('kind' in columns) != ('returned' in columns):
+                raise ValueError('runtime_operation_schema_incomplete')
+            projection = 'kind,returned' if 'kind' in columns else "'container' AS kind,0 AS returned"
+            for row in db.execute('SELECT id,fence,' + projection + ' FROM runs'):
+                key = (row['id'], row['fence'])
+                if (row['kind'] != kinds.get(key) or row['returned'] != int(key in returned)
+                        or row['kind'] not in {'container', 'planning_http'}):
+                    raise ValueError('runtime_operation_evidence_corrupt')
         return parent

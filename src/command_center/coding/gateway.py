@@ -47,6 +47,9 @@ class Gateway:
     def validate_external_data(self, data, token):
         """Purpose-specific screen before any decoded provider data enters the ledger."""
 
+    def during_external_io(self):
+        """Purpose-specific bounded read guard; never issues another request."""
+
     @staticmethod
     def action_digest(row):
         return digest({'id': row.id, 'task': row.task_id, 'key': row.key, 'kind': row.kind,
@@ -327,9 +330,11 @@ class Gateway:
                     raise Uncertain('invalid_request_identifier')
                 raw = bytearray()
                 for chunk in response.iter_bytes():
+                    self.during_external_io()
                     raw.extend(chunk)
                     if len(raw) > 65536:
                         raise Uncertain('external_output_limit')
+                self.during_external_io()
                 if token.encode() in raw:
                     raise Uncertain('credential_echo_blocked')
                 allowed_status = {200} if kind == 'github_git' else {200, 201}

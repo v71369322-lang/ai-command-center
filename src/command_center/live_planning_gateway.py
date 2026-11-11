@@ -166,6 +166,9 @@ class LivePlanningGateway(PlanningGateway):
     def default_pricing_required(self):
         return True
 
+    def during_external_io(self):
+        self._guard()
+
     def decode_external_json(self, raw):
         check_content(self.store, raw.decode('utf-8'))
         return json.loads(raw, object_pairs_hook=_unique)
