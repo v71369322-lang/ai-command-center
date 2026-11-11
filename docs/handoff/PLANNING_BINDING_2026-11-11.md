@@ -36,6 +36,8 @@ separate deployment/access authorization; no live access was widened here.
 
 Local locked checks completed before checkpoint: binding/release offline 104
 passed; factory/host Linux/PG 58 passed. These suites are disjoint. An earlier
+Offline binding/release also passed under UID 1001; fixtures use the current
+operator UID instead of assuming UID 1000, retaining the actual ownership gate.
 broader PG/control run passed 399 (overlaps factory/host, do not add). Ruff and
 API contract passed. Full clean-source infra/deployment regression and exact
 final CI are recorded with the resulting Draft PR; pending is not SUCCESS.

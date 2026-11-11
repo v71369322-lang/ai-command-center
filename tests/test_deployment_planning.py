@@ -23,6 +23,7 @@ from test_planning_admission import profile as profile
 def planning_release(release, profile, tmp_path):
     original, _ = release
     m = deepcopy(original['manifest'])
+    m.update(control_uid=os.getuid(), execution_uid=os.getuid() + 1)
     m['telegram'] = {'mode': 'live', 'owner_id': 1234567, 'bot_id': 123456789,
                      'connection_digest': 'c' * 64}
     host = HostDeclaration(source_revision=m['revision'], container_name='acc-f23-runtime-broker-1',
@@ -199,6 +200,8 @@ def test_deployment_postcheck_checks_binding_before_any_container_access(plannin
     ('image_id', 'sha256:' + 'f' * 64)])
 def test_resealing_cannot_change_fixed_host_scope(planning_release, field, value):
     m, _, profile, host = planning_release
+    if field == 'attestation_endpoint':
+        value = f'unix:///run/user/{m["control_uid"] + 1}/docker.sock'
     directory = Path(m['planning']['profile_directory'])
     host = HostDeclaration.model_validate({**host.model_dump(), field: value})
     data = profile.model_dump()
