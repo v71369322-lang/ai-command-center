@@ -133,6 +133,7 @@ class ConfiguredTelegramHTTP:
         elif method == 'sendMessage':
             from .telegram_control import allowed_markup as resume_markup
             from .telegram_experiment_authorize import allowed_markup as experiment_markup
+            from .telegram_planning_authorize import allowed_markup as planning_markup
             valid = (not set(body) - {'chat_id', 'text', 'reply_markup'}
                 and type(body.get('chat_id')) is int and body['chat_id'] == self.owner
                 and isinstance(body.get('text'), str) and 1 <= len(body['text']) <= 4096)
@@ -140,7 +141,8 @@ class ConfiguredTelegramHTTP:
             # Only this exact read-only menu is added; arbitrary reply keyboards,
             # contact/location requests, Web Apps and URLs remain forbidden.
             if (markup is not None and canonical(markup) != canonical(keyboard())
-                    and not allowed_markup(markup) and not resume_markup(markup) and not experiment_markup(markup)):
+                    and not allowed_markup(markup) and not resume_markup(markup)
+                    and not experiment_markup(markup) and not planning_markup(markup)):
                 valid = valid and (isinstance(markup, dict) and set(markup) == {'inline_keyboard'})
                 rows = markup.get('inline_keyboard') if isinstance(markup, dict) else None
                 valid = valid and isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], list) and len(rows[0]) == 1

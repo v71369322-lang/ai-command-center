@@ -36,5 +36,9 @@ def create_task(store, role, snapshot):
     owner(role)
     value = payload(snapshot)
     # One operation per exact context; terminal/unknown outcomes never create a new attempt.
-    key = 'plan-v1:' + snapshot.request_id + ':' + snapshot.binding
+    key = request_key(snapshot)
     return store.create(role, key, value)
+
+
+def request_key(snapshot):
+    return 'plan-v1:' + snapshot.request_id + ':' + snapshot.binding

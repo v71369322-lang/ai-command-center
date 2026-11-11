@@ -1,7 +1,7 @@
 """Client-free reviewed planning approval, composed with the existing locked F1 action.
 
-Internal trusted-call boundary only. Telegram authentication and live runtime/key
-bindings are intentionally absent; the production broker still rejects this kind.
+Internal trusted-call boundary; the Telegram transport composes authenticated card
+consumption through its scope hook. Live runtime/key bindings remain absent.
 """
 from datetime import datetime, timezone
 
@@ -40,7 +40,7 @@ class PlanningApproval:
             return prepare_review(actor, self._profile(), snapshot, task_id=task_id,
                 task_version=version, now=int(self.store.now(session).timestamp()), seconds=seconds)
 
-    def authorize(self, actor, quote, *, expected_quote_digest, confirmation):
+    def authorize(self, actor, quote, *, expected_quote_digest, confirmation, _scope_installer=None):
         owner(actor)
         if confirmation != CONFIRMATION:
             raise Denied('planning_exact_confirmation_required')
@@ -93,6 +93,8 @@ class PlanningApproval:
             session.add(ExternalGrant(task_id=task.id, document=document, digest=seal))
             self.store.audit(session, 'external_scope_approved', actor, task.id,
                              grant_digest=seal, review_digest=expected_quote_digest)
+            if _scope_installer:
+                _scope_installer(session, task)
             # A slow hook must not extend the displayed consent/profile deadline.
             validate_review(actor, self._profile(), snapshot, quote, task_id=task.id,
                 task_version=task.version, now=int(self.store.now(session).timestamp()),
