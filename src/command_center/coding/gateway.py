@@ -201,10 +201,14 @@ class Gateway:
         return 'https://api.github.com' + path, c.github_secret_ref
 
     def _reserve(self, s, task_id, doc, amount):
-        c = self.config
+        return self.check_budget(self.store, self.config, s, task_id, doc, amount)
+
+    @staticmethod
+    def check_budget(store, c, s, task_id, doc, amount):
+        """Shared ledger admission, also usable before constructing any HTTP client."""
         rows = s.execute(select(ExternalAction)).scalars().all()
-        self.check_ledger(s, rows)
-        now = self.store.now(s)
+        Gateway.check_ledger(s, rows)
+        now = store.now(s)
         day, month = now.strftime('%Y-%m-%d'), now.strftime('%Y-%m')
         task_total = sum(r.actual + r.reserved for r in rows if r.task_id == task_id)
         pending = sum(r.reserved for r in rows)  # Including disputed costs from earlier periods.
@@ -213,6 +217,7 @@ class Gateway:
         if (task_total + amount > doc['budget'] or daily + amount > c.daily_nano_rub
                 or monthly + amount >= c.monthly_nano_rub * 9 // 10):
             raise Denied('external_budget_limit')
+        return rows
 
     def request(self, task_id, fence, key, kind, method, path, body=None, *, query=None, reconcile=False):
         url, secret_ref = self.endpoint(kind, path, method)

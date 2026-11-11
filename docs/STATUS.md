@@ -1,10 +1,20 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **11 ноября 2026, reviewed F1 approval**: owner screenshots
+подтвердили `/resume` и live `/plan_prepare 131179169`: проект AI Commander,
+задача `f3ac4e07-c72e-4f47-9149-bfdb21e3207e`, версия 1, WAITING_APPROVAL.
+Это owner Telegram evidence; отдельная новая SSH-сверка не выполнялась.
+Parent Draft PR #87 (`4fb0aa5`) CI SUCCESS. Зависимая ветка
+`feat/planning-reviewed-f1-approval` добавляет [атомарную approval-композицию](planning/REVIEWED_F1_APPROVAL.md)
+на прежних F1/ExternalGrant/ledger: 123 locked Linux/PG tests passed, Ruff passed.
+Нет Telegram approval UI, credentials, provider I/O или production dispatch;
+broker по-прежнему блокирует planning kind. Live gateway остаётся незавершённым.
+
 Local continuation **11 ноября 2026**: [проверка VPS и checkpoint](handoff/LOCAL_RECONCILIATION_2026-11-11.md).
 Target PR #85 уже работал; exact preflight/postcheck прошли. Штатные reconcile
 закрыли deployment и activation в VERIFIED без apply/restart/binding changes.
-Normal stop сохранён; live /plan_prepare acceptance ждёт owner /resume и нового
-тестового запроса. Локально добавлен [offline контракт evidence и exact review](planning/TRUSTED_PLANNING_REVIEW.md)
+На момент серверной проверки normal stop был сохранён; последующая owner
+live-приёмка записана выше. Локально добавлен [offline контракт evidence и exact review](planning/TRUSTED_PLANNING_REVIEW.md)
 для будущего trusted planning gateway: 45 unit tests passed, без provider I/O,
 grant, расхода или production dispatch. Полный live gateway ещё не реализован.
 
