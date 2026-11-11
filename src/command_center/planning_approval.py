@@ -17,6 +17,18 @@ from .store import Denied, digest
 CONFIRMATION = 'AUTHORIZE_EXACT_SAVED_REQUEST_LIVE_PLANNING'
 
 
+def check_financial_room(store, profile, session, task_id, budget, *, amount=None):
+    amount = budget if amount is None else amount
+    rows = Gateway.check_budget(store, profile, session, task_id, {'budget': budget}, amount)
+    # Day-only anchors conservatively include all charges on the evidence UTC day.
+    evidence_day = datetime.fromtimestamp(profile.evidence.observed_at, timezone.utc).strftime('%Y-%m-%d')
+    committed = sum(row.reserved + (row.actual if (
+        not row.evidence.get('settled_day') or row.evidence['settled_day'] >= evidence_day) else 0)
+        for row in rows)
+    if committed + amount > profile.available_nano_rub:
+        raise Denied('planning_funding_limit')
+
+
 class PlanningApproval:
     def __init__(self, store, profile):
         self.store = store
@@ -79,16 +91,10 @@ class PlanningApproval:
                 'model': current.model, 'max_calls': 1, 'request_id': snapshot.request_id,
                 'context_digest': snapshot.binding, 'review': current.model_dump(),
                 'review_digest': expected_quote_digest, 'confirmation': CONFIRMATION,
-                'secret_refs': [], 'business_execution': False}
-            rows = Gateway.check_budget(self.store, profile, session, task.id, document, document['budget'])
-            # Funding evidence may predate a settlement. With only day-level settlement
-            # anchors, count that entire UTC day conservatively, plus all disputed reserves.
-            evidence_day = datetime.fromtimestamp(profile.evidence.observed_at, timezone.utc).strftime('%Y-%m-%d')
-            committed = sum(row.reserved + (row.actual if (
-                not row.evidence.get('settled_day') or row.evidence['settled_day'] >= evidence_day) else 0)
-                for row in rows)
-            if committed + document['budget'] > profile.available_nano_rub:
-                raise Denied('planning_funding_limit')
+                'secret_refs': [profile.runtime.credential_ref] if profile.runtime else [],
+                'runtime_binding': profile.runtime.model_dump() if profile.runtime else None,
+                'business_execution': False}
+            check_financial_room(self.store, profile, session, task.id, document['budget'])
             seal = digest(document)
             session.add(ExternalGrant(task_id=task.id, document=document, digest=seal))
             self.store.audit(session, 'external_scope_approved', actor, task.id,

@@ -95,6 +95,7 @@ def issue(bridge, session, iid):
     delivery = bridge.finish(session, iid, body, keyboard(token))
     bridge.store.audit(session, ISSUED, 'owner', task.id, profile=bridge.profile, delivery_id=delivery,
         card=hashlib.sha256(token.encode()).hexdigest(), review=quote.model_dump(), review_digest=digest(quote.model_dump()),
+        owner_id=bridge.owner,
         connection_digest=getattr(bridge.client, 'approved', bridge.profile))
 
 
@@ -112,14 +113,23 @@ def card(bridge, session, iid, intent):
         quote = PlanningQuote.model_validate(event['review'])
         if (digest(quote.model_dump()) != event['review_digest'] or event['task_id'] != quote.task_id
                 or event['revision'] != bridge.store.settings.source_revision
+                or event['owner_id'] != bridge.owner
                 or event['connection_digest'] != getattr(bridge.client, 'approved', bridge.profile)
                 or not quote.request_id.startswith(bridge.profile + ':')):
             raise ValueError()
     except (ValueError, KeyError, TypeError):
         raise Denied('planning_approval_binding_invalid') from None
+    observed_delivery(session, event, intent, bridge.profile, bridge.owner)
+    used = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == CONSUMED,
+        Audit.event['profile'].as_string() == bridge.profile, Audit.event['card'].as_string() == intent['card']).limit(1))
+    return event, quote, used
+
+
+def observed_delivery(session, event, intent, profile, owner):
+    """Shared read-only proof of the exact display; also checked at live admission."""
     delivery = session.get(TelegramDelivery, event.get('delivery_id'))
-    if (not delivery or delivery.profile != bridge.profile or delivery.state != 'SENT'
-            or delivery.message_id != intent['message_id'] or delivery.body.get('chat_id') != bridge.owner
+    if (not delivery or delivery.profile != profile or delivery.state != 'SENT'
+            or delivery.message_id != intent['message_id'] or delivery.body.get('chat_id') != owner
             or not allowed_markup(delivery.body.get('reply_markup'))
             or parse_callback(delivery.body['reply_markup']['inline_keyboard'][0][0]['callback_data'])['card'] != intent['card']
             or not session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_delivery_queued',
@@ -130,9 +140,6 @@ def card(bridge, session, iid, intent):
                 Audit.event['message_id'].as_integer() == intent['message_id'],
                 Audit.event['state'].as_string() == 'SENT').limit(1))):
         raise Denied('planning_approval_card_not_observed')
-    used = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == CONSUMED,
-        Audit.event['profile'].as_string() == bridge.profile, Audit.event['card'].as_string() == intent['card']).limit(1))
-    return event, quote, used
 
 
 def done(bridge, session, iid, intent):
