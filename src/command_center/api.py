@@ -23,6 +23,7 @@ from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreReques
 from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_DRAFT_EVENT
 from .plan_acceptance import AcceptanceRequest
 from .coding_preparation import CodingPreparationRequest, CodingPreparationSave
+from .isolated_coding import BindRequest, BindSave
 
 
 class Command(BaseModel):
@@ -526,6 +527,16 @@ def create_app(settings=None, gateway_factory=None):
                              role=Depends(identity)):
         from .plan_acceptance import read
         return read(store, role, request_id)
+
+    @app.post('/api/project-inbox/coding/task-preview')
+    def coding_task_preview(body: BindRequest, role=Depends(identity)):
+        from .isolated_coding import preview
+        return preview(store, role, body.model_dump())
+
+    @app.post('/api/project-inbox/coding/task')
+    def coding_task_create(body: BindSave, role=Depends(identity)):
+        from .isolated_coding import create
+        return create(store, role, body.model_dump())
 
     @app.post('/api/project-inbox/coding/preparation-preview')
     def coding_preparation_preview(body: CodingPreparationRequest, role=Depends(identity)):

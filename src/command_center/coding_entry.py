@@ -13,6 +13,15 @@ def main():
     if len(raw) > 65536:
         raise ValueError('coding_input_limit')
     job = json.loads(raw)
+    if 'payload' in job:
+        from command_center.coding.isolated_entry import execute
+        from command_center.isolated_coding import KIND
+        if (set(job) != {'operation_id', 'fence', 'mode', 'payload'}
+                or job['mode'] not in {'agent', 'verify'} or job['payload'].get('kind') != KIND):
+            raise ValueError('isolated_job_invalid')
+        result = execute(job['payload'], Path('/work/repository'))
+        print(json.dumps({'operation_id': job['operation_id'], 'fence': job['fence'], 'result': result}))
+        return
     task = CodingRequest.model_validate(job['coding']).model_dump()
     if job['mode'] == 'agent':
         if task['provider'] != 'mock':

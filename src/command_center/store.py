@@ -15,7 +15,7 @@ TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED", "SECURITY_BLOCKED"}
 
 
 def requires_approval(payload):
-    return payload['kind'] in {'approved_render', 'saved_request_plan'} or (
+    return payload['kind'] in {'approved_render', 'saved_request_plan', 'isolated_coding'} or (
         payload['kind'] == 'coding_synthetic' and payload['coding']['provider'] == 'openai')
 
 
@@ -83,12 +83,24 @@ class Store:
         ).order_by(Audit.sequence).limit(1)).scalar_one_or_none()
         if not created or created.event.get('revision') != self.settings.source_revision:
             raise Denied('stale_task_revision')
+        if task.payload.get('kind') == 'isolated_coding' or 'isolated_spec_digest' in created.event:
+            from .isolated_coding import check_binding
+            if (task.payload.get('kind') != 'isolated_coding'
+                    or created.event.get('isolated_spec_digest') != task.payload.get('spec_digest')
+                    or digest(task.payload) != task.payload_hash or created.event.get('payload_hash') != task.payload_hash):
+                raise Denied('coding_payload_integrity')
+            check_binding(self, s, task.payload)
 
     def create(self, actor, key, payload, *, _scope_installer=None):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
-        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic', 'saved_request_plan'}:
+        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic', 'saved_request_plan', 'isolated_coding'}:
             raise Denied("unknown_action")
+        if payload['kind'] == 'isolated_coding':
+            if actor != 'owner':
+                raise Denied('owner_required_for_coding')
+            from .isolated_coding import validate_payload
+            validate_payload(payload)
         if payload['kind'] == 'coding_synthetic':
             if actor != 'owner':
                 raise Denied('owner_required_for_coding')
@@ -111,6 +123,10 @@ class Store:
         fingerprint = digest(payload)
         with self.transaction() as s:
             control = s.get(Control, 1)
+            if payload['kind'] == 'isolated_coding':
+                from .isolated_coding import check_binding
+                self.check_audit(s)
+                check_binding(self, s, payload)
             if payload['kind'] == 'saved_request_plan':
                 from .planning_task import check_context
                 check_context(self, s, payload)
@@ -142,7 +158,8 @@ class Store:
                                         'summary': 'Ожидает ограниченного разрешения владельца.' if requires_approval(payload)
                                         else 'Задача разрешена. Ожидает тестового разработчика.'}
             s.flush()
-            self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint)
+            self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint,
+                       **({'isolated_spec_digest': payload['spec_digest']} if payload['kind'] == 'isolated_coding' else {}))
             if task.state == "READY":
                 s.add(Outbox(id=str(uuid4()), task_id=task.id))
             if _scope_installer:

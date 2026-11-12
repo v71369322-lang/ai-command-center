@@ -152,6 +152,82 @@
         "title": "BillingReconciliation",
         "type": "object"
       },
+      "BindRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_spec_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Spec Digest",
+            "type": "string"
+          },
+          "replacements": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 8,
+            "minProperties": 1,
+            "title": "Replacements",
+            "type": "object"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_spec_digest",
+          "snapshot",
+          "replacements"
+        ],
+        "title": "BindRequest",
+        "type": "object"
+      },
+      "BindSave": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_payload_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Payload Digest",
+            "type": "string"
+          },
+          "expected_spec_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Spec Digest",
+            "type": "string"
+          },
+          "replacements": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 8,
+            "minProperties": 1,
+            "title": "Replacements",
+            "type": "object"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_spec_digest",
+          "snapshot",
+          "replacements",
+          "expected_payload_digest"
+        ],
+        "title": "BindSave",
+        "type": "object"
+      },
       "CodingPreparationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -581,6 +657,31 @@
         "title": "FinalRecoveryApproval",
         "type": "object"
       },
+      "GitObject": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "maxLength": 48000,
+            "title": "Data",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "commit",
+              "tree",
+              "blob"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "data"
+        ],
+        "title": "GitObject",
+        "type": "object"
+      },
       "ManualContent": {
         "additionalProperties": false,
         "properties": {
@@ -901,6 +1002,25 @@
           "operation_id"
         ],
         "title": "SaveRequest",
+        "type": "object"
+      },
+      "Snapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/GitObject"
+            },
+            "maxItems": 64,
+            "minItems": 3,
+            "title": "Objects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "objects"
+        ],
+        "title": "Snapshot",
         "type": "object"
       },
       "Step": {
@@ -2382,6 +2502,122 @@
           }
         },
         "summary": "Coding Preparation Preview"
+      }
+    },
+    "/api/project-inbox/coding/task": {
+      "post": {
+        "operationId": "coding_task_create_api_project_inbox_coding_task_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Task Create"
+      }
+    },
+    "/api/project-inbox/coding/task-preview": {
+      "post": {
+        "operationId": "coding_task_preview_api_project_inbox_coding_task_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Task Preview"
       }
     },
     "/api/project-inbox/plan": {

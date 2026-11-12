@@ -43,7 +43,13 @@ class RuntimeBroker:
             self.ledger.verify()
             if revision != self.store.settings.source_revision:
                 raise Denied('broker_revision_mismatch')
-            planning = self.store.get(task_id)['payload']['kind'] == 'saved_request_plan'
+            kind = self.store.get(task_id)['payload']['kind']
+            planning = kind == 'saved_request_plan'
+            if kind == 'isolated_coding':
+                if self.backend.mode != 'rootless-required':
+                    raise Denied('isolated_coding_rootless_required')
+                if self.limits.memory_mib > 256 or self.limits.cpu > .5 or self.limits.pids > 64:
+                    raise Denied('isolated_coding_runtime_limits')
             if planning and self.planning_host is None:
                 raise Denied('planning_runtime_not_connected')
             if not self.ledger.watchdog_ready(self.limits.watchdog_seconds):
@@ -79,7 +85,10 @@ class RuntimeBroker:
                 self.ledger.phase(task['id'], task['fence'], 'UNCERTAIN')
                 self.ledger.record('planning_runner_failed', task_id=task['id'], fence=task['fence'])
             return
-        if task['payload']['kind'] == 'coding_synthetic':
+        if task['payload']['kind'] == 'isolated_coding':
+            from .coding.isolated_runner import IsolatedCodingRunner
+            runner = IsolatedCodingRunner(self.store, self.backend, self.limits, self.ledger)
+        elif task['payload']['kind'] == 'coding_synthetic':
             if task['payload']['coding']['provider'] == 'openai':
                 from .coding.http_runner import HttpCodingRunner
                 gateway = self.gateway_factory() if self.gateway_factory else None

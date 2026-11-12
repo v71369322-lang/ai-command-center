@@ -30,6 +30,7 @@ jobs:
           .venv/bin/ruff check infra/vps
           .venv/bin/pytest infra/vps/tests -q
           .venv/bin/python scripts/export_contract.py --check
+          .venv/bin/python scripts/export_coding_requirements.py --check
           npm ci --prefix web
           npm run --prefix web build
           .venv/bin/playwright install --with-deps chromium

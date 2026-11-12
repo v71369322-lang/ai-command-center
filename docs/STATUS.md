@@ -1,5 +1,18 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **12 ноября 2026, offline coding → real F1 / isolated runner**:
+parent #98 `7b9ee88` OPEN/DRAFT и итоговый CI SUCCESS проверены заново.
+Ветка `codex/isolated-coding-f1-binding` добавляет owner preview/create настоящей
+F1-задачи `WAITING_APPROVAL` из текущей coding-спецификации, точных Git objects и
+явных replacements. Это offline patch/check, без AI-генерации/remote fetch.
+Прежние F1 approval/Outbox/lease/fencing/broker/watchdog; current acceptance/spec
+проверяются при создании/approval/claim/pulse/finish. Rootless-required dispatch,
+два свежих sandbox stages, фиксированные Ruff/pytest и trusted hash/patch checks.
+Remote repository membership не подтверждается; публикация/расходы не разрешены.
+Local scope 131 passed, 1 container case excluded; итоговый exact CI — в
+зависимом Draft PR. На VPS не установлено. [Workflow](planning/ISOLATED_CODING_F1.md),
+[checkpoint](handoff/ISOLATED_CODING_F1_2026-11-12.md).
+
 Local continuation **12 ноября 2026, Telegram confirmation / coding specification**:
 parent #97 `e5795b4` exact CI SUCCESS повторно проверен. Ветка
 `codex/telegram-plan-coding-preparation` добавляет `/plan_accept`, `/plan_acceptance`
