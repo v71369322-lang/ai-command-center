@@ -8,9 +8,10 @@ per-plan ceiling, private output и read-only пересчёт. Никаких g
 API calls или установки профиля. Funding от owner — только attestation; лимиты,
 FX/evidence не подставляются автоматически. Fresh VPS read-only: прежний API key
 сохранён с private metadata, но в активный broker не смонтирован; f5ff8b2 VERIFIED.
-Значение ключа и provider API не читались. Locked Linux selected scope 236 passed,
-включая 41 operator cases и handoff в candidate builder; Windows 26 — subset.
-Ruff/Bandit PASS, final CI — Draft PR. [Checkpoint](handoff/PLANNING_OPERATOR_2026-11-12.md).
+Значение ключа и provider API не читались. Locked Linux selected scope 238 passed,
+включая 43 operator cases и handoff в candidate builder; Windows 26 — subset.
+Explicit default tier; API exporter исправлен на UTF-8/LF без изменения схемы.
+Ruff/Bandit/native contract PASS, final CI — Draft #95. [Checkpoint](handoff/PLANNING_OPERATOR_2026-11-12.md).
 
 Local continuation **11 ноября 2026, planning candidate / activation operator**:
 parent #93 exact full CI SUCCESS. Ветка `feat/planning-candidate-preparation`

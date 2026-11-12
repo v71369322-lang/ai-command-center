@@ -26,6 +26,7 @@ class OperatorInput(Strict):
     reviewed: Literal[True]
     model: str = Field(min_length=1, max_length=100, pattern=r'^[A-Za-z0-9._:-]+$')
     pricing_currency: Literal['USD']
+    service_tier: Literal['default']
     usd_input_upper_per_million: Number
     usd_output_upper_per_million: Number
     usd_fixed_upper_per_request: Number
@@ -66,7 +67,7 @@ class OperatorInput(Strict):
 def template():
     value = dict.fromkeys(OperatorInput.model_fields)
     value.update(purpose='planning-profile-evidence.v1', reviewed=False,
-                 pricing_currency='USD', context_tokens=8192, max_output_tokens=4096,
+                 pricing_currency='USD', service_tier='default', context_tokens=8192, max_output_tokens=4096,
                  evidence=dict.fromkeys(OperatorEvidence.model_fields))
     return value
 
@@ -102,6 +103,7 @@ def convert(data, *, now):
             if profile.tariff.maximum() > ceilings['per_plan_limit_rub']:
                 raise ValueError()
         conversion = {'purpose': 'planning-profile-conversion.v1', 'input_digest': evidence_digest,
+            'service_tier': reviewed.service_tier,
             'pricing_evidence': reviewed.pricing_evidence, 'fx_evidence': reviewed.fx_evidence,
             'usd_input_upper_per_million': reviewed.usd_input_upper_per_million,
             'usd_output_upper_per_million': reviewed.usd_output_upper_per_million,

@@ -29,12 +29,15 @@ not be repeated blindly, but provider validity/model access remain unverified.
 No VPS binding, credential, daemon, service or journal was changed.
 
 Validation: locked Linux UID 1001 operator/admission/profile/candidate/binding/
-release scope 236 passed, including 41 operator cases and an end-to-end handoff
+release scope 238 passed, including 43 operator cases and an end-to-end handoff
 of the generated unbound profile to the existing candidate builder without manual
 JSON edits. Ruff and existing Bandit triage passed; no gate/rule was relaxed.
 A separate Windows pure arithmetic/validation subset passed 26 and overlaps the
-Linux scope; do not add it. Core implementation is commit 4f4644e, later changes
-add only the integration test and this verification record.
+Linux scope; do not add it. Explicit `service_tier=default` matches the existing
+request and rejects Batch/Flex labels. The native Windows OpenAPI text check
+exposed locale-dependent decoding: parsed UTF-8 schemas were identical. Exporter
+now reads/writes explicit UTF-8/LF; native --check passed without changing the
+contract JSON. Locked Linux CI remains the final independent check.
 The local Docker Desktop app had been stopped; its existing user installation
 was started hidden without settings changes, then Linux checks ran normally.
 Final exact CI will be recorded in the dependent Draft PR; do not infer it from

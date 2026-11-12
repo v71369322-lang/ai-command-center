@@ -17,7 +17,7 @@ schema = create_app(settings).openapi()
 content = json.dumps(schema, ensure_ascii=False, sort_keys=True, indent=2) + '\n'
 path = Path('contracts/openapi.json')
 if args.check:
-    if path.read_text() != content:
+    if path.read_text(encoding='utf-8') != content:
         raise SystemExit('Contract drift: export and review compatibility/version before committing')
 else:
-    path.write_text(content)
+    path.write_text(content, encoding='utf-8', newline='\n')

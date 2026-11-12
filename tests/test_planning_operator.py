@@ -16,7 +16,7 @@ from test_planning_candidate import inputs as inputs
 @pytest.fixture
 def reviewed():
     return {'purpose': 'planning-profile-evidence.v1', 'reviewed': True, 'model': 'PUBLIC_TEST_MODEL',
-        'pricing_currency': 'USD', 'usd_input_upper_per_million': '0.125',
+        'pricing_currency': 'USD', 'service_tier': 'default', 'usd_input_upper_per_million': '0.125',
         'usd_output_upper_per_million': '0.50', 'usd_fixed_upper_per_request': '0',
         'rub_per_usd_upper': '100', 'pricing_evidence': 'PUBLIC_SYNTHETIC_PRICE_REFERENCE',
         'fx_evidence': 'PUBLIC_SYNTHETIC_FX_REFERENCE', 'available_rub': '75',
@@ -72,7 +72,8 @@ def test_limits_round_down_and_per_plan_ceiling_is_preserved(reviewed):
     ('usd_input_upper_per_million', 0.125), ('usd_input_upper_per_million', 'NaN'),
     ('usd_output_upper_per_million', '-1'), ('rub_per_usd_upper', '0'),
     ('rub_per_usd_upper', '1e2'), ('available_rub', '0'), ('monthly_limit_rub', '100.000000001'),
-    ('pricing_currency', 'RUB'), ('context_tokens', 8191), ('max_output_tokens', 4097)])
+    ('pricing_currency', 'RUB'), ('service_tier', 'flex'), ('service_tier', 'batch'),
+    ('context_tokens', 8191), ('max_output_tokens', 4097)])
 def test_unreviewed_or_ambiguous_values_never_create_profile(reviewed, field, value):
     reviewed[field] = value
     with pytest.raises(ValueError, match='reviewed_operator_inputs_invalid'):

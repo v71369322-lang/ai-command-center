@@ -27,6 +27,7 @@ Required facts include:
 | Input | Meaning |
 | --- | --- |
 | `model` | Reviewed exact model/snapshot identifier; no automatic latest-model substitution |
+| `service_tier` | Must be `default`, matching the existing request; no Batch/Flex substitution |
 | `usd_input_upper_per_million` | Confirmed upper price for all applicable input/cache-write billing |
 | `usd_output_upper_per_million` | Confirmed upper output-token price |
 | `usd_fixed_upper_per_request` | Confirmed upper fixed charge, explicitly zero if none |
