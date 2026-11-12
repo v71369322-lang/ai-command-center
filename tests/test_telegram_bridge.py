@@ -307,6 +307,42 @@ def test_database_and_audit_failure_grant_no_authority(bridge, admin, monkeypatc
         service.receive(message(1, "/demo safe"))
 
 
+def test_idle_poll_does_not_repeat_empty_delivery_checks(bridge, monkeypatch):
+    service, fake = bridge
+    calls = []
+    original = service.deliver_one
+
+    def deliver():
+        calls.append(True)
+        return original()
+
+    monkeypatch.setattr(service, 'deliver_one', deliver)
+    assert service.poll_once() == []
+    assert len(calls) == 1
+    assert fake.sent == []
+
+
+def test_poll_drains_pending_replies_in_order_and_stops_when_empty(bridge):
+    service, fake = bridge
+    for uid in range(1, 4):
+        service.receive(message(uid, '/help'))
+    results = service.poll_once()
+    assert len(results) == len(fake.sent) == 3
+    assert all(r['state'] == 'SENT' for r in results)
+    assert service.poll_once() == []
+    assert len(fake.sent) == 3
+
+
+def test_queued_delivery_still_checks_historical_audit_before_http(bridge, admin):
+    service, fake = bridge
+    service.receive(message(1, '/help'))
+    with admin.transaction() as tx:
+        tx.execute(text("UPDATE audit SET digest=repeat('f',64) WHERE sequence=(SELECT min(sequence) FROM audit)"))
+    with pytest.raises(Denied, match='audit_integrity_failure'):
+        service.deliver_one()
+    assert fake.sent == []
+
+
 def test_stop_race_does_not_repeat_epoch_change(bridge, store):
     service, _ = bridge
     before = store.snapshot()["epoch"]
