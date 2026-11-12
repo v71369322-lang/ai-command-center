@@ -22,6 +22,7 @@ from .coding.contract import CodingRequest, payload as coding_payload, template 
 from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreRequest, EVENT as PROJECT_SETUP_EVENT
 from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_DRAFT_EVENT
 from .plan_acceptance import AcceptanceRequest
+from .coding_preparation import CodingPreparationRequest, CodingPreparationSave
 
 
 class Command(BaseModel):
@@ -524,6 +525,22 @@ def create_app(settings=None, gateway_factory=None):
     def plan_acceptance_read(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
                              role=Depends(identity)):
         from .plan_acceptance import read
+        return read(store, role, request_id)
+
+    @app.post('/api/project-inbox/coding/preparation-preview')
+    def coding_preparation_preview(body: CodingPreparationRequest, role=Depends(identity)):
+        from .coding_preparation import preview
+        return preview(store, role, body)
+
+    @app.post('/api/project-inbox/coding/preparation')
+    def coding_preparation_save(body: CodingPreparationSave, role=Depends(identity)):
+        from .coding_preparation import prepare
+        return prepare(store, role, body)
+
+    @app.get('/api/project-inbox/coding/preparation')
+    def coding_preparation_read(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
+                                role=Depends(identity)):
+        from .coding_preparation import read
         return read(store, role, request_id)
 
     @app.get('/api/projects/{project_id}/connection-plan')

@@ -46,8 +46,9 @@ provenance, quality, billing evidence or setup compatibility.
 
 ## Remaining stage
 
-Telegram observed confirmation/UI and construction of an isolated coding task
-are not implemented by these endpoints. Future coding preparation must independently
+The dependent [Telegram confirmation and coding preparation](TELEGRAM_ACCEPTANCE_AND_CODING_PREPARATION.md)
+stage adds observed confirmation and non-runnable specifications. These acceptance
+endpoints themselves still do not construct an executable coding task. Future dispatch must independently
 check a current content receipt, exact repository capability and source, allowed
 files/check commands/resources, and the existing F1 permissions/lease/fencing and
 financial interlocks. Execution, provider I/O, verifier and Draft PR publication

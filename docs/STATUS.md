@@ -1,5 +1,18 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **12 ноября 2026, Telegram confirmation / coding specification**:
+parent #97 `e5795b4` exact CI SUCCESS повторно проверен. Ветка
+`codex/telegram-plan-coding-preparation` добавляет `/plan_accept`, `/plan_acceptance`
+и `/coding_prepare`: доставленные части точного плана, nonce/message/source/expiry
+binding, атомарное принятие содержания; затем явные файлы/тесты владельца и
+спецификация `PREPARED_NOT_RUNNABLE`. Digest принятия закреплён при intake команды,
+restart не переназначает её на другой план. Task/grants/исполнение/расходы не создаются.
+Текущий F2 остаётся fixed synthetic; real-repository runtime adapter ещё нужен.
+Local broad regression 367 passed до последних bounded guards; final changed
+scope 158 passed (пересекаются), Ruff/Bandit/locked API contract PASS.
+Новый этап не установлен на VPS. [Workflow](planning/TELEGRAM_ACCEPTANCE_AND_CODING_PREPARATION.md),
+[checkpoint](handoff/TELEGRAM_CODING_PREPARATION_2026-11-12.md).
+
 Local continuation **12 ноября 2026, plan content acceptance**:
 проверен parent #96 `67443ae`, exact CI SUCCESS (2193 core + отдельный 1013 infra;
 локальные пересекающиеся прогоны не складывать). Установка #96 ранее подтверждена:

@@ -112,50 +112,63 @@ def preview(store, role, request_id):
     owner(role)
     with store.transaction() as session:
         store.check_audit(session)
-        _history(store, session)
-        reference, proposal = _current(store, session, request_id)
-        return {'reference': reference, 'snapshot_digest': digest(reference), 'proposal': proposal,
-                'stored': False, **FLAGS}
+        return preview_locked(store, session, request_id)
+
+
+def preview_locked(store, session, request_id):
+    """Trusted composition under an already checked F1 Control transaction."""
+    _history(store, session)
+    reference, proposal = _current(store, session, request_id)
+    return {'reference': reference, 'snapshot_digest': digest(reference), 'proposal': proposal,
+            'stored': False, **FLAGS}
 
 
 def accept(store, role, request):
     owner(role)
+    with store.transaction() as session:
+        store.check_audit(session)
+        return accept_locked(store, session, request)
+
+
+def accept_locked(store, session, request):
+    """Trusted composition only; no public caller may supply a Session."""
     try:
         request = AcceptanceRequest.model_validate(request.model_dump() if isinstance(request, AcceptanceRequest) else request)
     except ValueError:
         raise Denied('plan_acceptance_request_invalid') from None
-    with store.transaction() as session:
-        store.check_audit(session)
-        history = _history(store, session)
-        reference, _ = _current(store, session, request.request_id)
-        pin = digest(reference)
-        if pin != request.expected_snapshot_digest:
-            raise Denied('plan_acceptance_snapshot_changed')
-        if pin in history:
-            return history[pin]
-        if len(history) >= MAX_ACCEPTANCES:
-            raise Denied('plan_acceptance_capacity')
-        store.audit(session, EVENT, 'owner', reference=reference, snapshot_digest=pin, flags=FLAGS)
-        # Read the exact appended receipt through the same semantic verifier.
-        return _history(store, session)[pin]
+    history = _history(store, session)
+    reference, _ = _current(store, session, request.request_id)
+    pin = digest(reference)
+    if pin != request.expected_snapshot_digest:
+        raise Denied('plan_acceptance_snapshot_changed')
+    if pin in history:
+        return history[pin]
+    if len(history) >= MAX_ACCEPTANCES:
+        raise Denied('plan_acceptance_capacity')
+    store.audit(session, EVENT, 'owner', reference=reference, snapshot_digest=pin, flags=FLAGS)
+    return _history(store, session)[pin]
 
 
 def read(store, role, request_id):
     owner(role)
     with store.transaction() as session:
         store.check_audit(session)
-        context = _context(store, session, request_id)
-        if context.project_id != 'command-center':
-            raise Denied('plan_acceptance_command_center_only')
-        records = [r for r in _history(store, session).values() if r['reference']['request_id'] == request_id]
-        if not records:
-            return {'state': 'MISSING', 'receipt': None, **FLAGS}
-        receipt = records[-1]
-        try:
-            reference, _ = _current(store, session, request_id)
-            current = digest(reference) == receipt['snapshot_digest']
-        except Denied as error:
-            if str(error) != 'plan_acceptance_not_ready':
-                raise
-            current = False
-        return {'state': 'CURRENT' if current else 'STALE', 'receipt': receipt, **FLAGS}
+        return read_locked(store, session, request_id)
+
+
+def read_locked(store, session, request_id):
+    context = _context(store, session, request_id)
+    if context.project_id != 'command-center':
+        raise Denied('plan_acceptance_command_center_only')
+    records = [r for r in _history(store, session).values() if r['reference']['request_id'] == request_id]
+    if not records:
+        return {'state': 'MISSING', 'receipt': None, **FLAGS}
+    receipt = records[-1]
+    try:
+        reference, _ = _current(store, session, request_id)
+        current = digest(reference) == receipt['snapshot_digest']
+    except Denied as error:
+        if str(error) != 'plan_acceptance_not_ready':
+            raise
+        current = False
+    return {'state': 'CURRENT' if current else 'STALE', 'receipt': receipt, **FLAGS}
