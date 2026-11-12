@@ -1,5 +1,19 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **12 ноября 2026, plan content acceptance**:
+проверен parent #96 `67443ae`, exact CI SUCCESS (2193 core + отдельный 1013 infra;
+локальные пересекающиеся прогоны не складывать). Установка #96 ранее подтверждена:
+оба журнала VERIFIED, один apply, реальный `/help` — около 10 секунд по owner,
+6.844 секунды от server receive до observed SENT. Это один замер, не SLA.
+Эта запись заменяет прежнее «исправление пока не установлено» ниже.
+Ветка `codex/plan-acceptance` добавляет [owner-only принятие содержания плана](planning/PLAN_CONTENT_ACCEPTANCE.md):
+точный draft/context/setup digest, append-only receipt, CURRENT/STALE, без Task,
+Outbox/grants/credentials/AI/coding или публикации. Только command-center.
+Locked Linux/PG scope: 192 passed; Ruff/Bandit и API contract прошли.
+Telegram confirmation и подготовка изолированной coding-задачи остаются отдельным
+следующим шагом. Новый этап на VPS не установлен, paid AI не вызывался.
+[Checkpoint](handoff/PLAN_ACCEPTANCE_2026-11-12.md).
+
 Local continuation **12 ноября 2026, Telegram latency repair**:
 parent #95 `9ed4fd0` фактически установлен; оба журнала VERIFIED после штатного
 reconcile без apply replay. Owner сообщил задержки 3–5 минут. Read-only probe:

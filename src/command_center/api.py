@@ -21,6 +21,7 @@ from .owner_auth import OwnerAuth
 from .coding.contract import CodingRequest, payload as coding_payload, template as coding_template
 from .project_setup import ProjectId, PreviewRequest, SaveRequest, RestoreRequest, EVENT as PROJECT_SETUP_EVENT
 from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_DRAFT_EVENT
+from .plan_acceptance import AcceptanceRequest
 
 
 class Command(BaseModel):
@@ -507,6 +508,23 @@ def create_app(settings=None, gateway_factory=None):
     def manual_plan_save(body: ManualSaveRequest, role=Depends(identity)):
         from .manual_plan import save
         return save(store, role, ManualRequest.model_validate(body.model_dump(exclude={'operation_id'})), body.operation_id)
+
+    @app.get('/api/project-inbox/plan/acceptance-preview')
+    def plan_acceptance_preview(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
+                                role=Depends(identity)):
+        from .plan_acceptance import preview
+        return preview(store, role, request_id)
+
+    @app.post('/api/project-inbox/plan/acceptance')
+    def plan_content_acceptance(body: AcceptanceRequest, role=Depends(identity)):
+        from .plan_acceptance import accept
+        return accept(store, role, body)
+
+    @app.get('/api/project-inbox/plan/acceptance')
+    def plan_acceptance_read(request_id: str = Query(pattern=r'^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$', max_length=81),
+                             role=Depends(identity)):
+        from .plan_acceptance import read
+        return read(store, role, request_id)
 
     @app.get('/api/projects/{project_id}/connection-plan')
     def project_connection_plan(project_id: Literal['command-center', 'vanilla-sugar', 'lnauto', 'capital-lab'],
