@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **12 ноября 2026, Telegram latency repair**:
+parent #95 `9ed4fd0` фактически установлен; оба журнала VERIFIED после штатного
+reconcile без apply replay. Owner сообщил задержки 3–5 минут. Read-only probe:
+около 32k audit rows, пустая очередь NEW, heartbeat 70–105 секунд при CPU 0.25.
+Ветка `codex/telegram-poll-latency` прекращает двадцатикратную проверку пустой
+очереди; no-op paths не сканируют историю, actual actions сохраняют полную
+проверку под Control lock. Полный verifier читает scalar rows вместо ORM, без
+кэша или пропуска истории. Locked PG regression 162 passed, 3 executor cases
+оставлены обычному CI. Исправление пока не установлено; live latency acceptance
+ещё не выполнен. [Checkpoint](handoff/TELEGRAM_LATENCY_2026-11-12.md).
+
 Local continuation **12 ноября 2026, operator profile materializer**:
 parent #94 exact CI SUCCESS в обоих workflows. Ветка
 `feat/planning-operator-profile-tools` добавляет [offline подготовку профиля](planning/OPERATOR_PROFILE.md)

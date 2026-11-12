@@ -811,7 +811,6 @@ class TelegramBridge:
     def deliver_one(self):
         self.guard()
         with self.store.transaction() as session:
-            self.store.check_audit(session)
             row = session.execute(select(TelegramDelivery).join(Audit,
                 Audit.event['delivery_id'].as_string() == TelegramDelivery.id).where(
                     TelegramDelivery.profile == self.profile, TelegramDelivery.state == 'NEW',
@@ -819,6 +818,7 @@ class TelegramBridge:
                 .order_by(Audit.sequence).limit(1)).scalar_one_or_none()
             if not row:
                 return None
+            self.store.check_audit(session)
             row.state, row.deadline = 'SENDING', self.store.now(session) + timedelta(seconds=30)
             oid, body = row.id, dict(row.body)
             anchored = session.execute(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_delivery_queued',
@@ -854,18 +854,22 @@ class TelegramBridge:
 
     def recover(self):
         with self.store.transaction() as session:
-            self.store.check_audit(session)
             rows = session.execute(select(TelegramDelivery).where(TelegramDelivery.profile == self.profile,
-                TelegramDelivery.state == 'SENDING', TelegramDelivery.deadline <= self.store.now(session))).scalars()
+                TelegramDelivery.state == 'SENDING', TelegramDelivery.deadline <= self.store.now(session))).scalars().all()
+            if not rows:
+                return
+            self.store.check_audit(session)
             for row in rows:
                 row.state = 'UNCERTAIN'
                 self.store.audit(session, 'telegram_delivery_recovery_uncertain', 'system', delivery_id=row.id)
 
     def resume_pending(self):
         with self.store.transaction() as session:
-            self.store.check_audit(session)
             rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == self.profile,
-                TelegramInbox.state == 'RECEIVED').order_by(TelegramInbox.created_at).limit(20)).scalars()
+                TelegramInbox.state == 'RECEIVED').order_by(TelegramInbox.created_at).limit(20)).scalars().all()
+            if not rows:
+                return
+            self.store.check_audit(session)
             pending = []
             for row in rows:
                 anchor = session.execute(select(Audit).where(
@@ -957,4 +961,10 @@ class TelegramBridge:
                     self.store.audit(session, 'telegram_update_rejected', 'unauthenticated', update_id=uid)
         self.guard()
         self.collect_results()
-        return [result for _ in range(20) if (result := self.deliver_one()) is not None]
+        results = []
+        for _ in range(20):
+            result = self.deliver_one()
+            if result is None:
+                break
+            results.append(result)
+        return results

@@ -445,8 +445,10 @@ class Store:
 
     def check_audit(self, s, anchor=None):
         previous, seen = ZERO, False
-        for row in s.execute(select(Audit).order_by(Audit.sequence)
-                             .execution_options(yield_per=256)).scalars():
+        # Validate every link, including historical edits, without constructing
+        # thousands of ORM entities or retaining them in the identity map.
+        for row in s.execute(select(Audit.sequence, Audit.previous, Audit.digest, Audit.event)
+                             .order_by(Audit.sequence).execution_options(yield_per=256)):
             if row.previous != previous or row.digest != digest({"previous": previous, "event": row.event}):
                 raise Denied("audit_integrity_failure")
             previous = row.digest
