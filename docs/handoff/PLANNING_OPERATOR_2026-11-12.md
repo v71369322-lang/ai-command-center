@@ -28,9 +28,14 @@ no key bytes/fingerprint or provider API was read/called. API provisioning need
 not be repeated blindly, but provider validity/model access remain unverified.
 No VPS binding, credential, daemon, service or journal was changed.
 
-Initial validation: locked Linux UID 1001 scope 40 passed, Ruff passed. A separate
-Windows pure arithmetic/validation subset passed 26 and overlaps those 40.
+Validation: locked Linux UID 1001 operator/admission/profile/candidate/binding/
+release scope 236 passed, including 41 operator cases and an end-to-end handoff
+of the generated unbound profile to the existing candidate builder without manual
+JSON edits. Ruff and existing Bandit triage passed; no gate/rule was relaxed.
+A separate Windows pure arithmetic/validation subset passed 26 and overlaps the
+Linux scope; do not add it. Core implementation is commit 4f4644e, later changes
+add only the integration test and this verification record.
 The local Docker Desktop app had been stopped; its existing user installation
 was started hidden without settings changes, then Linux checks ran normally.
-Broader final evidence/CI will be recorded in the dependent Draft PR; do not
-infer it from initial counts. Workflow: [OPERATOR_PROFILE.md](../planning/OPERATOR_PROFILE.md).
+Final exact CI will be recorded in the dependent Draft PR; do not infer it from
+local counts. Workflow: [OPERATOR_PROFILE.md](../planning/OPERATOR_PROFILE.md).

@@ -8,6 +8,9 @@ import pytest
 from command_center import planning_operator as operator
 from command_center.deployment_profile import atomic_json, checksum
 from command_center.store import Denied
+from test_deployment import release as release
+from test_planning_admission import profile as profile
+from test_planning_candidate import inputs as inputs
 
 
 @pytest.fixture
@@ -159,3 +162,20 @@ def test_inspection_rejects_changed_artifacts(files, attack):
         result['creation_digest'] = checksum(receipt)
     with pytest.raises((ValueError, Denied, OSError)):
         operator.inspect_profile(output, result['creation_digest'])
+
+
+def test_created_profile_flows_into_existing_candidate_without_manual_edits(files, inputs, monkeypatch):
+    from command_center import planning_candidate as candidate
+    path, pin, output = files
+    monkeypatch.setattr('httpx.Client', lambda *a, **k: pytest.fail('HTTP in profile/candidate pipeline'))
+    result = operator.prepare(path, pin, output)
+    options = inputs[0]
+    options.update(operator_file=output / 'profile.json', operator_pin=result['profile_sha256'])
+    staged = candidate.prepare(**options)
+    verification = candidate.inspect(options['output'], staged['candidate_bundle'], staged['preparation_digest'])
+    assert verification['status'] == 'PLANNING_CANDIDATE_INTEGRITY_VERIFIED_NOT_ACTIVATED'
+    bound, _ = candidate.check_binding(candidate.load_bundle(options['output'])['manifest'])
+    unbound = json.loads((output / 'profile.json').read_bytes())
+    assert unbound['runtime'] is None and bound.runtime is not None
+    assert bound.tariff.model_dump() == unbound['tariff']
+    assert bound.tariff.maximum() == result['maximum_nano_rub']
