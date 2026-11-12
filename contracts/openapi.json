@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "AcceptanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_snapshot_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Snapshot Digest",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_snapshot_digest"
+        ],
+        "title": "AcceptanceRequest",
+        "type": "object"
+      },
       "ApprovalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2140,6 +2161,180 @@
           }
         },
         "summary": "Manual Plan Save"
+      }
+    },
+    "/api/project-inbox/plan/acceptance": {
+      "get": {
+        "operationId": "plan_acceptance_read_api_project_inbox_plan_acceptance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 81,
+              "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Plan Acceptance Read"
+      },
+      "post": {
+        "operationId": "plan_content_acceptance_api_project_inbox_plan_acceptance_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Plan Content Acceptance"
+      }
+    },
+    "/api/project-inbox/plan/acceptance-preview": {
+      "get": {
+        "operationId": "plan_acceptance_preview_api_project_inbox_plan_acceptance_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 81,
+              "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Plan Acceptance Preview"
       }
     },
     "/api/project-inbox/plan/preview": {
