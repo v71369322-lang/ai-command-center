@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **12 ноября 2026, operator profile materializer**:
+parent #94 exact CI SUCCESS в обоих workflows. Ветка
+`feat/planning-operator-profile-tools` добавляет [offline подготовку профиля](planning/OPERATOR_PROFILE.md)
+из проверенных входных данных: Decimal, rates вверх / limits вниз, отдельный
+per-plan ceiling, private output и read-only пересчёт. Никаких grants, ключей,
+API calls или установки профиля. Funding от owner — только attestation; лимиты,
+FX/evidence не подставляются автоматически. Fresh VPS read-only: прежний API key
+сохранён с private metadata, но в активный broker не смонтирован; f5ff8b2 VERIFIED.
+Значение ключа и provider API не читались. Initial 40 Linux tests/Ruff PASS;
+final scope/CI — Draft PR. [Checkpoint](handoff/PLANNING_OPERATOR_2026-11-12.md).
+
 Local continuation **11 ноября 2026, planning candidate / activation operator**:
 parent #93 exact full CI SUCCESS. Ветка `feat/planning-candidate-preparation`
 добавляет [подготовку целостного кандидата и адаптер активации](planning/CANDIDATE_ACTIVATION.md)
