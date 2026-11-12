@@ -116,6 +116,9 @@ class TelegramBridge:
             elif token.startswith('pa:'):
                 from .telegram_planning_authorize import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('pc:'):
+                from .telegram_plan_acceptance import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('cl:'):
                 from .telegram_calendar import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
@@ -250,6 +253,14 @@ class TelegramBridge:
                     or int(parts[1]) >= 2**53):
                 raise Denied('telegram_plan_preparation_reference_invalid')
             return str(uid), {'kind': 'plan_prepare', 'number': parts[1]}
+        if value.split()[:1] in (['/plan_accept'], ['/plan_acceptance']):
+            parts = value.split()
+            if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1]) or int(parts[1]) >= 2**53):
+                raise Denied('plan_content_command_invalid')
+            return str(uid), {'kind': 'plan_accept_request' if parts[0] == '/plan_accept' else 'plan_accept_status', 'number': parts[1]}
+        if value.split()[:1] == ['/coding_prepare']:
+            from .telegram_coding_preparation import parse
+            return str(uid), parse(value)
         if value.split()[:1] == ['/plan_authorize']:
             parts = value.split()
             if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
@@ -357,6 +368,18 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
             else:
                 admission = {}
+                if intent['kind'] == 'coding_prepare' and intent['scope'] is not None:
+                    from .plan_acceptance import read_locked
+                    rid = self.profile + ':' + intent['number']
+                    accepted = None
+                    if session.get(TelegramInbox, rid) is not None:
+                        try:
+                            accepted = read_locked(self.store, session, rid)
+                        except Denied as error:
+                            if str(error) != 'plan_acceptance_command_center_only':
+                                raise
+                    admission['coding_acceptance_digest'] = (accepted['receipt']['snapshot_digest']
+                        if accepted and accepted['state'] == 'CURRENT' else None)
                 if intent['kind'] == 'coding_demo':
                     control = session.get(Control, 1)
                     if control.halted or control.recovery:
@@ -383,7 +406,29 @@ class TelegramBridge:
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
-        if kind == 'plan_authorize_request':
+        if kind in {'plan_accept_request', 'plan_accept_status', 'coding_prepare'}:
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state == 'DONE':
+                    return
+                if session.get(TelegramInbox, self.profile + ':' + intent['number']) is None:
+                    return self.finish(session, iid, 'Запрос не найден в этом Telegram-подключении. Задача не создана.')
+                if kind == 'plan_accept_request':
+                    from .telegram_plan_acceptance import issue
+                    issue(self, session, iid)
+                elif kind == 'coding_prepare':
+                    from .telegram_coding_preparation import reply
+                    reply(self, session, iid, intent)
+                else:
+                    from .plan_acceptance import read_locked
+                    value = read_locked(self.store, session, self.profile + ':' + intent['number'])
+                    self.finish(session, iid, f'Принятие содержания плана: {value["state"]}. '
+                        'Это не разрешение выполнения или расходов.')
+        elif kind == 'plan_accept_confirm':
+            from .telegram_plan_acceptance import confirm
+            confirm(self, iid, intent)
+        elif kind == 'plan_authorize_request':
             from .telegram_planning_authorize import issue
             with self.store.transaction() as session:
                 self.guard()
@@ -691,24 +736,25 @@ class TelegramBridge:
                         return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
                     if row.state != 'RECEIVED':
                         raise Denied('telegram_help_not_pending')
-                    self.finish(session, iid, 'Выберите кнопку меню или напишите запрос. '
-                        'Текст сохраняется и ожидает планирования.\n\n'
-                        '/menu — показать меню; /demo текст — синтетический тест с подтверждением; '
+                    self.finish(session, iid, 'Меню команд. Текст сохраняется и ожидает планирования.\n\n'
+                        '/menu — меню; /demo текст — синтетический тест с подтверждением; '
                         '/requests — сохранённые запросы; /requests project-id — очередь проекта; '
                         '/request номер — открыть запрос; '
                         '/plan номер — черновик; /plan_prepare номер — задача плана; '
                         '/plan_authorize номер — условия AI-плана; '
+                        '/plan_accept номер — принять содержание; /plan_acceptance номер — статус принятия; '
+                        '/coding_prepare номер — coding-спецификация; '
                         '/projects — проекты и назначение; /project project-id — подключение и границы; '
-                        '/queue — стадии подготовки, фильтры и страницы запросов; '
+                        '/queue — стадии и фильтры; '
                         '/connection project-id — план подключения; /setup project-id — черновик настройки; '
                         '/review номер — обзор запроса; /plan_edit номер — ручной план; '
                         '/attention — центр внимания; /reminders — расписание сводок; '
-                        '/voice — голосовые поручения до расшифровки; /system — роли и состояние компонентов; '
+                        '/voice — голосовые поручения; /system — роли и компоненты; '
                         '/readiness — состояние Commander и условия первого AI-запуска; '
-                        '/experiment — состояние и результат первого AI-эксперимента; '
-                        '/prepare_experiment — подготовить этот тест без запуска и расходов; '
-                        '/authorize_experiment — показать условия отдельного платного разрешения; '
-                        '/cancel_experiment — запросить отмену этой задачи; '
+                        '/experiment — первый AI-эксперимент; '
+                        '/prepare_experiment — подготовка без запуска; '
+                        '/authorize_experiment — условия платного разрешения; '
+                        '/cancel_experiment — отмена; '
                         '/watch_experiment — включить уведомления; /unwatch_experiment — отключить; '
                         '/recovery — отдельный восстановительный тест; /prepare_recovery — подготовить; '
                         '/authorize_recovery — условия платного разрешения; /cancel_recovery — отмена; '

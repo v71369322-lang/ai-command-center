@@ -152,6 +152,62 @@
         "title": "BillingReconciliation",
         "type": "object"
       },
+      "CodingPreparationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_acceptance_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Acceptance Digest",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CodingScope"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_acceptance_digest",
+          "scope"
+        ],
+        "title": "CodingPreparationRequest",
+        "type": "object"
+      },
+      "CodingPreparationSave": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_acceptance_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Acceptance Digest",
+            "type": "string"
+          },
+          "expected_spec_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Spec Digest",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CodingScope"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_acceptance_digest",
+          "scope",
+          "expected_spec_digest"
+        ],
+        "title": "CodingPreparationSave",
+        "type": "object"
+      },
       "CodingRequest": {
         "additionalProperties": false,
         "properties": {
@@ -240,6 +296,56 @@
           }
         },
         "title": "CodingRequest",
+        "type": "object"
+      },
+      "CodingScope": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_files": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Allowed Files",
+            "type": "array"
+          },
+          "max_diff_bytes": {
+            "default": 16384,
+            "maximum": 32768.0,
+            "minimum": 1024.0,
+            "title": "Max Diff Bytes",
+            "type": "integer"
+          },
+          "max_iterations": {
+            "default": 1,
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "max_seconds": {
+            "default": 60,
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Max Seconds",
+            "type": "integer"
+          },
+          "test_files": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Test Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed_files",
+          "test_files"
+        ],
+        "title": "CodingScope",
         "type": "object"
       },
       "Command": {
@@ -2103,6 +2209,179 @@
           }
         },
         "summary": "Project Assignment"
+      }
+    },
+    "/api/project-inbox/coding/preparation": {
+      "get": {
+        "operationId": "coding_preparation_read_api_project_inbox_coding_preparation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 81,
+              "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Preparation Read"
+      },
+      "post": {
+        "operationId": "coding_preparation_save_api_project_inbox_coding_preparation_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodingPreparationSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Preparation Save"
+      }
+    },
+    "/api/project-inbox/coding/preparation-preview": {
+      "post": {
+        "operationId": "coding_preparation_preview_api_project_inbox_coding_preparation_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodingPreparationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Coding Preparation Preview"
       }
     },
     "/api/project-inbox/plan": {
