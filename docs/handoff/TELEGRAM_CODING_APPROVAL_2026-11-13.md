@@ -23,11 +23,13 @@ Normal stop/stale content does not make status resume or authorize a task. Exist
 cancel/stop, source pinning, broker/rootless/lease/fence/watchdog behavior preserved.
 
 Local initial regression 126 passed before status guards. Later scope 129 passed
-with status/revocation/profile cases. Final expanded scope 203 passed, one existing
+with status/revocation/profile cases. Final expanded scope 204 passed, one existing
 actual-container case excluded from the local helper (no daemon/image there).
 All local scopes overlap and are not added. Final exact source/CI
 evidence is recorded in the resulting dependent Draft PR. Ruff, unchanged API
 contract and retained Bandit LOW triage were checked; final checks must match HEAD.
+Project reassignment is an ordinary stale-card refusal with an explicit reply,
+not a silent rejected update. The final regression includes this metadata-only case.
 New commands stay inside existing text/transport limits. No real Telegram/VPS/
 rootless execution acceptance is claimed. Local Docker Desktop was started for
 the already-owned PostgreSQL test environment; other projects were not changed.

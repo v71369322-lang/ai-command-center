@@ -103,12 +103,16 @@ def test_concurrent_clicks_restart_and_replay_consume_once(bridge, store, task):
     assert approvals(store) == (1, 1) and len(records(store, CONSUMED)) == 1
 
 
-@pytest.mark.parametrize('change', ['setup', 'halt', 'cancel', 'other_approval'])
+@pytest.mark.parametrize('change', ['setup', 'project', 'halt', 'cancel', 'other_approval'])
 def test_changed_state_invalidates_review(bridge, store, task, change):
     issue(bridge, task)
     button = click(bridge)
     if change == 'setup':
         patch(store, 'owner', 'command-center', 1, 'acceptance', ['New public criterion'], str(uuid4()))
+    elif change == 'project':
+        from command_center.project_inbox import classify
+        rid = task['payload']['specification']['acceptance_reference']['request_id']
+        classify(store, 'owner', rid, 'vanilla-sugar', 1, str(uuid4()))
     elif change == 'halt':
         store.halt('owner')
     elif change == 'cancel':

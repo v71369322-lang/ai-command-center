@@ -9,7 +9,7 @@ parent #99 `68a9405` OPEN/DRAFT и точный CI SUCCESS проверены з
 команда её не переназначает. Карточка 300 секунд, F1 approval до 120 и не позднее
 карточки; rollback при reply failure/revocation/expiry. `/coding_status UUID`
 читает изолированную задачу и проверяет verifier/artifact evidence. Generic
-synthetic status scope сохранён. Final local 203 passed, 1 container case excluded;
+synthetic status scope сохранён. Final local 204 passed, 1 container case excluded;
 initial 126/later 129 — перекрывающиеся subsets, не складывать.
 итоговый exact CI — в Draft PR. VPS/paid AI/live Telegram не затрагивались.
 [Workflow](planning/TELEGRAM_CODING_APPROVAL.md),

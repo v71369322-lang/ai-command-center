@@ -60,7 +60,7 @@ def binding(bridge, session, task_id):
     try:
         bridge.store.check_task_revision(session, task)
     except Denied as error:
-        if str(error) not in {'coding_binding_stale', 'stale_task_revision'}:
+        if str(error) not in {'coding_binding_stale', 'stale_task_revision', 'plan_acceptance_command_center_only'}:
             raise
         return None
     ref = task.payload['specification']['acceptance_reference']
