@@ -89,3 +89,5 @@ on the cloud test daemon. It deliberately does not claim rootless or VPS accepta
 No real project code is executed on production by this change. Telegram preparation
 remains available, but binary Git input/task review uses the owner API/operator
 workflow; no execution confirmation button is added to Telegram in this stage.
+The dependent [Telegram review continuation](TELEGRAM_CODING_APPROVAL.md) adds
+observed owner confirmation and a separately scoped status command for these tasks.
