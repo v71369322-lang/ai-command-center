@@ -119,6 +119,9 @@ class TelegramBridge:
             elif token.startswith('pc:'):
                 from .telegram_plan_acceptance import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('ca:'):
+                from .telegram_coding_approval import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('cl:'):
                 from .telegram_calendar import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
@@ -261,6 +264,9 @@ class TelegramBridge:
         if value.split()[:1] == ['/coding_prepare']:
             from .telegram_coding_preparation import parse
             return str(uid), parse(value)
+        if value.split()[:1] in (['/coding_authorize'], ['/coding_status']):
+            from .telegram_coding_approval import parse
+            return str(uid), parse(value)
         if value.split()[:1] == ['/plan_authorize']:
             parts = value.split()
             if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
@@ -368,6 +374,9 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
             else:
                 admission = {}
+                if intent['kind'] == 'coding_authorize_request':
+                    from .telegram_coding_approval import binding
+                    admission['coding_task_review_pin'] = binding(self, session, intent['task'])
                 if intent['kind'] == 'coding_prepare' and intent['scope'] is not None:
                     from .plan_acceptance import read_locked
                     rid = self.profile + ':' + intent['number']
@@ -406,7 +415,24 @@ class TelegramBridge:
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
-        if kind in {'plan_accept_request', 'plan_accept_status', 'coding_prepare'}:
+        if kind == 'coding_status':
+            from .telegram_coding_approval import status
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state != 'DONE':
+                    status(self, session, iid, intent['task'])
+        elif kind == 'coding_authorize_request':
+            from .telegram_coding_approval import issue
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state != 'DONE':
+                    issue(self, session, iid)
+        elif kind == 'coding_authorize_confirm':
+            from .telegram_coding_approval import confirm
+            confirm(self, iid, intent)
+        elif kind in {'plan_accept_request', 'plan_accept_status', 'coding_prepare'}:
             with self.store.transaction() as session:
                 self.guard()
                 self.store.check_audit(session)
@@ -743,7 +769,8 @@ class TelegramBridge:
                         '/plan номер — черновик; /plan_prepare номер — задача плана; '
                         '/plan_authorize номер — условия AI-плана; '
                         '/plan_accept номер — принять содержание; /plan_acceptance номер — статус принятия; '
-                        '/coding_prepare номер — coding-спецификация; '
+                        '/coding_prepare номер — спецификация; /coding_authorize UUID — условия; '
+                        '/coding_status UUID — coding-статус; '
                         '/projects — проекты и назначение; /project project-id — подключение и границы; '
                         '/queue — стадии и фильтры; '
                         '/connection project-id — план подключения; /setup project-id — черновик настройки; '

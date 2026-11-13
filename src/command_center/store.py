@@ -170,32 +170,39 @@ class Store:
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:
-            control = s.get(Control, 1)
-            task = self.task(s, task_id)
-            self.check_audit(s)
-            self.check_task_revision(s, task)
-            if (control.halted or control.recovery or task.epoch != control.epoch
-                    or task.version != version or task.state != "WAITING_APPROVAL"):
-                raise Denied("stale_or_ineligible_approval")
-            old = s.get(Approval, task_id)
-            if old:
-                s.delete(old)
-                s.flush()
-            expires_at = self.now(s) + timedelta(seconds=seconds)
-            if _deadline is not None:
-                expires_at = min(expires_at, _deadline)
-                if expires_at <= self.now(s):
-                    raise Denied('approval_deadline_expired')
-            s.add(Approval(task_id=task.id, task_version=task.version, payload_hash=task.payload_hash,
-                           epoch=control.epoch, expires_at=expires_at,
-                           used=False, revoked=False))
-            task.state = "READY"
-            s.add(Outbox(id=str(uuid4()), task_id=task.id))
-            self.audit(s, "approved", actor, task.id, version=version,
-                       payload_hash=task.payload_hash, epoch=control.epoch, expires_at=expires_at.isoformat())
-            if _scope_installer:
-                _scope_installer(s, task)
-            return self.view(task)
+            return self._approve_locked(s, actor, task_id, version, seconds,
+                                        _scope_installer=_scope_installer, _deadline=_deadline)
+
+    def _approve_locked(self, s, actor, task_id, version, seconds=120, *, _scope_installer=None, _deadline=None):
+        """Internal composition of the same F1 approval; caller holds transaction()."""
+        if actor != "owner":
+            raise Denied("owner_required")
+        control = s.get(Control, 1)
+        task = self.task(s, task_id)
+        self.check_audit(s)
+        self.check_task_revision(s, task)
+        if (control.halted or control.recovery or task.epoch != control.epoch
+                or task.version != version or task.state != "WAITING_APPROVAL"):
+            raise Denied("stale_or_ineligible_approval")
+        old = s.get(Approval, task_id)
+        if old:
+            s.delete(old)
+            s.flush()
+        expires_at = self.now(s) + timedelta(seconds=seconds)
+        if _deadline is not None:
+            expires_at = min(expires_at, _deadline)
+            if expires_at <= self.now(s):
+                raise Denied('approval_deadline_expired')
+        s.add(Approval(task_id=task.id, task_version=task.version, payload_hash=task.payload_hash,
+                       epoch=control.epoch, expires_at=expires_at,
+                       used=False, revoked=False))
+        task.state = "READY"
+        s.add(Outbox(id=str(uuid4()), task_id=task.id))
+        self.audit(s, "approved", actor, task.id, version=version,
+                   payload_hash=task.payload_hash, epoch=control.epoch, expires_at=expires_at.isoformat())
+        if _scope_installer:
+            _scope_installer(s, task)
+        return self.view(task)
 
     def cancel(self, actor, task_id, revoke=False, *, _scope_installer=None):
         if actor not in {"owner", "operator"} or (revoke and actor != "owner"):
