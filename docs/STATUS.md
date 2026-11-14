@@ -1,5 +1,16 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **14 ноября 2026, owner-authorized installation of PR101**:
+VPS read-only reconciliation подтвердил #100/2526d06, оба журнала VERIFIED,
+нет активных executions, все 4 historical ExternalAction COMPLETE/reserved0.
+Прежний planning profile истёк Nov13; не продлевается. Ветка
+`codex/telegram-offline-release` добавляет restriction-only adapter через прежние
+prepare/inspect/exact apply/reconcile, чтобы поставить новые команды с полностью
+снятыми optional provider bindings. Никаких paid calls/новых доступов.
+[Deployment checkpoint](handoff/OFFLINE_RELEASE_2026-11-14.md). Итог CI/фактической
+установки сверять с dependent Draft PR и private installation checkpoint;
+эта запись сама по себе не означает завершённую установку.
+
 Local continuation **14 ноября 2026, Telegram → AI code → verified result**:
 branch `codex/telegram-ai-code-workflow`, parent #100 exact `2526d06`;
 OPEN/DRAFT и итоговый CI SUCCESS проверены заново (2359 app, отдельно 1013 infra).

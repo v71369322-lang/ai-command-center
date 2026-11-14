@@ -68,11 +68,11 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
 
 
 def reconcile(previous_directory, candidate_directory, approved_previous, approved_candidate,
-              approved_until, approved_preparation, approved_capability):
+              approved_until, approved_preparation, approved_capability, *, _scope=None):
     deadline(approved_until)
     directory = Path(candidate_directory)
     previous, target = load_bundle(previous_directory), load_bundle(directory)
-    scope = PlanningScope(approved_previous, approved_candidate, approved_preparation, approved_capability)
+    scope = _scope or PlanningScope(approved_previous, approved_candidate, approved_preparation, approved_capability)
     extra = scope.validate(previous, target, directory, read_json(directory / 'preparation.json'))
     m = target['manifest']
     if os.getuid() != m['control_uid']:
