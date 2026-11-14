@@ -228,6 +228,108 @@
         "title": "BindSave",
         "type": "object"
       },
+      "CodeProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "available_nano_rub": {
+            "default": 0,
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Available Nano Rub",
+            "type": "integer"
+          },
+          "daily_nano_rub": {
+            "default": 0,
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Daily Nano Rub",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "installation_profile_digest": {
+            "anyOf": [
+              {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Profile Digest"
+          },
+          "live_authorized": {
+            "default": false,
+            "title": "Live Authorized",
+            "type": "boolean"
+          },
+          "mode": {
+            "default": "disabled",
+            "enum": [
+              "disabled",
+              "http_mock",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "monthly_nano_rub": {
+            "default": 0,
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Monthly Nano Rub",
+            "type": "integer"
+          },
+          "purpose": {
+            "const": "saved-request-code-proposal.v1",
+            "default": "saved-request-code-proposal.v1",
+            "title": "Purpose",
+            "type": "string"
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanningRuntimeBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tariff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Tariff"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "CodeProfile",
+        "type": "object"
+      },
       "CodingPreparationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -469,6 +571,47 @@
           "values"
         ],
         "title": "Command",
+        "type": "object"
+      },
+      "ConfigureCode": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "enum": [
+              "KEEP_CODE_AI_DISABLED",
+              "CONFIGURE_CODE_HTTP_MOCK",
+              "ENABLE_PAID_CODE_GENERATION"
+            ],
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "expected_previous_digest": {
+            "anyOf": [
+              {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Previous Digest"
+          },
+          "expected_profile_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Profile Digest",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/CodeProfile"
+          }
+        },
+        "required": [
+          "profile",
+          "expected_profile_digest",
+          "confirmation"
+        ],
+        "title": "ConfigureCode",
         "type": "object"
       },
       "Draft": {
@@ -831,6 +974,59 @@
         "title": "ManualSaveRequest",
         "type": "object"
       },
+      "OperatorEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Account",
+            "type": "string"
+          },
+          "data_sharing": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Data Sharing",
+            "type": "string"
+          },
+          "expires_at": {
+            "minimum": 1.0,
+            "title": "Expires At",
+            "type": "integer"
+          },
+          "funding": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Funding",
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Model",
+            "type": "string"
+          },
+          "observed_at": {
+            "minimum": 0.0,
+            "title": "Observed At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account",
+          "model",
+          "funding",
+          "data_sharing",
+          "observed_at",
+          "expires_at"
+        ],
+        "title": "OperatorEvidence",
+        "type": "object"
+      },
       "PasswordLogin": {
         "additionalProperties": false,
         "properties": {
@@ -854,6 +1050,39 @@
           "password"
         ],
         "title": "PasswordLogin",
+        "type": "object"
+      },
+      "PlanningRuntimeBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "binding_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Binding Digest",
+            "type": "string"
+          },
+          "credential_ref": {
+            "const": "planning-openai",
+            "default": "planning-openai",
+            "title": "Credential Ref",
+            "type": "string"
+          },
+          "credential_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Credential Sha256",
+            "type": "string"
+          },
+          "source_revision": {
+            "pattern": "^[a-f0-9]{40}$",
+            "title": "Source Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_revision",
+          "binding_digest",
+          "credential_sha256"
+        ],
+        "title": "PlanningRuntimeBinding",
         "type": "object"
       },
       "PreviewRequest": {
@@ -1051,6 +1280,132 @@
           "acceptance"
         ],
         "title": "Step",
+        "type": "object"
+      },
+      "Tariff": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "default": false,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "context_tokens": {
+            "maximum": 10000000.0,
+            "minimum": 8192.0,
+            "title": "Context Tokens",
+            "type": "integer"
+          },
+          "currency": {
+            "const": "RUB",
+            "default": "RUB",
+            "title": "Currency",
+            "type": "string"
+          },
+          "evidence": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "fixed_nano_rub": {
+            "default": 0,
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Fixed Nano Rub",
+            "type": "integer"
+          },
+          "input_nano_rub": {
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Input Nano Rub",
+            "type": "integer"
+          },
+          "max_output_tokens": {
+            "maximum": 4096.0,
+            "minimum": 32.0,
+            "title": "Max Output Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "Model",
+            "type": "string"
+          },
+          "output_nano_rub": {
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Output Nano Rub",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model",
+          "input_nano_rub",
+          "output_nano_rub",
+          "context_tokens",
+          "max_output_tokens",
+          "evidence"
+        ],
+        "title": "Tariff",
+        "type": "object"
+      },
+      "WorkspaceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_spec_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Spec Digest",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_spec_digest",
+          "snapshot"
+        ],
+        "title": "WorkspaceRequest",
+        "type": "object"
+      },
+      "WorkspaceSave": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_spec_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Spec Digest",
+            "type": "string"
+          },
+          "expected_workspace_digest": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Workspace Digest",
+            "type": "string"
+          },
+          "request_id": {
+            "pattern": "^[a-f0-9]{64}:(0|[1-9][0-9]{0,15})$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "request_id",
+          "expected_spec_digest",
+          "snapshot",
+          "expected_workspace_digest"
+        ],
+        "title": "WorkspaceSave",
         "type": "object"
       }
     }
@@ -2331,6 +2686,110 @@
         "summary": "Project Assignment"
       }
     },
+    "/api/project-inbox/coding/ai-profile": {
+      "get": {
+        "operationId": "code_profile_read_api_project_inbox_coding_ai_profile_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Code Profile Read"
+      },
+      "post": {
+        "operationId": "code_profile_save_api_project_inbox_coding_ai_profile_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Code Profile Save"
+      }
+    },
     "/api/project-inbox/coding/preparation": {
       "get": {
         "operationId": "coding_preparation_read_api_project_inbox_coding_preparation_get",
@@ -2618,6 +3077,122 @@
           }
         },
         "summary": "Coding Task Preview"
+      }
+    },
+    "/api/project-inbox/coding/workspace": {
+      "post": {
+        "operationId": "code_workspace_save_api_project_inbox_coding_workspace_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Code Workspace Save"
+      }
+    },
+    "/api/project-inbox/coding/workspace-preview": {
+      "post": {
+        "operationId": "code_workspace_preview_api_project_inbox_coding_workspace_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request; input is not echoed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bounded request rate exceeded"
+          }
+        },
+        "summary": "Code Workspace Preview"
       }
     },
     "/api/project-inbox/plan": {

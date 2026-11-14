@@ -29,7 +29,7 @@ class Request(BaseModel):
 
 
 class RuntimeBroker:
-    def __init__(self, store, ledger, backend, limits=None, gateway_factory=None, planning_host=None):
+    def __init__(self, store, ledger, backend, limits=None, gateway_factory=None, planning_host=None, code_factory=None):
         self.store, self.ledger, self.backend = store, ledger, backend
         self.limits = limits or RuntimeLimits()
         self.lock = Lock()
@@ -37,6 +37,8 @@ class RuntimeBroker:
         self.last_future = None
         self.gateway_factory = gateway_factory
         self.planning_host = planning_host
+        from .code_factory import CodeFactory
+        self.code_factory = code_factory or CodeFactory(store)
 
     def submit(self, task_id, revision):
         with self.lock:
@@ -44,7 +46,9 @@ class RuntimeBroker:
             if revision != self.store.settings.source_revision:
                 raise Denied('broker_revision_mismatch')
             kind = self.store.get(task_id)['payload']['kind']
-            planning = kind == 'saved_request_plan'
+            planning = kind in {'saved_request_plan', 'saved_request_code'}
+            if kind == 'saved_request_code':
+                self.code_factory.preflight()
             if kind == 'isolated_coding':
                 if self.backend.mode != 'rootless-required':
                     raise Denied('isolated_coding_rootless_required')
@@ -77,10 +81,11 @@ class RuntimeBroker:
             return {'phase': 'INTENT', 'fence': task['fence']}
 
     def execute(self, task):
-        if task['payload']['kind'] == 'saved_request_plan':
+        if task['payload']['kind'] in {'saved_request_plan', 'saved_request_code'}:
             from .planning_host_runner import PlanningHostRunner
             try:
-                PlanningHostRunner(self.store, self.ledger, self.backend, self.limits, self.planning_host).execute(task)
+                PlanningHostRunner(self.store, self.ledger, self.backend, self.limits, self.planning_host,
+                    gateway_factory=self.code_factory if task['payload']['kind'] == 'saved_request_code' else None).execute(task)
             except Exception:
                 self.ledger.phase(task['id'], task['fence'], 'UNCERTAIN')
                 self.ledger.record('planning_runner_failed', task_id=task['id'], fence=task['fence'])

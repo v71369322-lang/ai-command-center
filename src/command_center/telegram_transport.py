@@ -135,6 +135,7 @@ class ConfiguredTelegramHTTP:
             from .telegram_experiment_authorize import allowed_markup as experiment_markup
             from .telegram_planning_authorize import allowed_markup as planning_markup
             from .telegram_plan_acceptance import allowed_markup as content_markup
+            from .telegram_code_generation import allowed_markup as generation_markup
             from .telegram_coding_approval import allowed_markup as coding_markup
             valid = (not set(body) - {'chat_id', 'text', 'reply_markup'}
                 and type(body.get('chat_id')) is int and body['chat_id'] == self.owner
@@ -145,7 +146,7 @@ class ConfiguredTelegramHTTP:
             if (markup is not None and canonical(markup) != canonical(keyboard())
                     and not allowed_markup(markup) and not resume_markup(markup)
                     and not experiment_markup(markup) and not planning_markup(markup)
-                    and not content_markup(markup) and not coding_markup(markup)):
+                    and not content_markup(markup) and not coding_markup(markup) and not generation_markup(markup)):
                 valid = valid and (isinstance(markup, dict) and set(markup) == {'inline_keyboard'})
                 rows = markup.get('inline_keyboard') if isinstance(markup, dict) else None
                 valid = valid and isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], list) and len(rows[0]) == 1

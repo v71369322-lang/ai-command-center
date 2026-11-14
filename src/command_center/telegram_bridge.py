@@ -119,6 +119,9 @@ class TelegramBridge:
             elif token.startswith('pc:'):
                 from .telegram_plan_acceptance import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('cg:'):
+                from .telegram_code_generation import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('ca:'):
                 from .telegram_coding_approval import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
@@ -267,6 +270,14 @@ class TelegramBridge:
         if value.split()[:1] in (['/coding_authorize'], ['/coding_status']):
             from .telegram_coding_approval import parse
             return str(uid), parse(value)
+        if value.split()[:1] == ['/code_authorize']:
+            from .telegram_code_generation import parse
+            return str(uid), parse(value)
+        if value.split()[:1] == ['/develop']:
+            parts = value.split()
+            if len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1]) or int(parts[1]) >= 2**53:
+                raise Denied('develop_request_number_required')
+            return str(uid), {'kind': 'develop', 'number': parts[1]}
         if value.split()[:1] == ['/plan_authorize']:
             parts = value.split()
             if (len(parts) != 2 or not re.fullmatch(r'0|[1-9][0-9]{0,15}', parts[1])
@@ -374,6 +385,12 @@ class TelegramBridge:
                     return {'inbox_id': iid, 'state': row.state, 'task_id': row.task_id}
             else:
                 admission = {}
+                if intent['kind'] == 'code_authorize_request':
+                    from .telegram_code_generation import binding
+                    admission['code_review_pin'] = binding(self, session, intent['task'])
+                if intent['kind'] == 'develop':
+                    from .telegram_code_workflow import intake
+                    admission['code_workspace_pin'] = intake(self, session, intent['number'])
                 if intent['kind'] == 'coding_authorize_request':
                     from .telegram_coding_approval import binding
                     admission['coding_task_review_pin'] = binding(self, session, intent['task'])
@@ -415,7 +432,22 @@ class TelegramBridge:
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
-        if kind == 'coding_status':
+        if kind in {'develop', 'code_authorize_request'}:
+            with self.store.transaction() as session:
+                self.guard()
+                self.store.check_audit(session)
+                if session.get(TelegramInbox, iid).state == 'DONE':
+                    return
+                if kind == 'develop':
+                    from .telegram_code_workflow import apply
+                    apply(self, session, iid, intent['number'])
+                else:
+                    from .telegram_code_generation import issue
+                    issue(self, session, iid)
+        elif kind == 'code_authorize_confirm':
+            from .telegram_code_generation import confirm
+            confirm(self, iid, intent)
+        elif kind == 'coding_status':
             from .telegram_coding_approval import status
             with self.store.transaction() as session:
                 self.guard()
@@ -769,6 +801,7 @@ class TelegramBridge:
                         '/plan номер — черновик; /plan_prepare номер — задача плана; '
                         '/plan_authorize номер — условия AI-плана; '
                         '/plan_accept номер — принять содержание; /plan_acceptance номер — статус принятия; '
+                        '/develop номер — следующий шаг кода; /code_authorize UUID — условия AI; '
                         '/coding_prepare номер — спецификация; /coding_authorize UUID — условия; '
                         '/coding_status UUID — coding-статус; '
                         '/projects — проекты и назначение; /project project-id — подключение и границы; '
@@ -873,6 +906,8 @@ class TelegramBridge:
                                  if verified else 'Успех не подтверждён; нужна сверка состояния.')
                     text += ' Работа по реальной бизнес-задаче не выполнялась.'
                     self.enqueue(session, f'task:{task.id}:{task.version}:{task.state}', text)
+            from .telegram_code_workflow import collect as collect_code
+            collect_code(self, session)
             from .telegram_experiment_watch import collect
             collect(self, session)
             collect(RecoveryBridge(self), session)

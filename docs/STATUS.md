@@ -1,5 +1,26 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **14 ноября 2026, Telegram → AI code → verified result**:
+branch `codex/telegram-ai-code-workflow`, parent #100 exact `2526d06`;
+OPEN/DRAFT и итоговый CI SUCCESS проверены заново (2359 app, отдельно 1013 infra).
+Добавлены `/develop номер`, отдельное observed-согласие `/code_authorize UUID`,
+exact Git capsule/current plan/spec/source binding, один bounded AI code proposal
+через прежние F1/ExternalGrant/financial ledger и broker factory/HTTP host.
+Результат создаёт отдельный isolated child WAITING_APPROVAL; прежний полный diff
+и `/coding_authorize` остаются отдельным разрешением запуска. Notifications/status
+проверяют provider/child/artifact/verifier evidence. Default disabled; paid calls
+не запускались. [Workflow](planning/TELEGRAM_AI_CODE_WORKFLOW.md),
+[checkpoint](handoff/TELEGRAM_AI_CODE_WORKFLOW_2026-11-14.md).
+Новая версия на VPS не устанавливалась; итоговые локальные проверки и exact CI —
+в зависимом Draft PR #101. Первый CI выявил CVE-2026-126360 в прежнем transitive
+`opentelemetry-api 1.45.1`; точечный lock upgrade до исправленной 1.45.2,
+без отключения аудита, fresh all-dependency audit PASS. Финальный CI — follow-up HEAD.
+Предыдущая установка #100 на VPS подтверждена локальным
+operational checkpoint: оба журнала VERIFIED; это исправляет старую запись ниже.
+Owner screenshot Nov14 подтверждает resume epoch33 и capture №131179183,
+но не live coding/AI acceptance. Старый planning profile истёк Nov13.
+
+
 Local continuation **13 ноября 2026, Telegram offline coding approval**:
 parent #99 `68a9405` OPEN/DRAFT и точный CI SUCCESS проверены заново (2325 app,
 отдельно 1013 infra). Ветка `codex/telegram-coding-approval` добавляет

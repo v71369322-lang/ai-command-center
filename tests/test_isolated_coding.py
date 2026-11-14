@@ -376,3 +376,7 @@ def test_offline_materializer_reads_exact_git_objects_not_worktree(store, monkey
     preparation = {'specification': payload['specification'], 'spec_digest': body['expected_spec_digest']}
     result = module['materialize'](str(root), preparation, body['replacements'])
     assert preview(store, 'owner', result)['payload_digest'] == digest(payload)
+    from command_center.code_workspace import preview as workspace_preview
+    capsule = module['materialize'](str(root), preparation)
+    assert 'replacements' not in capsule
+    assert workspace_preview(store, 'owner', capsule)['workspace']['snapshot'] == result['snapshot']
