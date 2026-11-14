@@ -32,7 +32,8 @@ def main():
          'infra/vps/stage_telegram_update.py', 'infra/vps/prepare_github_token.py',
          'infra/vps/inspect_first_recovery.py', 'infra/vps/prepare_first_recovery_profile.py',
            'infra/vps/prepare_recovery_offline.py', 'infra/vps/prepare_planning_candidate.py',
-           'infra/vps/activate_planning_candidate.py', 'infra/vps/apply_reconciled_telegram_candidate.py',
+           'infra/vps/activate_planning_candidate.py', 'infra/vps/activate_offline_candidate.py',
+           'infra/vps/apply_reconciled_telegram_candidate.py',
            'infra/vps/prepare_planning_operator.py', '-f', 'json',
          '-o', str(target / 'bandit.json')], expected=(0, 1))
     static = json.loads((target / 'bandit.json').read_text())
