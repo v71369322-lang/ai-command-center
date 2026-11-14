@@ -15,7 +15,7 @@ TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED", "SECURITY_BLOCKED"}
 
 
 def requires_approval(payload):
-    return payload['kind'] in {'approved_render', 'saved_request_plan', 'isolated_coding'} or (
+    return payload['kind'] in {'approved_render', 'saved_request_plan', 'isolated_coding', 'saved_request_code'} or (
         payload['kind'] == 'coding_synthetic' and payload['coding']['provider'] == 'openai')
 
 
@@ -83,6 +83,13 @@ class Store:
         ).order_by(Audit.sequence).limit(1)).scalar_one_or_none()
         if not created or created.event.get('revision') != self.settings.source_revision:
             raise Denied('stale_task_revision')
+        if task.payload.get('kind') == 'saved_request_code' or 'code_workspace_digest' in created.event:
+            from .code_workspace import check_task
+            if (task.payload.get('kind') != 'saved_request_code'
+                    or created.event.get('code_workspace_digest') != task.payload.get('workspace_digest')
+                    or digest(task.payload) != task.payload_hash or created.event.get('payload_hash') != task.payload_hash):
+                raise Denied('code_generation_payload_integrity')
+            check_task(self, s, task.payload)
         if task.payload.get('kind') == 'isolated_coding' or 'isolated_spec_digest' in created.event:
             from .isolated_coding import check_binding
             if (task.payload.get('kind') != 'isolated_coding'
@@ -94,7 +101,15 @@ class Store:
     def create(self, actor, key, payload, *, _scope_installer=None):
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
-        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic', 'saved_request_plan', 'isolated_coding'}:
+        with self.transaction() as s:
+            return self._create_locked(s, actor, key, payload, _scope_installer=_scope_installer)
+
+    def _create_locked(self, s, actor, key, payload, *, _scope_installer=None):
+        """Same F1 admission for atomic trusted composition; caller holds Control lock."""
+        if actor not in {"owner", "operator"}:
+            raise Denied("role_forbidden")
+        if payload.get("kind") not in {"render", "approved_render", 'coding_synthetic', 'saved_request_plan',
+                                       'isolated_coding', 'saved_request_code'}:
             raise Denied("unknown_action")
         if payload['kind'] == 'isolated_coding':
             if actor != 'owner':
@@ -121,50 +136,56 @@ class Store:
             raise Denied("secret_content_forbidden")
         scoped_key = actor + ":" + key
         fingerprint = digest(payload)
-        with self.transaction() as s:
-            control = s.get(Control, 1)
-            if payload['kind'] == 'isolated_coding':
-                from .isolated_coding import check_binding
-                self.check_audit(s)
-                check_binding(self, s, payload)
-            if payload['kind'] == 'saved_request_plan':
-                from .planning_task import check_context
-                check_context(self, s, payload)
-            previous = s.execute(select(Task).where(Task.request_key == scoped_key)).scalar_one_or_none()
-            if previous:
-                if previous.payload_hash != fingerprint:
-                    raise Denied("idempotency_conflict")
-                if _scope_installer:
-                    _scope_installer(s, previous)
-                return self.view(previous)
-            if control.halted or control.recovery:
-                raise Denied("control_blocked")
-            if s.execute(select(func.count()).select_from(Task).where(Task.state.not_in(TERMINAL))).scalar_one() >= 100:
-                raise Denied("pending_task_limit")
-            if s.execute(text("SELECT pg_database_size(current_database())")).scalar_one() > 64 * 1024 * 1024:
-                raise Denied("database_resource_limit")
-            dependency = payload.get("dependency")
-            if dependency:
-                self.task(s, dependency)
-            task = Task(id=str(uuid4()), request_key=scoped_key, payload_hash=fingerprint,
-                        payload=payload, state="WAITING_APPROVAL" if requires_approval(payload)
-                        else "READY", version=1, epoch=control.epoch, owner_role=actor,
-                        created_at=self.now(s), dependency=dependency, attempts=0, fence=0, reserved=0,
-                        coding_evidence={})
-            s.add(task)
-            if payload['kind'] == 'coding_synthetic':
-                from .coding.spec import PLAN
-                task.coding_evidence = {'plan': PLAN, 'stage': 'queued',
-                                        'summary': 'Ожидает ограниченного разрешения владельца.' if requires_approval(payload)
-                                        else 'Задача разрешена. Ожидает тестового разработчика.'}
-            s.flush()
-            self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint,
-                       **({'isolated_spec_digest': payload['spec_digest']} if payload['kind'] == 'isolated_coding' else {}))
-            if task.state == "READY":
-                s.add(Outbox(id=str(uuid4()), task_id=task.id))
+        control = s.get(Control, 1)
+        if payload['kind'] == 'saved_request_code':
+            if actor != 'owner':
+                raise Denied('owner_required_for_code_generation')
+            from .code_workspace import check_task
+            self.check_audit(s)
+            check_task(self, s, payload)
+        if payload['kind'] == 'isolated_coding':
+            from .isolated_coding import check_binding
+            self.check_audit(s)
+            check_binding(self, s, payload)
+        if payload['kind'] == 'saved_request_plan':
+            from .planning_task import check_context
+            check_context(self, s, payload)
+        previous = s.execute(select(Task).where(Task.request_key == scoped_key)).scalar_one_or_none()
+        if previous:
+            if previous.payload_hash != fingerprint:
+                raise Denied("idempotency_conflict")
             if _scope_installer:
-                _scope_installer(s, task)
-            return self.view(task)
+                _scope_installer(s, previous)
+            return self.view(previous)
+        if control.halted or control.recovery:
+            raise Denied("control_blocked")
+        if s.execute(select(func.count()).select_from(Task).where(Task.state.not_in(TERMINAL))).scalar_one() >= 100:
+            raise Denied("pending_task_limit")
+        if s.execute(text("SELECT pg_database_size(current_database())")).scalar_one() > 64 * 1024 * 1024:
+            raise Denied("database_resource_limit")
+        dependency = payload.get("dependency")
+        if dependency:
+            self.task(s, dependency)
+        task = Task(id=str(uuid4()), request_key=scoped_key, payload_hash=fingerprint,
+                    payload=payload, state="WAITING_APPROVAL" if requires_approval(payload)
+                    else "READY", version=1, epoch=control.epoch, owner_role=actor,
+                    created_at=self.now(s), dependency=dependency, attempts=0, fence=0, reserved=0,
+                    coding_evidence={})
+        s.add(task)
+        if payload['kind'] == 'coding_synthetic':
+            from .coding.spec import PLAN
+            task.coding_evidence = {'plan': PLAN, 'stage': 'queued',
+                                    'summary': 'Ожидает ограниченного разрешения владельца.' if requires_approval(payload)
+                                    else 'Задача разрешена. Ожидает тестового разработчика.'}
+        s.flush()
+        self.audit(s, "task_created", actor, task.id, payload_hash=fingerprint,
+                   **({'isolated_spec_digest': payload['spec_digest']} if payload['kind'] == 'isolated_coding' else {}),
+                   **({'code_workspace_digest': payload['workspace_digest']} if payload['kind'] == 'saved_request_code' else {}))
+        if task.state == "READY":
+            s.add(Outbox(id=str(uuid4()), task_id=task.id))
+        if _scope_installer:
+            _scope_installer(s, task)
+        return self.view(task)
 
     def approve(self, actor, task_id, version, seconds=120, *, _scope_installer=None, _deadline=None):
         if actor != "owner":

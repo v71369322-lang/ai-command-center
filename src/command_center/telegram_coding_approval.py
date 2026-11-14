@@ -235,7 +235,7 @@ def confirm(bridge, iid, intent):
             raise Denied('coding_approval_deadline_expired')
 
 
-def status(bridge, session, iid, task_id):
+def status_text(bridge, session, task_id):
     task = session.get(Task, task_id)
     created = session.scalar(select(Audit).where(Audit.event['kind'].as_string() == 'task_created',
         Audit.event['actor'].as_string() == 'owner', Audit.event['task_id'].as_string() == task_id).limit(1))
@@ -243,10 +243,10 @@ def status(bridge, session, iid, task_id):
             or created.event.get('revision') != bridge.store.settings.source_revision
             or created.event.get('payload_hash') != task.payload_hash or digest(task.payload) != task.payload_hash
             or created.event.get('isolated_spec_digest') != task.payload.get('spec_digest')):
-        return bridge.finish(session, iid, 'Coding-задача этого подключения и source revision не найдена или не подтверждена.')
+        return 'Coding-задача этого подключения и source revision не найдена или не подтверждена.'
     validate_payload(task.payload)
     if not task.payload['specification']['acceptance_reference']['request_id'].startswith(bridge.profile + ':'):
-        return bridge.finish(session, iid, 'Coding-задача этого подключения не найдена.')
+        return 'Coding-задача этого подключения не найдена.'
     verified = False
     if bridge.confirmed_result(session, task):
         expected = {**report(task.payload), 'checks': [{'command': c, 'passed': True}
@@ -260,4 +260,12 @@ def status(bridge, session, iid, task_id):
             + ('Результат независимо проверен: ' + task.artifact_hash + '.\n' if verified else
                'Подтверждённого результата пока нет; состояние F1 само по себе не доказывает исполнение или остановку.\n')
             + f'Отмена: /cancel {task.id}.\nAI-вызовы и публикация этим заданием не разрешены.')
-    return bridge.finish(session, iid, text)
+    if verified:
+        text += '\nПроверки Ruff и pytest пройдены: ' + str(len(expected['checks']))
+        text += '\nФайлов в проверенном результате: ' + str(len(expected['files']))
+        text += '\nПубликация и установка не выполнялись.'
+    return text
+
+
+def status(bridge, session, iid, task_id):
+    return bridge.finish(session, iid, status_text(bridge, session, task_id))

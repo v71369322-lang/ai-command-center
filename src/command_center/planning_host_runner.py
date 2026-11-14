@@ -10,8 +10,9 @@ from .store import Denied
 
 
 class PlanningHostRunner:
-    def __init__(self, store, ledger, backend, limits, host):
+    def __init__(self, store, ledger, backend, limits, host, gateway_factory=None):
         self.store, self.ledger, self.backend, self.limits, self.host = store, ledger, backend, limits, host
+        self.gateway_factory = gateway_factory
 
     def execute(self, task):
         stop, revoked = Event(), Event()
@@ -47,7 +48,8 @@ class PlanningHostRunner:
 
             pulse = Thread(target=heartbeat, daemon=True)
             pulse.start()
-            gateway = LivePlanningGateway(self.store, runtime_guard=guard)
+            gateway = (self.gateway_factory(guard) if self.gateway_factory
+                       else LivePlanningGateway(self.store, runtime_guard=guard))
             gateway.perform(task['id'], task['fence'])
         except Exception:
             failed = True

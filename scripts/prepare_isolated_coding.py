@@ -12,7 +12,7 @@ from command_center.isolated_coding import Snapshot, validate_payload
 from command_center.store import canonical, digest
 
 
-def materialize(repository, preparation, replacements):
+def materialize(repository, preparation, replacements=None):
     spec = preparation['specification']
     if digest(spec) != preparation['spec_digest']:
         raise ValueError('specification_digest_mismatch')
@@ -33,6 +33,9 @@ def materialize(repository, preparation, replacements):
     snapshot = Snapshot(objects=[{'kind': obj.type_name.decode(),
         'data': base64.b64encode(obj.as_raw_string()).decode()} for obj in selected.values()]).model_dump()
     snapshot['objects'].sort(key=canonical)
+    if replacements is None:
+        return {'request_id': spec['acceptance_reference']['request_id'],
+                'expected_spec_digest': preparation['spec_digest'], 'snapshot': snapshot}
     payload = {'kind': 'isolated_coding', 'spec_digest': preparation['spec_digest'],
                'specification': spec, 'snapshot': snapshot, 'replacements': replacements, 'cost': 0}
     validate_payload(payload)
@@ -44,11 +47,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repository', required=True)
     parser.add_argument('--preparation', required=True, help='Saved preparation JSON; no credentials')
-    parser.add_argument('--replacements', required=True, help='Explicit JSON mapping from path to full new source')
+    parser.add_argument('--replacements', help='Explicit JSON mapping from path to full new source')
     parser.add_argument('--output', required=True, help='New operator-controlled private file, never Git')
     args = parser.parse_args()
     value = materialize(args.repository, json.loads(Path(args.preparation).read_text(encoding='utf-8')),
-                        json.loads(Path(args.replacements).read_text(encoding='utf-8')))
+                        json.loads(Path(args.replacements).read_text(encoding='utf-8')) if args.replacements else None)
     # Exclusive creation: never follow/overwrite an existing output or symlink.
     fd = os.open(args.output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as output:

@@ -24,6 +24,8 @@ from .request_plan_store import ManualRequest, ManualSaveRequest, EVENT as PLAN_
 from .plan_acceptance import AcceptanceRequest
 from .coding_preparation import CodingPreparationRequest, CodingPreparationSave
 from .isolated_coding import BindRequest, BindSave
+from .code_workspace import WorkspaceRequest, WorkspaceSave
+from .code_generation import ConfigureCode
 
 
 class Command(BaseModel):
@@ -409,7 +411,7 @@ def create_app(settings=None, gateway_factory=None):
     @app.post("/api/tasks/{task_id}/approve")
     def approve(task_id: str, approval: ApprovalRequest, role=Depends(identity)):
         task_payload = store.get(task_id)['payload']
-        if task_payload['kind'] == 'saved_request_plan' or task_payload.get('coding', {}).get('provider') == 'openai':
+        if task_payload['kind'] in {'saved_request_plan', 'saved_request_code'} or task_payload.get('coding', {}).get('provider') == 'openai':
             raise Denied('external_scope_approval_required')
         return store.approve(role, task_id, approval.version, approval.seconds)
 
@@ -527,6 +529,31 @@ def create_app(settings=None, gateway_factory=None):
                              role=Depends(identity)):
         from .plan_acceptance import read
         return read(store, role, request_id)
+
+    @app.post('/api/project-inbox/coding/workspace-preview')
+    def code_workspace_preview(body: WorkspaceRequest, role=Depends(identity)):
+        from .code_workspace import preview
+        return preview(store, role, body.model_dump())
+
+    @app.post('/api/project-inbox/coding/workspace')
+    def code_workspace_save(body: WorkspaceSave, role=Depends(identity)):
+        from .code_workspace import prepare
+        return prepare(store, role, body.model_dump())
+
+    @app.get('/api/project-inbox/coding/ai-profile')
+    def code_profile_read(role=Depends(identity)):
+        from .project_inbox import owner
+        from .code_generation import configured
+        owner(role)
+        with store.transaction() as session:
+            store.check_audit(session)
+            profile, pin = configured(store, session)
+            return {'profile': profile.model_dump(), 'profile_digest': pin, 'provider_called': False}
+
+    @app.post('/api/project-inbox/coding/ai-profile')
+    def code_profile_save(body: ConfigureCode, role=Depends(identity)):
+        from .code_generation import configure
+        return configure(store, role, body.model_dump())
 
     @app.post('/api/project-inbox/coding/task-preview')
     def coding_task_preview(body: BindRequest, role=Depends(identity)):
