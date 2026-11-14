@@ -17,6 +17,16 @@ child, existing full diff/execution consent, exact verified result notifications
 See [workflow and boundaries](../planning/TELEGRAM_AI_CODE_WORKFLOW.md).
 New APIs are additive; contract regenerated; original envelopes/pinning retained.
 
+Initial PR #101 workflow 43595407980 passed static/1013 infra checks but failed
+before builds/application tests at the retained dependency audit. Independent
+locked-package diagnosis identified only `opentelemetry-api 1.45.1`, newly
+indexed CVE-2026-126360 / GHSA-mf5v-w3w3-f6cg. The maintainer's
+[advisory](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg)
+identifies 1.45.2 as the fix. `uv lock --upgrade-package opentelemetry-api==1.45.2`
+changed only this package/version/distribution hashes. No ignored advisory or
+disabled gate. Fresh exported all-dependency audit reports no known vulnerabilities.
+Final full CI must match the follow-up commit, not the failed earlier run.
+
 Default code profile disabled. This turn reads no provider key, configures no live
 profile, calls no real provider/Telegram API, touches no VPS, deploys/merges nothing.
 Tests use explicit public mocks, real PG and local check subprocesses. Changes to

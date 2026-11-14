@@ -12,7 +12,10 @@ exact Git capsule/current plan/spec/source binding, один bounded AI code pro
 не запускались. [Workflow](planning/TELEGRAM_AI_CODE_WORKFLOW.md),
 [checkpoint](handoff/TELEGRAM_AI_CODE_WORKFLOW_2026-11-14.md).
 Новая версия на VPS не устанавливалась; итоговые локальные проверки и exact CI —
-в зависимом Draft PR. Предыдущая установка #100 на VPS подтверждена локальным
+в зависимом Draft PR #101. Первый CI выявил CVE-2026-126360 в прежнем transitive
+`opentelemetry-api 1.45.1`; точечный lock upgrade до исправленной 1.45.2,
+без отключения аудита, fresh all-dependency audit PASS. Финальный CI — follow-up HEAD.
+Предыдущая установка #100 на VPS подтверждена локальным
 operational checkpoint: оба журнала VERIFIED; это исправляет старую запись ниже.
 Owner screenshot Nov14 подтверждает resume epoch33 и capture №131179183,
 но не live coding/AI acceptance. Старый planning profile истёк Nov13.
