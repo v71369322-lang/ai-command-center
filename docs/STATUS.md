@@ -1,5 +1,17 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **23 ноября 2026, delegated real Telegram setup**:
+VPS фактически VERIFIED на PR102/`9f6297b`; PR/оба CI freshly SUCCESS.
+Telegram перестал отвечать из-за выхода обработчика Nov19 после сетевых/502
+ошибок. Existing-binding preflight и один штатный start telegram восстановили
+heartbeat/реальный ответ. Это разовая починка, не исправление повторных сбоев/задержек.
+Через настоящий owner UI: setup5 (5/5), план запроса 131179189 v2 принят,
+coding scope сохранён PREPARED_NOT_RUNNABLE. Код/Task/execute grant/paid AI
+не создавались; улучшение статуса пока не реализовано. Admission OPEN, epoch37,
+recovery=false, historical ExternalActions4/reserved0. Подробности и следующий
+безопасный шаг: [live handoff](handoff/TELEGRAM_LIVE_SETUP_2026-11-23.md).
+Это docs-only local checkpoint, не новая установленная версия и не новый CI-прогон.
+
 Local continuation **14 ноября 2026, owner-authorized installation of PR101**:
 VPS read-only reconciliation подтвердил #100/2526d06, оба журнала VERIFIED,
 нет активных executions, все 4 historical ExternalAction COMPLETE/reserved0.
