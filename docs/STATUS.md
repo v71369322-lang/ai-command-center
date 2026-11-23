@@ -1,3 +1,10 @@
+Local continuation **23 ноября 2026, voice activation repair**:
+Exact PR104 installation failed its voice postcheck and was not replayed.
+Compatible standard rollback restored VERIFIED predecessor9f6297b, without
+data restore. Failed activation evidence retained. Narrow admission-contention
+retry and real PostgreSQL regression coverage: [repair handoff](handoff/OFFLINE_VOICE_REPAIR_2026-11-23.md).
+Voice is not yet live; paid calls remain forbidden.
+
 # Текущий контекст и облачный handoff
 
 Local continuation **23 ноября 2026, offline voice release binding**:
@@ -692,3 +699,4 @@ Actions API с фильтром exact head_sha вернул **0 runs** для в
 В handoff каждой задачи сохранять repo/branch/base SHA, scope, изменённые файлы,
 коммит/PR, команды и результаты, CI, неразрешённые внешние intents/резервы,
 точные блокеры и один следующий безопасный шаг. Временный workspace не архив.
+

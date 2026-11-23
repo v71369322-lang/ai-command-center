@@ -4,6 +4,7 @@ from datetime import datetime
 from hashlib import sha256
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 
 from .models import Audit, Control, TelegramInbox
 from .store import Denied, digest
@@ -14,6 +15,16 @@ FAILED = 'telegram_voice_transcription_failed'
 STARTED = 'telegram_voice_transcription_started'
 
 
+def admission_busy(error, store):
+    """Retry only a timed-out admission lock, never arbitrary SQL/audit failures."""
+    if (not isinstance(error, OperationalError)
+            or getattr(error.orig, 'sqlstate', None) not in {'55P03', '57014'}):
+        return False
+    statement = select(Control).where(Control.id == 1).with_for_update().compile(
+        dialect=store.engine.dialect)
+    return error.statement == str(statement) and error.params == statement.params
+
+
 def process_or_pause(worker):
     """Normal stop pauses speech; revocation/integrity errors still stop the service."""
     try:
@@ -22,6 +33,27 @@ def process_or_pause(worker):
         if str(error) != 'control_blocked':
             raise
         return {'state': 'PAUSED'}
+    except OperationalError as error:
+        if not admission_busy(error, worker.bridge.store):
+            raise
+        return {'state': 'BUSY'}
+
+
+def heartbeat(worker, guard, fingerprint, state):
+    """A busy admission lock produces no invented heartbeat or audit evidence."""
+    store = worker.bridge.store
+    try:
+        with store.transaction() as session:
+            guard()
+            store.check_audit(session)
+            store.audit(session, 'telegram_voice_worker_heartbeat', 'transcriber',
+                        profile=worker.bridge.profile, profile_digest=fingerprint,
+                        model_fingerprint=worker.model_fingerprint, state=state, paid_api=False)
+    except OperationalError as error:
+        if not admission_busy(error, store):
+            raise
+        return False
+    return True
 
 
 class VoiceWorker:
@@ -137,7 +169,10 @@ class VoiceWorker:
                     raise Denied('voice_worker_source_changed')
             result = propose(self.bridge, iid, response, request, expected_epoch=epoch)
             return {'state': 'PROPOSED', **result}
-        except Exception:
+        except Exception as error:
+            if admission_busy(error, store):
+                # Nothing has been published. Re-enter with fresh epoch/profile guards.
+                raise
             # Raw decoder/provider errors and transcript text must not enter failure logs.
             with store.transaction() as session:
                 self._guard(session, epoch)
@@ -225,14 +260,8 @@ def main():
             finally:
                 signal.alarm(0)
             if heartbeat_at is None or time.monotonic() - heartbeat_at >= 15:
-                with store.transaction() as session:
-                    guard()
-                    store.check_audit(session)
-                    store.audit(session, 'telegram_voice_worker_heartbeat', 'transcriber',
-                                profile=bridge.profile, profile_digest=fingerprint,
-                                model_fingerprint=decoder.model_fingerprint,
-                                state=result['state'], paid_api=False)
-                heartbeat_at = time.monotonic()
+                if heartbeat(worker, guard, fingerprint, result['state']):
+                    heartbeat_at = time.monotonic()
             stop.wait(1)
     except Exception:
         parser.exit(1, 'offline_voice_worker_failed_closed; inspect protected configuration and audit\n')
