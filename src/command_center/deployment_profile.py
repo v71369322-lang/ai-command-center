@@ -27,7 +27,7 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
     if 'telegram' in m:
@@ -65,10 +65,13 @@ def validate_manifest(m):
     if 'planning' in m:
         from .deployment_planning import validate_binding
         validate_binding(m)
+    if 'voice' in m:
+        from .deployment_voice import validate_binding
+        validate_binding(m)
 
 
 def services(m):
-    return SERVICES | ({'telegram'} if 'telegram' in m else set())
+    return SERVICES | ({'telegram'} if 'telegram' in m else set()) | ({'voice'} if 'voice' in m else set())
 
 
 def telegram_service(m):
@@ -180,6 +183,9 @@ def render(base, m):
     if 'telegram' in m:
         profile['networks']['telegram-access'] = {'internal': False}
         profile['services']['telegram'] = telegram_service(m)
+    if 'voice' in m:
+        from .deployment_voice import service
+        profile['services']['voice'] = service(m)
     if 'first_experiment' in m:
         from .deployment_integrations import CONFIG_TARGET, mounts
         profile['networks']['gateway-access'] = {'internal': False}
@@ -219,6 +225,11 @@ def validate_profile(p, m):
     if p['networks'] != expected_networks:
         raise ValueError('deployment_network_scope_changed')
     for name, s in p['services'].items():
+        if name == 'voice':
+            from .deployment_voice import service
+            if s != service(m):
+                raise ValueError('voice_service_boundary_changed')
+            continue
         if {k: v for k, v in s.get('environment', {}).items() if k.startswith('F1_PLANNING_')} != planning_environment(m, name):
             raise ValueError('planning_deployment_environment_invalid')
         if name == 'telegram':

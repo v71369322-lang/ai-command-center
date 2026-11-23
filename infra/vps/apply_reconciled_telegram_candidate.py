@@ -28,6 +28,8 @@ def validate_transition(old, target, old_digest, target_digest, *, planning=Fals
         raise ValueError('exact_bundle_approvals_required')
     if 'planning' in after and not planning:
         raise ValueError('separate_planning_access_approval_required')
+    if 'voice' in after and not planning:
+        raise ValueError('separate_voice_access_approval_required')
     fixed = ('migration_hash', 'database_image', 'redis_image', 'data_root',
              'control_uid', 'execution_uid', 'owner_login')
     if any(before.get(key) != after.get(key) for key in fixed):

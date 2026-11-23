@@ -140,3 +140,25 @@ def test_tampered_inbox_cannot_be_downloaded_even_with_recomputed_row_hash(bridg
     with pytest.raises(Denied, match='intake_binding_changed'):
         worker(service, download).process_one()
     assert download.calls == 0
+
+
+def test_idle_worker_does_not_rescan_entire_audit_history_each_second(bridge, store, monkeypatch):
+    service, _ = bridge
+    download = Download()
+    monkeypatch.setattr(store, 'check_audit', lambda _: pytest.fail('no full audit scan for an empty read-only poll'))
+    assert worker(service, download).process_one()['state'] == 'IDLE'
+    assert download.calls == 0
+
+
+def test_full_audit_is_still_required_before_any_download(bridge, store, monkeypatch):
+    service, _ = bridge
+    service.receive(voice())
+    download = Download()
+
+    def invalid(_):
+        raise Denied('audit_integrity_failure')
+
+    monkeypatch.setattr(store, 'check_audit', invalid)
+    with pytest.raises(Denied, match='audit_integrity_failure'):
+        worker(service, download).process_one()
+    assert download.calls == 0

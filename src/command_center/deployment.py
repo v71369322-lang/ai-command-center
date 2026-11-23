@@ -186,6 +186,11 @@ class Deployment:
         if 'planning' in self.m and planning_check:
             from .deployment_planning import check_binding
             check_binding(self.m)
+        if 'voice' in self.m:
+            from .deployment_voice import check_binding
+            if planning_check:  # independent backup/restore inspection survives optional voice revocation
+                check_binding(self.m)
+            image_check(self.engine, {'voice': self.m['voice']['image']}, self.m['revision'])
         image_check(self.engine, {k: v for k, v in self.m['images'].items() if k not in {'executor', 'coding'}}, self.m['revision'])
         image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
         if fresh:
@@ -257,6 +262,10 @@ class Deployment:
             raise ValueError('telegram_active_release_changed')
         if 'telegram' in previous['manifest']:
             active = Deployment(previous, state['directory'], self.engine, self.execution)
+            if 'voice' in previous['manifest']:
+                active.compose('stop', 'voice')
+                if self.engine.run('ps', '-q', '--filter', 'name=^' + PROJECT + '-voice-1$').strip():
+                    raise ValueError('voice_stop_unconfirmed')
             active.compose('stop', 'telegram')
             if self.engine.run('ps', '-q', '--filter', 'name=^' + PROJECT + '-telegram-1$').strip():
                 raise ValueError('telegram_stop_unconfirmed')
@@ -386,6 +395,9 @@ class Deployment:
         return {'state': 'BOOTED_ADMISSION_HALTED', 'go_live': False}
 
     def postcheck(self):
+        if 'voice' in self.m:
+            from .deployment_voice import check_binding
+            check_binding(self.m)
         if 'planning' in self.m:
             from .deployment_planning import check_binding
             check_binding(self.m)
@@ -408,6 +420,9 @@ class Deployment:
             metadata = self.engine.json('inspect', PROJECT + '-' + name + '-1')[0]
             if not metadata['State']['Running']:
                 raise ValueError('service_not_running:' + name)
+            if name == 'voice':
+                from .deployment_voice import check_runtime
+                check_runtime(self.m, metadata)
             if 'first_experiment' in self.m:
                 from .deployment_integrations import CONFIG_TARGET, CREDENTIAL_TARGETS, mounts
                 binding = self.m['first_experiment']

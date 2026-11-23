@@ -1,5 +1,14 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **23 ноября 2026, offline voice release binding**:
+`codex/offline-voice-release-20261123` зависит от PR103 exact2fcf472.
+Добавлены opt-in manifest/service, model/profile/image/runtime проверки и
+штатный profile/prepare/inspect/apply/reconcile adapter с отдельным exact
+voice capability approval. Idle worker не сканирует audit каждую секунду;
+проверка перед эффектами сохранена. Это исправляет нижнее «installer ещё нужен»
+на уровне кода, но не означает установку. Итоговые CI, staging и реальные
+неоконченные шаги: [release handoff](handoff/OFFLINE_VOICE_RELEASE_2026-11-23.md).
+
 Local continuation **23 ноября 2026, offline voice implementation**:
 ветка `codex/offline-voice-intake-20261123` поверх dd95fc3/PR102 добавляет
 отдельный opt-in downloader/CPU speech worker и существующий owner readback.
