@@ -77,6 +77,8 @@ def decode_audio(audio):
 class OfflineSpeech:
     def __init__(self, model_directory, manifest):
         self.model_fingerprint = verify_model(model_directory, manifest)
+        import onnxruntime
+        onnxruntime.disable_telemetry_events()
         from faster_whisper import WhisperModel
 
         self.model = WhisperModel(str(model_directory), device='cpu', compute_type='int8',

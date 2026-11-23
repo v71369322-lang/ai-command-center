@@ -30,6 +30,23 @@ def test_unreviewed_model_files_are_not_loaded(tmp_path):
         verify_model(tmp_path, manifest)
 
 
+def test_runtime_is_local_cpu_only_and_disables_decoder_telemetry(tmp_path, monkeypatch):
+    import sys
+    events = []
+
+    def whisper(directory, **options):
+        assert events == ['telemetry_disabled']
+        assert directory == str(tmp_path)
+        assert options == {'device': 'cpu', 'compute_type': 'int8', 'cpu_threads': 1,
+                           'num_workers': 1, 'local_files_only': True}
+        return object()
+
+    monkeypatch.setitem(sys.modules, 'onnxruntime', SimpleNamespace(
+        disable_telemetry_events=lambda: events.append('telemetry_disabled')))
+    monkeypatch.setitem(sys.modules, 'faster_whisper', SimpleNamespace(WhisperModel=whisper))
+    assert OfflineSpeech(tmp_path, model(tmp_path)).model is not None
+
+
 def decoder(monkeypatch, segments):
     import command_center.offline_speech as speech
     monkeypatch.setattr(speech, 'decode_audio', lambda _: [0] * 16000)
