@@ -1,5 +1,24 @@
 # Критическое ревью F1: текущая облачная итерация
 
+## Offline voice release, 23 November 2026
+
+Self-review by the implementing agent, not an independent review. Speech receives
+only existing scoped Telegram/DB credentials, read-only exact model/profile/source,
+one CPU/1GiB/64 pids, no Docker/host/owner/publisher/provider credentials. The
+candidate digest additionally binds the exact voice capability and cutoff. Source,
+custody, model, connection, immutable image, actual runtime mounts/env/resources
+and fresh paused-worker heartbeat are checked. Existing deployment lock, stop,
+financial/drain/backup/INTENT/VERIFIED and reconcile interlocks remain mandatory.
+Normal stop pauses recognition; revocation/integrity failures remain fatal. Empty
+read-only polling avoids full history scans, while every download and durable
+write retains full audit validation. No arbitrary executor or paid AI is added.
+
+Retained LOW B105 findings in `deployment_voice.py` are the constant environment
+flag `HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and fixed in-container `/run/telegram/token`
+path; the analogous path comparison in `voice_candidate.py` is also non-secret.
+They remain visible in the Bandit report under the existing reviewed-low policy.
+No vulnerability or new MEDIUM/HIGH finding is ignored.
+
 Отдельная последующая проверка PR #8 и исправления:
 [REVIEW_PR8.md](REVIEW_PR8.md). Она выполнена в отдельной ветке, но той же
 сессией; полностью независимое внешнее заключение по-прежнему не заявляется.

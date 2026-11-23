@@ -41,7 +41,7 @@ class VoiceWorker:
         self.key = int(digest({'voice_worker': bridge.profile})[:15], 16)
         self.leader = None
 
-    def _guard(self, session, epoch=None):
+    def _guard(self, session, epoch=None, *, audit=True):
         if self.runtime_guard:
             self.runtime_guard()
         if self.leader is None:
@@ -54,7 +54,8 @@ class VoiceWorker:
         if not held:
             raise Denied('voice_worker_leadership_lost')
         self.bridge.guard()
-        self.bridge.store.check_audit(session)
+        if audit:
+            self.bridge.store.check_audit(session)
         control = session.get(Control, 1)
         if (control is None or control.halted or control.recovery
                 or (epoch is not None and control.epoch != epoch)):
@@ -62,30 +63,31 @@ class VoiceWorker:
         return control.epoch
 
     def _next(self, session):
-        # Indexed inbox selection; no full Store.snapshot()/ORM audit materialization.
-        rows = session.scalars(select(TelegramInbox).where(
+        # Exclude completed voices in SQL, not two queries per historical voice.
+        completed = select(Audit.sequence).where(
+            Audit.event['kind'].as_string().in_((PROPOSED, FAILED)),
+            Audit.event['profile'].as_string() == self.bridge.profile,
+            Audit.event['voice_inbox_id'].as_string() == TelegramInbox.id).exists()
+        intake_exists = select(Audit.sequence).where(
+            Audit.event['kind'].as_string() == INTAKE,
+            Audit.event['profile'].as_string() == self.bridge.profile,
+            Audit.event['inbox_id'].as_string() == TelegramInbox.id).exists()
+        row = session.scalar(select(TelegramInbox).where(
             TelegramInbox.profile == self.bridge.profile, TelegramInbox.state == 'DONE',
             TelegramInbox.created_at >= self.since,
-            TelegramInbox.intent['kind'].as_string() == 'voice_request'
-        ).order_by(TelegramInbox.created_at, TelegramInbox.id).limit(1001)).all()
-        if len(rows) > 1000:
-            raise Denied('voice_worker_queue_limit')
-        for row in rows:
-            completed = session.scalar(select(Audit.sequence).where(
-                Audit.event['kind'].as_string().in_((PROPOSED, FAILED)),
-                Audit.event['profile'].as_string() == self.bridge.profile,
-                Audit.event['voice_inbox_id'].as_string() == row.id).limit(1))
-            intake = session.scalar(select(Audit).where(
-                Audit.event['kind'].as_string() == INTAKE,
-                Audit.event['profile'].as_string() == self.bridge.profile,
-                Audit.event['inbox_id'].as_string() == row.id).limit(1))
-            if completed is None and intake is not None:
-                if (row.fingerprint != digest(row.intent)
-                        or any(intake.event.get(key) != row.intent.get(key) for key in
-                               ('file_unique_hash', 'file_ref_hash', 'duration_seconds', 'file_size', 'mime_type'))):
-                    raise Denied('voice_worker_intake_binding_changed')
-                return row.id, row.fingerprint, dict(row.intent)
-        return None
+            TelegramInbox.intent['kind'].as_string() == 'voice_request', ~completed, intake_exists
+        ).order_by(TelegramInbox.created_at, TelegramInbox.id).limit(1))
+        if row is None:
+            return None
+        intake = session.scalar(select(Audit).where(
+            Audit.event['kind'].as_string() == INTAKE,
+            Audit.event['profile'].as_string() == self.bridge.profile,
+            Audit.event['inbox_id'].as_string() == row.id).limit(1))
+        if (row.fingerprint != digest(row.intent)
+                or any(intake.event.get(key) != row.intent.get(key) for key in
+                       ('file_unique_hash', 'file_ref_hash', 'duration_seconds', 'file_size', 'mime_type'))):
+            raise Denied('voice_worker_intake_binding_changed')
+        return row.id, row.fingerprint, dict(row.intent)
 
     def process_one(self):
         store = self.bridge.store
@@ -108,10 +110,12 @@ class VoiceWorker:
     def _process(self):
         store = self.bridge.store
         with store.transaction() as session:
-            epoch = self._guard(session)
+            epoch = self._guard(session, audit=False)
             item = self._next(session)
             if item is None:
                 return {'state': 'IDLE'}
+            # Full history verification remains mandatory before any download/write.
+            store.check_audit(session)
             iid, fingerprint, intent = item
             store.audit(session, STARTED, 'transcriber', profile=self.bridge.profile,
                         voice_inbox_id=iid, voice_fingerprint=fingerprint,
@@ -154,24 +158,13 @@ def main():
     import threading
     import time
 
-    from pydantic import BaseModel, ConfigDict, Field
-
     from .offline_speech import OfflineSpeech
     from .store import Store
     from .telegram_bridge import TelegramBridge
     from .telegram_service import service_settings
     from .telegram_transport import ConfiguredTelegramHTTP, connection, private_read
     from .telegram_voice_files import TelegramVoiceFiles
-
-    class Profile(BaseModel):
-        model_config = ConfigDict(extra='forbid', strict=True, frozen=True)
-        enabled: bool = False
-        connection_file: str
-        connection_digest: str = Field(pattern=r'^[a-f0-9]{64}$')
-        source_revision: str = Field(pattern=r'^[a-f0-9]{40}$')
-        model_directory: str
-        model_manifest: dict[str, str]
-        since: str
+    from .voice_profile import VoiceProfile as Profile
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['inspect', 'run'])

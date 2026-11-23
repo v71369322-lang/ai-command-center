@@ -63,6 +63,14 @@ def test_transition_rejects_scope_expansion(monkeypatch, change):
         operator.validate_transition(old, new, 'old', 'new')
 
 
+def test_voice_addition_requires_its_own_exact_capability_scope(monkeypatch):
+    old, new = manifests()
+    new['manifest']['voice'] = {}
+    monkeypatch.setattr(operator, 'checksum', lambda value: 'old' if value is old else 'new')
+    with pytest.raises(ValueError, match='separate_voice_access_approval_required'):
+        operator.validate_transition(old, new, 'old', 'new')
+
+
 @pytest.mark.parametrize('now,until', [(1000, 1000), (1000, 4601), (1000, None), (1000, True)])
 def test_deadline_is_fresh_and_bounded(monkeypatch, now, until):
     monkeypatch.setattr(operator.time, 'time', lambda: now)
