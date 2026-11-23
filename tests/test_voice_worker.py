@@ -162,3 +162,104 @@ def test_full_audit_is_still_required_before_any_download(bridge, store, monkeyp
     with pytest.raises(Denied, match='audit_integrity_failure'):
         worker(service, download).process_one()
     assert download.calls == 0
+
+
+def test_real_admission_contention_retries_without_download_or_false_heartbeat(bridge, store):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from command_center.voice_worker import heartbeat, process_or_pause
+
+    service, _ = bridge
+    service.receive(voice())
+    download = Download()
+    runner = worker(service, download)
+    locked, release = Event(), Event()
+
+    def hold():
+        with store.transaction():
+            locked.set()
+            assert release.wait(20)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        holder = pool.submit(hold)
+        try:
+            assert locked.wait(5)
+            assert process_or_pause(runner) == {'state': 'BUSY'}
+            assert not heartbeat(runner, lambda: pytest.fail('no lock acquired'), 'b' * 64, 'BUSY')
+            assert download.calls == 0
+        finally:
+            release.set()
+        holder.result(timeout=5)
+    assert process_or_pause(runner)['state'] == 'PROPOSED'
+    assert download.calls == 1
+    assert heartbeat(runner, lambda: None, 'b' * 64, 'IDLE')
+
+
+@pytest.mark.parametrize('sqlstate,query,params,expected', [
+    ('57014', 'control', {'id_1': 1}, True),
+    ('55P03', 'control', {'id_1': 1}, True),
+    ('08006', 'control', {'id_1': 1}, False),
+    ('57014', 'audit', {'id_1': 1}, False),
+    ('57014', 'control', {'id_1': 2}, False),
+    ('57014', None, None, False),
+])
+def test_only_exact_admission_timeout_is_retriable(store, sqlstate, query, params, expected):
+    from types import SimpleNamespace
+    from sqlalchemy import select
+    from sqlalchemy.exc import OperationalError
+    from command_center.voice_worker import admission_busy
+    statement = str(select(Control).where(Control.id == 1).with_for_update().compile(
+        dialect=store.engine.dialect)) if query == 'control' else query
+    error = OperationalError(statement, params, SimpleNamespace(sqlstate=sqlstate))
+    assert admission_busy(error, store) is expected
+
+
+def test_audit_timeout_remains_fatal_for_processing_and_heartbeat(bridge, store, monkeypatch):
+    from types import SimpleNamespace
+    from sqlalchemy.exc import OperationalError
+    from command_center.voice_worker import heartbeat, process_or_pause
+    service, _ = bridge
+    service.receive(voice())
+    download = Download()
+    runner = worker(service, download)
+
+    def fail(_):
+        raise OperationalError('SELECT audit', {}, SimpleNamespace(sqlstate='57014'))
+
+    monkeypatch.setattr(store, 'check_audit', fail)
+    with pytest.raises(OperationalError):
+        process_or_pause(runner)
+    with pytest.raises(OperationalError):
+        heartbeat(runner, lambda: None, 'b' * 64, 'IDLE')
+    assert download.calls == 0
+
+
+def test_contention_after_download_does_not_permanently_fail_voice(bridge, store):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from sqlalchemy import select
+    from sqlalchemy.exc import OperationalError
+    from command_center.voice_worker import process_or_pause
+    service, _ = bridge
+    service.receive(voice())
+    transaction = store.transaction
+
+    @contextmanager
+    def busy():
+        statement = select(Control).where(Control.id == 1).with_for_update().compile(
+            dialect=store.engine.dialect)
+        raise OperationalError(str(statement), statement.params, SimpleNamespace(sqlstate='57014'))
+        yield  # pragma: no cover
+
+    class BusyDownload(Download):
+        def download(self, intent):
+            result = super().download(intent)
+            store.transaction = busy
+            return result
+
+    download = BusyDownload()
+    try:
+        assert process_or_pause(worker(service, download)) == {'state': 'BUSY'}
+    finally:
+        store.transaction = transaction
+    assert worker(service, Download()).process_one()['state'] == 'PROPOSED'
