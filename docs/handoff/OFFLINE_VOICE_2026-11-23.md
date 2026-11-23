@@ -44,7 +44,9 @@ See [worker contract](../telegram/OFFLINE_VOICE_WORKER.md).
   Docker CLI/socket for two pre-existing actual-executor service cases. These
   overlapping partial runs are not added together or claimed complete. The final
   bounded suite explicitly excludes those two container cases; full CI must run
-  them normally. Final bounded PG result: **115 passed, 2 deselected** (68.86s).
+  them normally. Latest bounded PG result: **116 passed, 2 deselected** (69.08s),
+  adding immutable intake-audit binding to the downloaded file checks. Three
+  additional pure tests cover pause vs fatal integrity/profile errors.
   New PR/CI are recorded in the PR/checkpoint, not inferred.
 - Windows full `security_checks.py` was blocked by its POSIX `npm` invocation
   (npm.cmd is not an executable accepted by that subprocess call). No check was

@@ -3,7 +3,7 @@ from hashlib import sha256
 
 import pytest
 
-from command_center.models import Control
+from command_center.models import Control, TelegramInbox
 from command_center.store import Denied
 from command_center.voice_worker import VoiceWorker
 from command_center.telegram_voice_requests import pending_count
@@ -126,3 +126,17 @@ def test_profile_revocation_during_inference_blocks_readback(bridge):
         runtime_guard=guard)
     with pytest.raises(Denied, match='profile_revoked'):
         runner.process_one()
+
+
+def test_tampered_inbox_cannot_be_downloaded_even_with_recomputed_row_hash(bridge, store):
+    from command_center.store import digest
+    service, _ = bridge
+    received = service.receive(voice())
+    with store.transaction() as session:
+        row = session.get(TelegramInbox, received['inbox_id'])
+        row.intent = row.intent | {'file_size': 100}
+        row.fingerprint = digest(row.intent)
+    download = Download()
+    with pytest.raises(Denied, match='intake_binding_changed'):
+        worker(service, download).process_one()
+    assert download.calls == 0

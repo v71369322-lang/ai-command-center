@@ -60,3 +60,19 @@ def test_transcript_hash_binds_exact_audio_and_returns_no_authority(monkeypatch)
 def test_bad_inference_does_not_become_a_task(monkeypatch, segments, code):
     with pytest.raises(Denied, match=code):
         decoder(monkeypatch, segments).transcribe(b'fixture')
+
+
+@pytest.mark.parametrize('code,paused', [('control_blocked', True), ('voice_profile_revoked', False),
+                                      ('audit_integrity_failure', False)])
+def test_only_normal_stop_becomes_an_idle_worker_pause(code, paused):
+    from command_center.voice_worker import process_or_pause
+
+    class Worker:
+        def process_one(self):
+            raise Denied(code)
+
+    if paused:
+        assert process_or_pause(Worker()) == {'state': 'PAUSED'}
+    else:
+        with pytest.raises(Denied, match=code):
+            process_or_pause(Worker())

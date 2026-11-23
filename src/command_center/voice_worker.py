@@ -14,6 +14,16 @@ FAILED = 'telegram_voice_transcription_failed'
 STARTED = 'telegram_voice_transcription_started'
 
 
+def process_or_pause(worker):
+    """Normal stop pauses speech; revocation/integrity errors still stop the service."""
+    try:
+        return worker.process_one()
+    except Denied as error:
+        if str(error) != 'control_blocked':
+            raise
+        return {'state': 'PAUSED'}
+
+
 class VoiceWorker:
     def __init__(self, bridge, downloader, decoder, *, since, model_fingerprint, runtime_guard=None):
         if (not isinstance(since, datetime) or since.tzinfo is None or since.utcoffset() is None
@@ -65,11 +75,15 @@ class VoiceWorker:
                 Audit.event['kind'].as_string().in_((PROPOSED, FAILED)),
                 Audit.event['profile'].as_string() == self.bridge.profile,
                 Audit.event['voice_inbox_id'].as_string() == row.id).limit(1))
-            intake = session.scalar(select(Audit.sequence).where(
+            intake = session.scalar(select(Audit).where(
                 Audit.event['kind'].as_string() == INTAKE,
                 Audit.event['profile'].as_string() == self.bridge.profile,
                 Audit.event['inbox_id'].as_string() == row.id).limit(1))
             if completed is None and intake is not None:
+                if (row.fingerprint != digest(row.intent)
+                        or any(intake.event.get(key) != row.intent.get(key) for key in
+                               ('file_unique_hash', 'file_ref_hash', 'duration_seconds', 'file_size', 'mime_type'))):
+                    raise Denied('voice_worker_intake_binding_changed')
                 return row.id, row.fingerprint, dict(row.intent)
         return None
 
@@ -138,6 +152,7 @@ def main():
     import json
     import signal
     import threading
+    import time
 
     from pydantic import BaseModel, ConfigDict, Field
 
@@ -207,14 +222,24 @@ def main():
             raise Denied('voice_worker_time_limit')
 
         signal.signal(signal.SIGALRM, timeout)
+        heartbeat_at = None
         while not stop.is_set():
             # Re-read the protected profile before each voice note (revocation).
             guard()
             signal.alarm(90)
             try:
-                worker.process_one()
+                result = process_or_pause(worker)
             finally:
                 signal.alarm(0)
+            if heartbeat_at is None or time.monotonic() - heartbeat_at >= 15:
+                with store.transaction() as session:
+                    guard()
+                    store.check_audit(session)
+                    store.audit(session, 'telegram_voice_worker_heartbeat', 'transcriber',
+                                profile=bridge.profile, profile_digest=fingerprint,
+                                model_fingerprint=decoder.model_fingerprint,
+                                state=result['state'], paid_api=False)
+                heartbeat_at = time.monotonic()
             stop.wait(1)
     except Exception:
         parser.exit(1, 'offline_voice_worker_failed_closed; inspect protected configuration and audit\n')
