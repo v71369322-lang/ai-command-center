@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
+import os
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,10 @@ from test_deployment import release as release
 
 @pytest.fixture
 def voice_release(release, tmp_path, monkeypatch):
-    base, _ = release
+    original, _ = release
+    base = deepcopy(original)
+    base['manifest'].update(control_uid=os.getuid(), execution_uid=os.getuid() + 1)
+    base['compose'] = render(original['compose'], base['manifest'])
     old = deepcopy(base)
     active = TelegramConnection(mode='live', owner_id=1234567, bot_id=123456789,
         source_revision=old['manifest']['revision'], token_file='/run/telegram/token')
