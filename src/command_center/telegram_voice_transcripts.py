@@ -5,13 +5,14 @@ from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import select
 
-from .models import Audit, TelegramDelivery, TelegramInbox
+from .models import Audit, Control, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
 from .telegram_requests import capture_receipt
 from .telegram_voice_requests import INTAKE, verify_transcript
 
 PROPOSED = 'telegram_voice_transcript_proposed'
 ACCEPTED = 'telegram_voice_transcript_accepted'
+DECIDED = 'telegram_voice_transcript_decided'
 LABEL_ACCEPT = 'Сохранить запрос'
 LABEL_REJECT = 'Удалить расшифровку'
 
@@ -31,13 +32,25 @@ def parse_callback(value):
             'voice_callback': value}
 
 
-def propose(bridge, voice_inbox_id, response, request):
+def allowed_markup(value):
+    try:
+        intent = parse_callback(value['inline_keyboard'][0][0]['callback_data'])
+        return canonical(value) == canonical(keyboard(intent['proposal_id']))
+    except (Denied, KeyError, IndexError, TypeError):
+        return False
+
+
+def propose(bridge, voice_inbox_id, response, request, *, expected_epoch=None):
     """Import a verified transcript from a future trusted worker; no provider call."""
     transcript = verify_transcript(response, request)
     bridge.check_text(transcript['text'])
     proposal_id = str(uuid5(NAMESPACE_URL, 'acc:voice-transcript:' + voice_inbox_id))
     with bridge.store.transaction() as session:
         bridge.store.check_audit(session)
+        if expected_epoch is not None:
+            control = session.get(Control, 1)
+            if control.halted or control.recovery or control.epoch != expected_epoch:
+                raise Denied('control_blocked')
         source = session.get(TelegramInbox, voice_inbox_id)
         intake = session.execute(select(Audit).where(
             Audit.event['kind'].as_string() == INTAKE,
@@ -100,6 +113,16 @@ def decide(bridge, iid, intent):
         if row.state != 'RECEIVED':
             raise Denied('telegram_voice_confirmation_not_pending')
         proposal = _proposal(bridge, session, intent)
+        # Different callback update IDs must not save the same speech twice.
+        previous = session.scalar(select(Audit.sequence).where(
+            Audit.event['kind'].as_string().in_((DECIDED, ACCEPTED)),
+            Audit.event['profile'].as_string() == bridge.profile,
+            Audit.event['proposal_id'].as_string() == intent['proposal_id']).limit(1))
+        if previous is not None:
+            bridge.finish(session, iid, 'Эта расшифровка уже обработана. Повторный запрос не создан.')
+            return
+        bridge.store.audit(session, DECIDED, 'owner', profile=bridge.profile,
+                           proposal_id=intent['proposal_id'], confirmed=intent['confirm'])
         if not intent['confirm']:
             bridge.finish(session, iid, 'Расшифровка отклонена. Запрос, AI и исполнитель не создавались.')
             return

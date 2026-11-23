@@ -51,10 +51,15 @@ def capture(bridge, session, iid, intent):
 
 
 def pending_count(session, profile):
+    from .telegram_voice_transcripts import PROPOSED
+    proposed = select(Audit.event['voice_inbox_id'].as_string()).where(
+        Audit.event['kind'].as_string().in_((PROPOSED, 'telegram_voice_transcription_failed')),
+        Audit.event['profile'].as_string() == profile)
     value = session.scalar(select(func.count()).select_from(Audit).where(
         Audit.event['kind'].as_string() == INTAKE,
         Audit.event['profile'].as_string() == profile,
-        Audit.event['transcription_requested'].as_boolean().is_(False)))
+        Audit.event['transcription_requested'].as_boolean().is_(False),
+        Audit.event['inbox_id'].as_string().not_in(proposed)))
     if type(value) is not int or not 0 <= value <= 1000:
         raise Denied('telegram_voice_request_history_invalid')
     return value

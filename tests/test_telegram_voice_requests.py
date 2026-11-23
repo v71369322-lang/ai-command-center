@@ -124,3 +124,31 @@ def test_rejected_transcript_never_enters_project_queue(bridge, store):
     result = service.receive(transcript_callback(service, fake, proposal['proposal_id'], 'n'))
     assert result['state'] == 'DONE'
     assert inbox(store, 'owner')['total_pending'] == 0
+
+
+def test_separate_callback_updates_cannot_save_same_transcript_twice(bridge, store):
+    service, fake = bridge
+    original = service.receive(voice())
+    request = transcription_contract({'kind': 'voice_request'}, 'b' * 64)
+    proposal = propose(service, original['inbox_id'], {'audio_sha256': 'b' * 64, 'language': 'ru',
+        'text': 'Позвонить завтра', 'duration_seconds': 20.5}, request)
+    service.receive(transcript_callback(service, fake, proposal['proposal_id'], uid=3))
+    service.receive(transcript_callback(service, fake, proposal['proposal_id'], uid=4))
+    assert inbox(store, 'owner')['total_pending'] == 1
+    from command_center.telegram_voice_requests import pending_count
+    with store.transaction() as session:
+        assert pending_count(session, service.profile) == 0
+
+
+def test_configured_transport_accepts_only_exact_transcript_keyboard():
+    from uuid import uuid4
+    from command_center.telegram_transport import ConfiguredTelegramHTTP
+    from command_center.telegram_voice_transcripts import keyboard
+    transport = object.__new__(ConfiguredTelegramHTTP)
+    transport.owner = OWNER
+    transport._token = 'PUBLIC_FIXTURE'
+    markup = keyboard(str(uuid4()))
+    transport.validate('sendMessage', {'chat_id': OWNER, 'text': 'Проверьте текст', 'reply_markup': markup})
+    markup['inline_keyboard'][0][1]['url'] = 'https://outside.example/'
+    with pytest.raises(Denied):
+        transport.validate('sendMessage', {'chat_id': OWNER, 'text': 'Текст', 'reply_markup': markup})

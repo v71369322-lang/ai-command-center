@@ -14,6 +14,7 @@ dependencies = [
     "dulwich>=1.2.8,<2",
 ]
 [dependency-groups]
+speech = ["faster-whisper==1.2.1"]
 dev = [
     "bandit>=1.9.4",
     "pip-audit>=2.10.1",

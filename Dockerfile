@@ -25,6 +25,16 @@ CMD ["uvicorn", "command_center.api:create_app", "--factory", "--host", "0.0.0.0
 FROM app AS worker
 CMD ["python", "-m", "command_center.worker"]
 
+FROM app AS speech
+USER root
+COPY requirements.speech.lock ./
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
+    pip install --no-cache-dir --require-hashes -r requirements.speech.lock
+USER 10001:10001
+ENV HF_HUB_OFFLINE=1 HF_HUB_DISABLE_IMPLICIT_TOKEN=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS=1
+ENTRYPOINT ["python", "-m", "command_center.voice_worker"]
+
 FROM worker AS broker
 COPY --chmod=0555 --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 CMD ["uvicorn", "command_center.runtime_broker:create_broker_app", "--factory", "--uds", "/run/f1-broker/runtime.sock", "--no-access-log"]
