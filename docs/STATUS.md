@@ -1,5 +1,15 @@
 # Текущий контекст и облачный handoff
 
+Local continuation **23 ноября 2026, offline voice implementation**:
+ветка `codex/offline-voice-intake-20261123` поверх dd95fc3/PR102 добавляет
+отдельный opt-in downloader/CPU speech worker и существующий owner readback.
+Реальная локальная русская ASR-проверка без платного API прошла; это ещё не
+live Telegram acceptance. На VPS выполнена только read-only проверка: оба журнала
+VERIFIED/source9f6297b, текущие сервисы работают. Google ожидает terms/country
+подтверждения владельца. Точный scope, проверки и незавершённая интеграция
+дополнительного сервиса в штатный installer: [handoff](handoff/OFFLINE_VOICE_2026-11-23.md).
+Не выдавать эту реализацию за установленного голосового помощника.
+
 Local continuation **23 ноября 2026, delegated real Telegram setup**:
 VPS фактически VERIFIED на PR102/`9f6297b`; PR/оба CI freshly SUCCESS.
 Telegram перестал отвечать из-за выхода обработчика Nov19 после сетевых/502
