@@ -1,5 +1,11 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: Apps Script проект с GCP Default успешно создан без подмены страны;
+read-only probe сохранён. В обычном Chrome открыт «Jarvis Calendar — Read-only check»;
+Google ожидает подтверждения владельца. Чтение Calendar ещё не подтверждено.
+PR111 exactf5b0d17 / CI45369287193 SUCCESS.
+[Точная готовность и проверка надёжности](../infra/google-calendar/README.md).
+
 24 ноября: live Google OAuth bootstrap упёрся в регистрацию Google Cloud:
 владелец указал Россию и согласился с условиями, но Russia отсутствует в форме.
 Другую страну не выбирали; аккаунт/ключи/расходы не создавали. PR110 CI SUCCESS;
