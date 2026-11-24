@@ -1,3 +1,12 @@
+# Jarvis 2.0 — текущая стратегия владельца
+
+24 ноября2026: владелец явно отказался от собственного AI-разработчика.
+Jarvis — единый персональный партнёр/секретарь/наставник; техническую работу ведёт Codex.
+[Решение и причина](jarvis-2/OWNER_DECISION_2026-11-24.md).
+Текущий этап — аудит и согласование перехода, без runtime изменений/удаления/платных AI.
+[Фактический аудит VPS/кода, зависимости, ресурсы и план](jarvis-2/AUDIT_2026-11-24.md).
+Ниже сохранена история технического контура; её цель больше не определяет будущую миссию.
+
 Local continuation **24 ноября 2026, installed offline voice**:
 Implementation PR106/exact956c19f installed; both journals VERIFIED; owner Telegram
 resume observed, OPEN epoch50, fresh voice IDLE. No paid calls. Phone voice/readback/
@@ -712,6 +721,3 @@ Actions API с фильтром exact head_sha вернул **0 runs** для в
 В handoff каждой задачи сохранять repo/branch/base SHA, scope, изменённые файлы,
 коммит/PR, команды и результаты, CI, неразрешённые внешние intents/резервы,
 точные блокеры и один следующий безопасный шаг. Временный workspace не архив.
-
-
-
