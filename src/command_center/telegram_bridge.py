@@ -687,7 +687,10 @@ class TelegramBridge:
                     raise Denied('telegram_query_not_pending')
                 suffix = '\n\nРабота по реальной бизнес-задаче не выполнялась.'
                 control = session.get(Control, 1)
-                if control.halted or control.recovery:
+                if assistant_only():
+                    suffix = ('\n\nРаспознавание голоса на паузе. Снять обычную остановку: /resume.'
+                              if control.halted and not control.recovery else '')
+                elif control.halted or control.recovery:
                     suffix += '\n\nНовые запуски остановлены; чтение статуса не возобновляет выполнение.'
                 if kind == 'readiness':
                     from .telegram_readiness import reply as readiness_reply
@@ -708,8 +711,11 @@ class TelegramBridge:
                     from .telegram_requests import project_reply
                     reply = project_reply(session, intent['project_id'])
                 elif kind == 'attention':
-                    from .attention import telegram_reply
-                    reply = telegram_reply(self.store, session)
+                    if assistant_only():
+                        reply = request_reply(self, session, {'kind': 'requests'}, suffix=suffix)
+                    else:
+                        from .attention import telegram_reply
+                        reply = telegram_reply(self.store, session)
                 elif kind == 'reminders':
                     from .attention_schedule import telegram_reply
                     reply = telegram_reply(session)

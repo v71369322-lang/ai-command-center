@@ -73,6 +73,26 @@ def test_telegram_blocks_developer_but_keeps_capture(store, monkeypatch):
         client.close()
 
 
+def test_personal_replies_do_not_send_owner_back_to_developer_setup(store, monkeypatch):
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    fake = BotHTTP()
+    client = MockTelegramHTTP(httpx.MockTransport(fake))
+    try:
+        bridge = TelegramBridge(store, client, OWNER)
+        for uid, value in enumerate(['Идея: новый десерт', '/requests', '/request 1',
+                                     '/projects', '/project command-center', '/attention'], 1):
+            bridge.receive(message(uid, value))
+        while bridge.deliver_one():
+            pass
+        responses = '\n'.join(item['text'] for item in fake.sent)
+        assert 'Сохранено во входящих' in responses
+        assert 'Идея: новый десерт' in responses
+        assert not any(token in responses for token in ['/develop', '/setup', '/connection',
+                                                       'Ожидает планирования', 'GitHub App', 'Baseline:'])
+    finally:
+        client.close()
+
+
 def test_real_http_rejects_owner_developer_routes(client, headers, store, monkeypatch):
     monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
     for path in ['/api/simulator/commands', '/api/tasks/missing/approve', '/api/project-inbox/plan']:
