@@ -90,7 +90,8 @@ def test_profile_rejects_writable_or_extra_calendar_mount(assistant_release):
 
 
 @pytest.mark.parametrize('already_assistant', [False, True])
-def test_prepare_inspect_rechecks_calendar_without_network_or_activation(assistant_release, already_assistant):
+@pytest.mark.parametrize('cpu', [None, 1])
+def test_prepare_inspect_rechecks_calendar_without_network_or_activation(assistant_release, already_assistant, cpu):
     args, old, plain, active, _ = assistant_release
     if already_assistant:
         old['manifest']['assistant_only'] = True
@@ -105,7 +106,7 @@ def test_prepare_inspect_rechecks_calendar_without_network_or_activation(assista
         atomic_json(args['previous_directory'] / 'activation.json', {'phase': 'VERIFIED', 'target': checksum(old)})
     calendar = binding(plain, active.owner_id)
     before = (Path(old['manifest']['data_root']) / 'deployment.json').read_bytes()
-    result = candidate.prepare(**args, calendar=calendar)
+    result = candidate.prepare(**args, calendar=calendar, telegram_cpu=cpu)
     candidate.inspect(args['output'], result['candidate_bundle'], result['preparation_digest'])
     assert (Path(old['manifest']['data_root']) / 'deployment.json').read_bytes() == before
     assert not (args['output'] / 'activation.json').exists()
@@ -114,12 +115,13 @@ def test_prepare_inspect_rechecks_calendar_without_network_or_activation(assista
         candidate.inspect(args['output'], result['candidate_bundle'], result['preparation_digest'])
 
 
-@pytest.mark.parametrize('attack', [None, 'command', 'key_writable', 'key_missing'])
-def test_actual_telegram_runtime_calendar_boundary(assistant_release, attack):
+@pytest.mark.parametrize('cpu', [None, 1])
+@pytest.mark.parametrize('attack', [None, 'command', 'key_writable', 'key_missing', 'cpu'])
+def test_actual_telegram_runtime_calendar_boundary(assistant_release, attack, cpu):
     from command_center.assistant_runtime import check_runtime
     args, old, plain, active, _ = assistant_release
     target, _ = candidate.assemble(old, plain, active, args['voice'], checksum(old), checksum(plain),
-                                  binding(plain, active.owner_id))
+                                  binding(plain, active.owner_id), telegram_cpu=cpu)
     m = target['manifest']
     service = target['compose']['services']['telegram']
     metadata = {'Image': m['images']['api'],
@@ -127,7 +129,7 @@ def test_actual_telegram_runtime_calendar_boundary(assistant_release, attack):
                    'Env': [k + '=' + str(v) for k, v in service['environment'].items()]},
         'HostConfig': {'IpcMode': 'private', 'ReadonlyRootfs': True, 'CapDrop': ['ALL'],
                        'SecurityOpt': ['no-new-privileges'], 'Memory': 256 * 1024**2,
-                       'NanoCpus': 250000000, 'PidsLimit': 32},
+                       'NanoCpus': int(service['cpus'] * 10**9), 'PidsLimit': 32},
         'NetworkSettings': {'Networks': {'acc-f23_' + k: {} for k in service['networks']}},
         'Mounts': [{'Source': v['source'], 'Destination': v['target'], 'RW': False}
                    for v in service['volumes']] + [{'Source': str(Path(m['data_root']) / 'secrets/db_password'),
@@ -138,6 +140,8 @@ def test_actual_telegram_runtime_calendar_boundary(assistant_release, attack):
         metadata['Mounts'][-2]['RW'] = True
     elif attack == 'key_missing':
         metadata['Mounts'].pop(-2)
+    elif attack == 'cpu':
+        metadata['HostConfig']['NanoCpus'] = 250000000 if cpu == 1 else 1000000000
     if attack:
         with pytest.raises(ValueError):
             check_runtime(m, 'telegram', metadata, service)

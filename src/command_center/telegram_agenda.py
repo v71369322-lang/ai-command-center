@@ -9,11 +9,17 @@ from .store import Denied
 
 
 def parse(value):
-    words = ' '.join(value.lower().strip().rstrip('?').split())
+    words = ' '.join(value.lower().strip().rstrip('?!.,').split())
     aliases = {'/agenda': 'today', '/agenda сегодня': 'today', '/agenda завтра': 'tomorrow',
         '/agenda неделя': 'week', 'расписание на сегодня': 'today',
         'что у меня сегодня': 'today', 'расписание на завтра': 'tomorrow',
         'что у меня завтра': 'tomorrow', 'расписание на неделю': 'week'}
+    # Explicit read-only phrasings, not substring matching: a request to add or
+    # move an event must never be silently interpreted as an agenda read.
+    for day, period in (('сегодня', 'today'), ('завтра', 'tomorrow')):
+        for phrase in (f'что у меня {day} в календаре', f'что у меня в календаре {day}',
+                       f'покажи календарь на {day}', f'покажи расписание на {day}'):
+            aliases[phrase] = period
     if words in aliases:
         return {'kind': 'calendar_agenda', 'period': aliases[words]}
     if words.split()[:1] == ['/agenda']:

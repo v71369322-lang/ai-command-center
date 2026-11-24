@@ -27,12 +27,15 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice', 'assistant_only', 'calendar_script'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice', 'assistant_only', 'calendar_script', 'telegram_cpu'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
     if 'assistant_only' in m and (m['assistant_only'] is not True or any(
             key in m for key in ('planning', 'first_experiment'))):
         raise ValueError('assistant_restriction_only_required')
+    if 'telegram_cpu' in m and (type(m['telegram_cpu']) is not int or m['telegram_cpu'] != 1
+            or m.get('assistant_only') is not True or 'telegram' not in m):
+        raise ValueError('telegram_exact_assistant_cpu_required')
     if 'telegram' in m:
         from .telegram_health import scope
         from .store import Denied
@@ -95,7 +98,7 @@ def telegram_service(m):
         'volumes': [{'type': 'bind', 'source': str(Path(m['data_root']) / 'telegram'),
                      'target': '/run/telegram', 'read_only': True}],
         'networks': {'control': None, 'telegram-access': None},
-        'mem_limit': '256m', 'cpus': .25, 'pids_limit': 32,
+        'mem_limit': '256m', 'cpus': m.get('telegram_cpu', .25), 'pids_limit': 32,
         # Compose syntax for a private bounded tmpfs, not a host tempfile operation.
         'tmpfs': ['/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777'], 'stop_grace_period': '30s',  # nosec B108
         'depends_on': {'db': {'condition': 'service_healthy'}},
