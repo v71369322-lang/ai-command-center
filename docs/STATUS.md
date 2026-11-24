@@ -1,3 +1,11 @@
+Local continuation **24 ноября 2026, installed offline voice**:
+Implementation PR106/exact956c19f installed; both journals VERIFIED; owner Telegram
+resume observed, OPEN epoch50, fresh voice IDLE. No paid calls. Phone voice/readback/
+save acceptance still pending (no sample). Operator maintenance-entry retry and
+voice-heartbeat/resume coordination are documented workarounds, not shipped fixes:
+[current live handoff](handoff/OFFLINE_VOICE_LIVE_2026-11-24.md).
+This is a documentation checkpoint, not another application release.
+
 Local continuation **24 ноября 2026, voice ledger memory repair**:
 Kernel confirms maintenance MEMCG OOM; narrow streamed ledger anchors fix and
 89 real PG checks under256MiB. Telegram intake restored through owner UI.
@@ -704,5 +712,6 @@ Actions API с фильтром exact head_sha вернул **0 runs** для в
 В handoff каждой задачи сохранять repo/branch/base SHA, scope, изменённые файлы,
 коммит/PR, команды и результаты, CI, неразрешённые внешние intents/резервы,
 точные блокеры и один следующий безопасный шаг. Временный workspace не архив.
+
 
 
