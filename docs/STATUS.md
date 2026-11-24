@@ -1,5 +1,14 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: Calendar read-only пакет PR113/exact7edc1d8 установлен на VPS; оба
+журнала VERIFIED. CI45403493355/45403493835 SUCCESS, финальная локальная suite215 PASS.
+Реальное чтение Google из Telegram-контейнера3.10s PASS. Owner browser resume
+подтверждён: OPEN epoch56; реальный ответ Calendar в Telegram получен.
+Есть задержка: UI→SENT53.31s, inbox→SENT24.60s; не выдавать3.10s HTTP за скорость бота.
+Голосовой контейнер восстановлен; phone-ASR acceptance ещё не подтверждён.
+Платные вызовы и запись событий не разрешены.
+[Установка, bounded operator repair, backup и приёмка](handoff/JARVIS_CALENDAR_LIVE_2026-11-24.md).
+
 24 ноября: подготовлено optional Calendar deployment binding для Telegram и обновление
 уже assistant-only predecessor. Предыдущий code CI PR112/exact8a676a7 SUCCESS.
 Linux regression209 PASS; final Calendar suite18 PASS (наборы пересекаются).
