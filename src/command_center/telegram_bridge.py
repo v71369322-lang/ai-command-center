@@ -43,11 +43,17 @@ class MockTelegramHTTP:
 
 
 class TelegramBridge:
-    def __init__(self, store, client, owner_id):
+    def __init__(self, store, client, owner_id, *, calendar=None):
         if (type(owner_id) is not int or not 0 < owner_id < 2**52
                 or not isinstance(client, (MockTelegramHTTP, ConfiguredTelegramHTTP))):
             raise ValueError('synthetic_private_owner_binding_required')
         self.store, self.client, self.owner = store, client, owner_id
+        from .google_calendar_access import PersonalCalendarHTTP
+        if calendar is not None and (not isinstance(calendar, PersonalCalendarHTTP)
+                or calendar.profile.owner_id != owner_id
+                or calendar.profile.source_revision != store.settings.source_revision):
+            raise Denied('telegram_calendar_connection_scope_mismatch')
+        self.calendar = calendar
         self.profile = digest({'owner': owner_id, 'revision': store.settings.source_revision, 'mode': 'http_mock'})
         if isinstance(client, ConfiguredTelegramHTTP):
             if client.owner != owner_id or client.revision != store.settings.source_revision:
@@ -153,6 +159,10 @@ class TelegramBridge:
             return str(uid), parse_message(message, sensitive)
         self.check_text(value)
         value = dict(BUTTONS).get(value, value)
+        from .telegram_agenda import parse as parse_agenda
+        agenda = parse_agenda(value)
+        if agenda:
+            return str(uid), agenda
         if value.startswith('/demo '):
             try:
                 payload = Command(kind='approved_render', values={'request': value[6:]}).model_dump()
@@ -441,7 +451,8 @@ class TelegramBridge:
             with self.store.transaction() as session:
                 return self.finish(session, iid, 'Jarvis: отправьте текстовое или голосовое поручение. '
                                    'Сохранённые запросы: /requests; проекты: /projects; '
-                                   'напоминания: /reminders. Разработка и платные AI-вызовы не включены.')
+                                   'напоминания: /reminders. После подключения Google спросите: '
+                                   '«что у меня завтра?». Разработка и платные AI-вызовы не включены.')
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
@@ -651,6 +662,9 @@ class TelegramBridge:
                             raise Denied('telegram_assignment_not_pending')
                         self.finish(session, iid, 'Проект не изменён: карточка устарела. '
                                     f'Откройте /request {intent["number"]}, чтобы выбрать проект заново.')
+        elif kind == 'calendar_agenda':
+            from .telegram_agenda import reply as agenda_reply
+            agenda_reply(self, iid, intent)
         elif kind == 'calendar_create':
             from .telegram_calendar import create_card
             create_card(self, iid, intent)

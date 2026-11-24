@@ -20,7 +20,7 @@ PERSONAL_INTENTS = frozenset({
     'help', 'projects', 'project', 'requests', 'request', 'assign',
     'archive_request', 'restore_request', 'attention', 'reminders',
     'attention_schedule', 'attention_schedule_change',
-    'calendar_list', 'calendar_create', 'calendar_decide', 'calendar_voice',
+    'calendar_list', 'calendar_create', 'calendar_decide', 'calendar_voice', 'calendar_agenda',
     'stop', 'resume_request', 'resume_confirm', 'assistant_disabled', 'unknown_command',
 })
 
