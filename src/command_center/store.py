@@ -99,6 +99,8 @@ class Store:
             check_binding(self, s, task.payload)
 
     def create(self, actor, key, payload, *, _scope_installer=None):
+        from .assistant_policy import require_developer
+        require_developer()
         if actor not in {"owner", "operator"}:
             raise Denied("role_forbidden")
         with self.transaction() as s:
@@ -196,6 +198,8 @@ class Store:
 
     def _approve_locked(self, s, actor, task_id, version, seconds=120, *, _scope_installer=None, _deadline=None):
         """Internal composition of the same F1 approval; caller holds transaction()."""
+        from .assistant_policy import require_developer
+        require_developer()
         if actor != "owner":
             raise Denied("owner_required")
         control = s.get(Control, 1)
@@ -262,6 +266,8 @@ class Store:
             return len(events)
 
     def claim(self, task_id):
+        from .assistant_policy import require_developer
+        require_developer()
         with self.transaction() as s:
             control = s.get(Control, 1)
             task = self.task(s, task_id)
@@ -465,6 +471,8 @@ class Store:
             self.audit(s, "isolation_compromise", "policy", task.id, fence=fence)
 
     def retry(self, actor, task_id):
+        from .assistant_policy import require_developer
+        require_developer()
         if actor != "owner":
             raise Denied("owner_required")
         with self.transaction() as s:

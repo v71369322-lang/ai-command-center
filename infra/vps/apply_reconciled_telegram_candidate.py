@@ -22,10 +22,12 @@ def deadline(value):
         raise ValueError('fresh_bounded_update_approval_required')
 
 
-def validate_transition(old, target, old_digest, target_digest, *, planning=False):
+def validate_transition(old, target, old_digest, target_digest, *, planning=False, assistant=False):
     before, after = old['manifest'], target['manifest']
     if checksum(old) != old_digest or checksum(target) != target_digest:
         raise ValueError('exact_bundle_approvals_required')
+    if after.get('assistant_only') and not assistant:
+        raise ValueError('separate_assistant_transition_approval_required')
     if 'planning' in after and not planning:
         raise ValueError('separate_planning_access_approval_required')
     if 'voice' in after and not planning:
@@ -37,7 +39,7 @@ def validate_transition(old, target, old_digest, target_digest, *, planning=Fals
     if ('telegram' not in before or 'telegram' not in after
             or 'first_experiment' in after
             or target['compose']['services']['telegram'].get('mem_limit') != '256m'
-            or str(target['compose']['services']['watchdog'].get('mem_limit')) != '268435456'):
+            or (not assistant and str(target['compose']['services']['watchdog'].get('mem_limit')) != '268435456')):
         raise ValueError('telegram_memory_candidate_scope_invalid')
     for key in ('mode', 'owner_id', 'bot_id'):
         if before['telegram'][key] != after['telegram'][key]:
@@ -62,7 +64,8 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
     previous = exact_bundle(previous_directory, approved_previous)
     target = load_bundle(candidate_directory)
     old, new = validate_transition(
-        previous, target, approved_previous, approved_candidate, planning=_planning is not None)
+        previous, target, approved_previous, approved_candidate, planning=_planning is not None,
+        assistant=_planning is not None and getattr(_planning, 'assistant_only', False) is True)
     root = Path(old['data_root'])
     state_file = root / 'deployment.json'
     live_file = root / 'telegram/connection.json'
@@ -87,15 +90,18 @@ def apply(previous_directory, candidate_directory, approved_previous, approved_c
             or digest(staged.model_dump()) != new['telegram']['connection_digest']):
         raise ValueError('exact_candidate_binding_required')
 
-    controller = Deployment(previous, previous_directory)
+    controller = (_planning.predecessor_controller(previous, previous_directory)
+                  if _planning is not None and hasattr(_planning, 'predecessor_controller')
+                  else Deployment(previous, previous_directory))
     if _planning is None:
         controller.preflight()
     else:
         # Expired previous planning evidence must not prevent a quiesced update.
         controller.preflight(planning_check=False)
     source_check(new)
-    for uid, names in ((new['control_uid'], {'api', 'worker', 'broker'}),
-                       (new['execution_uid'], {'executor', 'coding'})):
+    checks = ((new['control_uid'], {'api'}),) if new.get('assistant_only') else (
+        (new['control_uid'], {'api', 'worker', 'broker'}), (new['execution_uid'], {'executor', 'coding'}))
+    for uid, names in checks:
         engine = Engine(uid)
         engine.preflight()
         image_check(engine, {key: new['images'][key] for key in names}, new['revision'])

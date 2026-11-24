@@ -117,6 +117,8 @@ class FinalRecoveryApproval(ExternalApprovalRequest):
 
 
 def create_app(settings=None, gateway_factory=None):
+    from .assistant_policy import assistant_only, http_allowed
+    assistant_only()  # Reject malformed operator configuration at startup.
     settings = settings or Settings.load()
     store = Store(settings)
     owner_auth = OwnerAuth(store)
@@ -179,6 +181,10 @@ def create_app(settings=None, gateway_factory=None):
             from fastapi.responses import JSONResponse
             return JSONResponse(status_code=429, content={"detail": "rate_limited"},
                                 headers={"Retry-After": "60", "Cache-Control": "no-store"})
+        if assistant_only() and not http_allowed(request.method, request.url.path):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=403, content={'detail': 'developer_functionality_disabled'},
+                                headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
         size = request.headers.get("content-length")
         if size and (not size.isdigit() or int(size) > 8192):
             return Response(status_code=413)

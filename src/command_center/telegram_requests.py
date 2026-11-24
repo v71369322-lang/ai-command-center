@@ -50,6 +50,10 @@ def captured_text(session, row, *, states=frozenset({'NEEDS_PLANNING'})):
 
 def capture_receipt(inbox_id):
     number = inbox_id.rsplit(':', 1)[1]
+    from .assistant_policy import assistant_only
+    if assistant_only():
+        return (f'Сохранено во входящих: №{number}.\n'
+                f'Посмотреть: /request {number}\nРаздел можно выбрать кнопкой ниже или позже.')
     return (f'Запрос №{number} сохранён.\nПроверить: /request {number}\n'
             'Ожидает планирования. AI автоматически не вызывается; бизнес-действия не выполнялись.\n'
             'Выберите проект кнопкой ниже. Это только категория запроса.\n'
@@ -87,6 +91,12 @@ def project_queue(bridge, session, project='all'):
 
 def projects_reply(bridge, session):
     from .project_inbox import PROJECTS
+    from .assistant_policy import assistant_only
+    if assistant_only():
+        _, counts = project_queue(bridge, session)
+        parts = [f'{label}: {counts[key]}\n/requests {key}' for key, label in PROJECTS]
+        parts.append(f'Без раздела: {counts["unassigned"]}\n/requests unassigned')
+        return 'Сохранённые записи по проектам:\n\n' + '\n\n'.join(parts)
     from .project_connections import statuses
     _, counts = project_queue(bridge, session)
     connections = statuses(session)
@@ -101,6 +111,10 @@ def projects_reply(bridge, session):
 
 def project_reply(session, project_id):
     from .project_catalog import summary
+    from .assistant_policy import assistant_only
+    if assistant_only():
+        return (f"{summary(project_id)['label']}\nРаздел для ваших поручений, идей и заметок.\n"
+                f'Сохранённые записи: /requests {project_id}')
     from .project_connections import statuses
     project = summary(project_id)
     connection = statuses(session).get(project_id)
@@ -116,6 +130,8 @@ def project_reply(session, project_id):
 
 def request_reply(bridge, session, intent, *, suffix=''):
     """Called under the existing admission/audit lock after audit validation."""
+    from .assistant_policy import assistant_only
+    personal = assistant_only()
     query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
         TelegramInbox.state == 'NEEDS_PLANNING', or_(
             TelegramInbox.intent['kind'].as_string() == 'capture',
@@ -128,7 +144,8 @@ def request_reply(bridge, session, intent, *, suffix=''):
         selected, counts = project_queue(bridge, session, project)
         if project != 'all':
             label = dict(PROJECTS).get(project, 'Не распределены')
-            header = f'Очередь: {label}. Ожидают планирования: {counts[project]}.\n\n'
+            header = (f'Раздел: {label}. Сохранено: {counts[project]}.\n\n' if personal else
+                      f'Очередь: {label}. Ожидают планирования: {counts[project]}.\n\n')
             if not selected:
                 return header + 'Сохранённых запросов этого проекта в этом Telegram-подключении пока нет.'
             header += 'Последние запросы (до 5):\n\n'
@@ -161,6 +178,9 @@ def request_reply(bridge, session, intent, *, suffix=''):
             if width is not None:
                 preview = ' '.join(value.split())
                 value = preview[:width] + ('…' if len(preview) > width else '')
+            if personal:
+                parts.append(f'Запись №{number}\n{value}\nРаздел: {project_label}.\n/request {number}')
+                continue
             parts.append(f'Запрос №{number}\nТекст запроса (не команда):\n{value}\n'
                          f'Проект: {project_label}. Версия назначения: {version}.\n'
                          f'Ожидает планирования. Выполнение не запускалось.\nОткрыть: /request {number}')

@@ -10,6 +10,8 @@ BUTTONS = (
 
 def keyboard():
     """Return a fresh Bot API ReplyKeyboardMarkup, never caller-defined actions."""
-    return {'keyboard': [[{'text': label} for label, _ in BUTTONS[start:start + 2]]
-                         for start in range(0, len(BUTTONS), 2)],
+    from .assistant_policy import assistant_only
+    buttons = tuple(item for item in BUTTONS if item[1] not in {'/tasks', '/system'}) if assistant_only() else BUTTONS
+    return {'keyboard': [[{'text': label} for label, _ in buttons[start:start + 2]]
+                         for start in range(0, len(buttons), 2)],
             'resize_keyboard': True, 'is_persistent': True}

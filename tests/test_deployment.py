@@ -396,7 +396,8 @@ def test_prepare_cli_propagates_only_explicit_binding_paths(monkeypatch, capsys,
     assert calls[0][1] == dict(owner_password_origin=None, password_loopback_http=False,
         telegram_connection_digest=None, first_experiment_config='/private/config',
         openai_key_file='/private/openai', github_token_file='/private/github',
-        first_experiment_telegram_readiness=telegram, planning_profile_directory=None, planning_key_directory=None)
+        first_experiment_telegram_readiness=telegram, planning_profile_directory=None, planning_key_directory=None,
+        assistant_only=False)
 
 
 @pytest.mark.parametrize('arguments', [['--first-experiment-config', '/private/config'],
@@ -579,7 +580,8 @@ def operator(release, monkeypatch):
 
 def mark_current(deployment, *, phase='VERIFIED', previous='old'):
     value = {'phase': phase, 'bundle': 'current', 'migration_hash': deployment.m['migration_hash'],
-             'database_image': deployment.m['database_image'], 'previous_bundle': previous}
+             'database_image': deployment.m['database_image'], 'previous_bundle': previous,
+             'directory': str(deployment.directory)}
     atomic_json(deployment.root / 'deployment.json', value)
     return value
 

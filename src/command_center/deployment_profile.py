@@ -27,9 +27,12 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice', 'assistant_only'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
+    if 'assistant_only' in m and (m['assistant_only'] is not True or any(
+            key in m for key in ('planning', 'first_experiment'))):
+        raise ValueError('assistant_restriction_only_required')
     if 'telegram' in m:
         from .telegram_health import scope
         from .store import Denied
@@ -48,7 +51,7 @@ def validate_manifest(m):
             raise ValueError('password_origin_invalid')
     if not re.fullmatch('[a-f0-9]{40}', m['revision']) or not re.fullmatch('[a-f0-9]{64}', m['migration_hash']):
         raise ValueError('exact_revision_and_migration_required')
-    if (set(m['images']) != IMAGE_KEYS or any(not re.fullmatch('sha256:[a-f0-9]{64}', v)
+    if (set(m['images']) != ({'api'} if m.get('assistant_only') else IMAGE_KEYS) or any(not re.fullmatch('sha256:[a-f0-9]{64}', v)
                                             for v in m['images'].values())):
         raise ValueError('immutable_local_image_ids_required')
     for key, prefix in [('database_image', 'postgres:16-'), ('redis_image', 'redis:7-')]:
@@ -71,7 +74,8 @@ def validate_manifest(m):
 
 
 def services(m):
-    return SERVICES | ({'telegram'} if 'telegram' in m else set()) | ({'voice'} if 'voice' in m else set())
+    base = {'db', 'redis', 'api'} if m.get('assistant_only') else SERVICES
+    return base | ({'telegram'} if 'telegram' in m else set()) | ({'voice'} if 'voice' in m else set())
 
 
 def telegram_service(m):
@@ -103,6 +107,8 @@ def telegram_service(m):
         from .deployment_planning import environment, mounts
         service['environment'].update(environment(m, 'telegram'))
         service['volumes'] += mounts(m, 'telegram')
+    if m.get('assistant_only'):
+        service['environment']['F1_ASSISTANT_ONLY'] = '1'
     return service
 
 
@@ -110,8 +116,11 @@ def render(base, m):
     validate_manifest(m)
     # Input is Docker Compose's normalized JSON from the pinned source checkout.
     profile = json.loads(json.dumps(base))
-    if set(profile['services']) != SERVICES:
+    if set(profile['services']) != SERVICES and not (
+            m.get('assistant_only') and set(profile['services']) == {'db', 'redis', 'api'}):
         raise ValueError('unexpected_source_services')
+    if m.get('assistant_only'):
+        profile['services'] = {k: v for k, v in profile['services'].items() if k in {'db', 'redis', 'api'}}
     root = Path(m['data_root'])
     profile.pop('x-bounded-logging', None)
     profile['name'] = PROJECT
@@ -201,6 +210,14 @@ def render(base, m):
         service['environment'].update(environment(m, 'runtime-broker'))
         service['volumes'] += mounts(m, 'runtime-broker')
         service['networks'] = {'control': {'priority': 100}, 'planning-access': {'priority': 0}}
+    if m.get('assistant_only'):
+        profile['services'] = {k: v for k, v in profile['services'].items() if k in services(m)}
+        for name in ('api', 'telegram', 'voice'):
+            if name in profile['services']:
+                profile['services'][name]['environment']['F1_ASSISTANT_ONLY'] = '1'
+        for service in profile['services'].values():
+            if 'depends_on' in service:
+                service['depends_on'] = {k: v for k, v in service['depends_on'].items() if k in services(m)}
     validate_profile(profile, m)
     return profile
 
@@ -225,6 +242,9 @@ def validate_profile(p, m):
     if p['networks'] != expected_networks:
         raise ValueError('deployment_network_scope_changed')
     for name, s in p['services'].items():
+        if s.get('environment', {}).get('F1_ASSISTANT_ONLY') != (
+                '1' if m.get('assistant_only') and name in {'api', 'telegram', 'voice'} else None):
+            raise ValueError('assistant_mode_binding_changed')
         if name == 'voice':
             from .deployment_voice import service
             if s != service(m):

@@ -41,6 +41,8 @@ class RuntimeBroker:
         self.code_factory = code_factory or CodeFactory(store)
 
     def submit(self, task_id, revision):
+        from .assistant_policy import require_developer
+        require_developer()
         with self.lock:
             self.ledger.verify()
             if revision != self.store.settings.source_revision:

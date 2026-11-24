@@ -24,6 +24,23 @@ TRANSPORT_EVENTS = {
 }
 
 
+def transport_only(event, profile):
+    if event['kind'] in TRANSPORT_EVENTS:
+        return True
+    from .assistant_policy import assistant_only
+    # An idle offline transcriber records health every 15s. This changes no
+    # task, permission, budget or capture and must not invalidate the owner card.
+    # Processing/completion/error and malformed/unknown events remain barriers.
+    return (assistant_only() and event['kind'] == 'telegram_voice_worker_heartbeat'
+            and set(event) == {'kind', 'actor', 'task_id', 'time', 'revision', 'profile',
+                              'profile_digest', 'model_fingerprint', 'state', 'paid_api'}
+            and event['actor'] == 'transcriber' and event['task_id'] is None
+            and event['profile'] == profile and event['state'] in {'IDLE', 'PAUSED'}
+            and event['paid_api'] is False
+            and all(isinstance(event[k], str) and re.fullmatch('[a-f0-9]{64}', event[k])
+                    for k in ('profile_digest', 'model_fingerprint')))
+
+
 def parse_callback(value):
     if not isinstance(value, str) or not re.fullmatch(r'rs:[A-Za-z0-9_-]{32}', value):
         raise Denied('telegram_resume_callback_invalid')
@@ -110,7 +127,7 @@ def confirm(bridge, session, iid, intent):
     if (event['revision'] != bridge.store.settings.source_revision
             or event['connection_digest'] != getattr(bridge.client, 'approved', bridge.profile)
             or not expires - timedelta(seconds=120) <= bridge.store.now(session) < expires
-            or any(row.event['kind'] not in TRANSPORT_EVENTS
+            or any(not transport_only(row.event, bridge.profile)
                    or row.event['revision'] != bridge.store.settings.source_revision for row in later)):
         return bridge.finish(session, iid, 'Подтверждение устарело или состояние изменилось. '
                              'Остановка не снята этой командой. Отправьте /resume заново.')
