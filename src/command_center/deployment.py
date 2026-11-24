@@ -175,9 +175,10 @@ def verify_restored_audit(query, checkpoint):
     # bounded. The restored DB is isolated and has no concurrent writers.
     previous, anchored, sequence = '0' * 64, False, 0
     while True:
-        rows = json.loads(query('SELECT coalesce(json_agg(r ORDER BY sequence),\'[]\'::json) FROM '
-            f'(SELECT sequence,event,previous,digest FROM audit WHERE sequence>{sequence} '
-            'ORDER BY sequence LIMIT 256) r'))
+        statement = sql.SQL("SELECT coalesce(json_agg(r ORDER BY sequence),'[]'::json) FROM "
+            '(SELECT sequence,event,previous,digest FROM audit WHERE sequence>{} '
+            'ORDER BY sequence LIMIT 256) r').format(sql.Literal(sequence))
+        rows = json.loads(query(statement.as_string()))
         if not rows:
             break
         for row in rows:
