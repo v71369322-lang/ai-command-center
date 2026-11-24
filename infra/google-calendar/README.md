@@ -20,12 +20,20 @@ An owner-account Apps Script project was created successfully with GCP Default.
 Both files were saved in the editor, the selected function was verified, and Run
 reached Google authorization. Google then required a fresh passkey identity check;
 the owner was asked to complete that personal authentication in the browser.
-No successful calendar read or final OAuth grant has yet been observed. The embedded
-browser's passkey attempt reported an incompatible device. At the owner's request,
+The embedded browser's initial passkey attempt reported an incompatible device. At the owner's request,
 the same project was opened in their already signed-in normal Chrome window and
 renamed to `Jarvis Calendar — Read-only check`. Run again reached Authorization
 required / Review permissions. Native authentication dialogs are left to the owner;
 no passkey, Google credential or security setting is automated or changed.
+
+The owner then authorized and ran the probe on their phone. The agent independently
+observed the execution history: jarvisCalendarReadiness completed at15:40:32 Moscow
+time, duration0.69s. A fresh editor view in the other browser ran the same unchanged
+function again at15:41:46–47 and returned CALENDAR_READ_OK, Europe/Moscow,
+events_changed=false, external_fetch_performed=false, followed by Execution completed.
+No new identity/permission prompt appeared on this repeat. Read-only editor access
+and reuse of the saved grant are therefore verified. This is not evidence of token
+expiry/revocation recovery, unattended operation or a Telegram/server connection.
 
 Do not confuse an accessible dashboard or successful project creation with Calendar
 API authorization or a functioning Jarvis connection. Do not copy OAuth flow URLs,
