@@ -15,6 +15,11 @@ from apply_reconciled_telegram_candidate import ReconciledUpdate, apply as apply
 
 class PreviousUpdate(Deployment):
     def tool(self, code):
+        if self.m.get('assistant_only'):
+            # Deployment.tool already adds this wrapper for assistant releases.
+            # Applying it twice makes the embedded global original reference
+            # point at the wrapper itself and recursively re-enter it.
+            return super().tool(code)
         return super().tool(entry_retry_code() + code)
 
 
