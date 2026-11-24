@@ -1,5 +1,9 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: следующий локальный этап — одноразовый Desktop OAuth, обмен/refresh
+токенов и AES-GCM custody adapter; 69 focused tests passed. Реального подключения
+Google пока нет. [Состояние и оставшаяся интеграция](handoff/JARVIS_CALENDAR_OAUTH_2026-11-24.md).
+
 24 ноября: подготовлен ограниченный Calendar HTTP adapter и Desktop PKCE;
 44 focused mock/contract tests passed. Браузерный доступ проверен, но OAuth и
 VPS-подключение ещё не созданы. [Точное состояние и оставшаяся работа](handoff/JARVIS_CALENDAR_PREPARATION_2026-11-24.md).
