@@ -1,5 +1,10 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: подготовлены private Linux custody, реальный loopback callback и
+фабрика Calendar-клиента; 85 focused tests passed в Linux. PR108 CI SUCCESS;
+PR109 CI ещё выполняется. Google пока не подключён.
+[Состояние и ограничения](handoff/JARVIS_CALENDAR_LOCAL_SETUP_2026-11-24.md).
+
 24 ноября: следующий локальный этап — одноразовый Desktop OAuth, обмен/refresh
 токенов и AES-GCM custody adapter; 69 focused tests passed. Реального подключения
 Google пока нет. [Состояние и оставшаяся интеграция](handoff/JARVIS_CALENDAR_OAUTH_2026-11-24.md).
