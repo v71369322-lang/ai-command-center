@@ -91,7 +91,7 @@ class PersonalCalendarHTTP:
 
     def _send(self, request):
         token = self._token_provider()
-        if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9._~+/-]{20,4096}', token):
+        if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9._~+/=-]{20,4096}', token):
             raise Denied('google_access_token_invalid')
         try:
             with self.client.stream(request['method'], request['path'], params=request['query'],
