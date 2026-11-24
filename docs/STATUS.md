@@ -1,5 +1,11 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: подготовлено optional Calendar deployment binding для Telegram и обновление
+уже assistant-only predecessor. Предыдущий code CI PR112/exact8a676a7 SUCCESS.
+Linux regression209 PASS; final Calendar suite18 PASS (наборы пересекаются).
+Новый финальный CI ещё не подтверждён. VPS не затронут.
+[Состав, проверка и план активации](handoff/JARVIS_CALENDAR_RELEASE_2026-11-24.md).
+
 24 ноября,16:12–16:14 Москва: по отдельному подтверждению владельца опубликован
 Google Apps Script bridge v1, exact Bridge.gs SHA256 ae2e2d7fd1a3…; ключ сохранён
 в защищённой локальной custody и Google ScriptProperties. Реальный HTTP: подписанное

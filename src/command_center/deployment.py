@@ -219,6 +219,9 @@ class Deployment:
         if 'planning' in self.m and planning_check:
             from .deployment_planning import check_binding
             check_binding(self.m)
+        if 'calendar_script' in self.m and planning_check:
+            from .deployment_calendar import check_binding
+            check_binding(self.m)
         if 'voice' in self.m:
             from .deployment_voice import check_binding
             if planning_check:  # independent backup/restore inspection survives optional voice revocation
@@ -427,6 +430,14 @@ class Deployment:
         return {'state': 'BOOTED_ADMISSION_HALTED', 'go_live': False}
 
     def postcheck(self):
+        if 'calendar_script' in self.m:
+            from .deployment_calendar import CONFIG, check_binding
+            calendar = check_binding(self.m)
+            code = ('from command_center.google_script_calendar import script_calendar_runtime;'
+                    f'c=script_calendar_runtime({CONFIG!r},{checksum(calendar.model_dump())!r},'
+                    f'{self.m["revision"]!r},{self.m["telegram"]["owner_id"]!r});'
+                    'c.__enter__();c.__exit__(None,None,None)')
+            self.engine.run('exec', PROJECT + '-telegram-1', 'python', '-c', code)
         if 'voice' in self.m:
             from .deployment_voice import check_binding
             check_binding(self.m)

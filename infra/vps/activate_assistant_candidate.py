@@ -88,6 +88,7 @@ def main():
     p = actions.add_parser('prepare')
     for key in ('previous-directory', 'plain-directory', 'output', 'voice-binding-file', 'previous-pin', 'plain-pin'):
         p.add_argument('--' + key, required=True)
+    p.add_argument('--calendar-binding-file')
     p = actions.add_parser('inspect')
     for key in ('directory', 'candidate-pin', 'preparation-pin'):
         p.add_argument('--' + key, required=True)
@@ -103,6 +104,9 @@ def main():
         if action == 'profile':
             result = prepare_profile(**args)
         elif action == 'prepare':
+            calendar_file = args.pop('calendar_binding_file')
+            if calendar_file:
+                args['calendar'] = read_json(calendar_file)
             args['voice'] = read_json(args.pop('voice_binding_file'))
             result = prepare(**args)
         elif action == 'inspect':
