@@ -7,6 +7,11 @@ Jarvis — единый персональный партнёр/секретар
 assistant-only релиз и обратимое выключение developer runtime. Необратимая очистка
 и платные AI не разрешены. [Ход этапа1](jarvis-2/STAGE1_2026-11-24.md).
 [Фактический аудит VPS/кода, зависимости, ресурсы и план](jarvis-2/AUDIT_2026-11-24.md).
+Этап1 установлен24 ноября: PR107/exact9351ba6, deployment/activation VERIFIED,
+5 сервисов вместо8; developer runtime/operator triggers остановлены. Через настоящий
+owner Telegram UI снята normal stop: OPEN epoch53, recovery=false, paid calls0.
+[Итог установки, backup, ограничения и следующий scope](handoff/JARVIS_STAGE1_LIVE_2026-11-24.md).
+Ниже installed956 — предыдущая версия, сохранённая для совместимого отката.
 Ниже сохранена история технического контура; её цель больше не определяет будущую миссию.
 
 Local continuation **24 ноября 2026, installed offline voice**:
