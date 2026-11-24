@@ -40,7 +40,9 @@ def agenda(store):
 
 
 @pytest.mark.parametrize('phrase,period', [('Что у меня завтра?', 'tomorrow'),
-    ('расписание на сегодня', 'today'), ('/agenda неделя', 'week')])
+    ('расписание на сегодня', 'today'), ('/agenda неделя', 'week'),
+    ('Что у меня завтра в календаре?', 'tomorrow'), ('что у меня в календаре сегодня', 'today'),
+    ('Покажи календарь на завтра!', 'tomorrow'), ('  Покажи   расписание на сегодня. ', 'today')])
 def test_natural_agenda_aliases(phrase, period):
     assert parse(phrase) == {'kind': 'calendar_agenda', 'period': period}
     assert parse('Идея нового проекта') is None
@@ -48,11 +50,19 @@ def test_natural_agenda_aliases(phrase, period):
         parse('/agenda 100000')
 
 
-def test_owner_agenda_uses_get_and_replays_snapshot_without_grants(agenda, store, monkeypatch):
+@pytest.mark.parametrize('phrase', ['Добавь встречу завтра в календарь',
+    'Перенеси расписание на завтра', 'Удали календарь на сегодня',
+    'Что у меня завтра в календаре и добавь встречу'])
+def test_calendar_mutations_and_mixed_requests_are_not_agenda_reads(phrase):
+    assert parse(phrase) is None
+
+
+@pytest.mark.parametrize('phrase', ['что у меня завтра', 'Что у меня завтра в календаре?'])
+def test_owner_agenda_uses_get_and_replays_snapshot_without_grants(agenda, store, monkeypatch, phrase):
     service, calls, _ = agenda
     monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
     before = authority(store)
-    update = message(1, 'что у меня завтра')
+    update = message(1, phrase)
     first = response(service, update)
     assert 'Планёрка' in first and 'Основной календарь Google' in first
     assert response(service, update) == first

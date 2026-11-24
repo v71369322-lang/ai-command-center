@@ -94,6 +94,7 @@ def main():
     for key in ('previous-directory', 'plain-directory', 'output', 'voice-binding-file', 'previous-pin', 'plain-pin'):
         p.add_argument('--' + key, required=True)
     p.add_argument('--calendar-binding-file')
+    p.add_argument('--telegram-cpu', type=int, choices=(1,))
     p = actions.add_parser('inspect')
     for key in ('directory', 'candidate-pin', 'preparation-pin'):
         p.add_argument('--' + key, required=True)
