@@ -1,3 +1,8 @@
+Local continuation **24 ноября 2026, voice ledger memory repair**:
+Kernel confirms maintenance MEMCG OOM; narrow streamed ledger anchors fix and
+89 real PG checks under256MiB. Telegram intake restored through owner UI.
+[Current handoff](handoff/VOICE_LEDGER_MEMORY_2026-11-24.md). Live voice acceptance pending.
+
 Local continuation **23 ноября 2026, voice activation repair**:
 Exact PR104 installation failed its voice postcheck and was not replayed.
 Compatible standard rollback restored VERIFIED predecessor9f6297b, without
@@ -699,4 +704,5 @@ Actions API с фильтром exact head_sha вернул **0 runs** для в
 В handoff каждой задачи сохранять repo/branch/base SHA, scope, изменённые файлы,
 коммит/PR, команды и результаты, CI, неразрешённые внешние intents/резервы,
 точные блокеры и один следующий безопасный шаг. Временный workspace не архив.
+
 

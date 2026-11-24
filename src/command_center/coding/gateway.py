@@ -58,9 +58,16 @@ class Gateway:
 
     @staticmethod
     def check_ledger(s, rows):
-        anchors = {a.event['action_id']: a.event['ledger_digest'] for a in s.execute(
-            select(Audit).order_by(Audit.sequence)).scalars()
-                   if 'action_id' in a.event and 'ledger_digest' in a.event}
+        rows = list(rows)
+        if not rows:
+            return
+        # Only these actions can affect this comparison. Preserve the last anchor
+        # per action, without materializing unrelated audit ORM entities/history.
+        events = s.execute(select(Audit.event).where(
+            Audit.event['action_id'].as_string().in_([row.id for row in rows])
+        ).order_by(Audit.sequence).execution_options(yield_per=256)).scalars()
+        anchors = {event['action_id']: event['ledger_digest'] for event in events
+                   if 'ledger_digest' in event}
         if any(anchors.get(row.id) != Gateway.action_digest(row) for row in rows):
             raise Denied('external_ledger_integrity_failure')
 
