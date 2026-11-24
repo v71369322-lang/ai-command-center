@@ -129,3 +129,32 @@ def test_agenda_render_is_bounded_plain_text_and_honest_about_partial_data():
     assert 'не учитываются' in result
     value['events'] = [{'summary': 'unknown', 'start': {}}]
     assert 'неполные записи' in render(value)
+
+
+def test_script_bridge_uses_existing_owner_agenda_and_delivery_path(store, monkeypatch):
+    from command_center.google_script_calendar import ScriptCalendarHTTP
+    from test_google_script_calendar import KEY, profile, answer, decode
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    item = profile(owner_id=OWNER, source_revision=store.settings.source_revision)
+    calls = []
+    def handler(req):
+        calls.append(req)
+        with store.engine.begin() as connection:
+            connection.execute(text("SET LOCAL lock_timeout = '500ms'"))
+            connection.execute(text('SELECT id FROM control WHERE id=1 FOR UPDATE'))
+        return httpx.Response(200, json=answer(decode(req.content), events=[{
+            'summary': 'Планёрка через Apps Script', 'start': {'dateTime': '2026-11-25T09:00:00+03:00'},
+            'end': {'dateTime': '2026-11-25T10:00:00+03:00'}}]))
+    calendar = ScriptCalendarHTTP(item, digest(item.model_dump()), KEY, transport=httpx.MockTransport(handler))
+    bot = MockTelegramHTTP(httpx.MockTransport(BotHTTP()))
+    try:
+        service = TelegramBridge(store, bot, OWNER, calendar=calendar)
+        before = authority(store)
+        result = response(service, message(1, 'что у меня завтра?'))
+        assert 'Планёрка через Apps Script' in result and len(calls) == 1
+        assert calls[0].method == 'POST' and authority(store) == before
+        assert response(service, message(1, 'что у меня завтра?')) == result
+        assert len(calls) == 1
+    finally:
+        calendar.close()
+        bot.close()

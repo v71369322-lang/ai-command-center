@@ -137,7 +137,9 @@ def main():
     parser.add_argument('action', choices=['inspect', 'run'])
     parser.add_argument('--config', required=True)
     parser.add_argument('--approved-connection')
-    parser.add_argument('--calendar-config')
+    calendar_options = parser.add_mutually_exclusive_group()
+    calendar_options.add_argument('--calendar-config')
+    calendar_options.add_argument('--calendar-script-config')
     parser.add_argument('--approved-calendar')
     args = parser.parse_args()
     client = None
@@ -153,12 +155,16 @@ def main():
         store = Store(service_settings())
         client = ConfiguredTelegramHTTP(args.config, args.approved_connection, store.settings.source_revision)
         calendar = None
-        if bool(args.calendar_config) != bool(args.approved_calendar):
+        if bool(args.calendar_config or args.calendar_script_config) != bool(args.approved_calendar):
             raise Denied('google_calendar_runtime_exact_approval_required')
         if args.calendar_config:
             from .google_calendar_runtime import calendar_runtime
             calendar = resources.enter_context(calendar_runtime(args.calendar_config, args.approved_calendar,
                                                 store.settings.source_revision, client.owner))
+        elif args.calendar_script_config:
+            from .google_script_calendar import script_calendar_runtime
+            calendar = resources.enter_context(script_calendar_runtime(args.calendar_script_config,
+                args.approved_calendar, store.settings.source_revision, client.owner))
         service = TelegramService(store, client, calendar=calendar)
         stop = threading.Event()
         for signum in (signal.SIGTERM, signal.SIGINT):
