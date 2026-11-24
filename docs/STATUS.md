@@ -1,5 +1,28 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: подготовлен подписанный read-only Apps Script bridge и подключение к
+существующему Telegram agenda runtime.32 protocol/transport +49 PG checks passed;
+полный CI ещё не подтверждён. Google-файл сохранён и сверен по SHA256, публикация
+не выполнена, ключи не созданы, VPS не затронут.
+[Точный пакет, границы и разрешения](handoff/JARVIS_SCRIPT_BRIDGE_2026-11-24.md).
+
+24 ноября,15:41 Москва: Calendar read-only probe реально прошёл после подтверждения
+на телефоне. История Google: Completed/0.69s; независимый повтор в другом браузере
+вернул CALENDAR_READ_OK без нового входа. События не менялись. Это подтверждает
+чтение через Apps Script; серверная связь с Telegram ещё не реализована/не активирована.
+[Доказательства и границы проверки](../infra/google-calendar/README.md).
+
+24 ноября: Apps Script проект с GCP Default успешно создан без подмены страны;
+read-only probe сохранён. В обычном Chrome открыт «Jarvis Calendar — Read-only check»;
+Google ожидает подтверждения владельца. Чтение Calendar ещё не подтверждено.
+PR111 exactf5b0d17 / CI45369287193 SUCCESS.
+[Точная готовность и проверка надёжности](../infra/google-calendar/README.md).
+
+24 ноября: live Google OAuth bootstrap упёрся в регистрацию Google Cloud:
+владелец указал Россию и согласился с условиями, но Russia отсутствует в форме.
+Другую страну не выбирали; аккаунт/ключи/расходы не создавали. PR110 CI SUCCESS;
+PR111 CI ещё выполняется. [Факты и реальный блокер](handoff/GOOGLE_CALENDAR_SIGNUP_2026-11-24.md).
+
 24 ноября: реализуется opt-in чтение основного Google Calendar из Telegram
 по фразам «что у меня завтра?»; внешний HTTP вынесен из блокировки БД.
 Google/production ещё не подключены. PR109 CI SUCCESS.

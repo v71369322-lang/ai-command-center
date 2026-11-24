@@ -49,7 +49,8 @@ class TelegramBridge:
             raise ValueError('synthetic_private_owner_binding_required')
         self.store, self.client, self.owner = store, client, owner_id
         from .google_calendar_access import PersonalCalendarHTTP
-        if calendar is not None and (not isinstance(calendar, PersonalCalendarHTTP)
+        from .google_script_calendar import ScriptCalendarHTTP
+        if calendar is not None and (not isinstance(calendar, (PersonalCalendarHTTP, ScriptCalendarHTTP))
                 or calendar.profile.owner_id != owner_id
                 or calendar.profile.source_revision != store.settings.source_revision):
             raise Denied('telegram_calendar_connection_scope_mismatch')
