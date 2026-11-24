@@ -19,6 +19,28 @@ OWNER, BOT = 1234567, 123456789
 PUBLIC_TOKEN = str(BOT) + ":" + "PUBLIC_FIXTURE_NOT_AN_ACTUAL_KEY_12345"
 
 
+def test_opt_in_calendar_is_read_through_real_polling_loop(configured, store):
+    from command_center.google_calendar_access import CalendarAccess, PersonalCalendarHTTP
+    fake, calls = FakeBot(), []
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(200, json={'items': []})
+    profile = CalendarAccess(enabled=True, source_revision=store.settings.source_revision,
+                              owner_id=OWNER, calendar_id='a' * 32 + '@group.calendar.google.com')
+    calendar = PersonalCalendarHTTP(profile, digest(profile.model_dump()), lambda: 'fixture-access-token-123',
+                                    transport=httpx.MockTransport(handle))
+    client = client_for(configured, fake)
+    try:
+        fake.updates = [update(1, 'что у меня завтра?')]
+        TelegramService(store, client, calendar=calendar, poll_seconds=0).run(max_cycles=1)
+        assert len(calls) == 1 and calls[0].method == 'GET'
+        assert any('Событий за выбранный период не найдено' in item['text'] for item in fake.sent)
+        assert store.snapshot()['tasks'] == []
+    finally:
+        calendar.close()
+        client.close()
+
+
 class FakeBot:
     def __init__(self):
         self.calls, self.updates, self.sent = [], [], []

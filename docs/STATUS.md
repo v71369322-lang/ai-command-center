@@ -1,5 +1,10 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября: реализуется opt-in чтение основного Google Calendar из Telegram
+по фразам «что у меня завтра?»; внешний HTTP вынесен из блокировки БД.
+Google/production ещё не подключены. PR109 CI SUCCESS.
+[Текущий runtime/проверки/оставшаяся активация](handoff/JARVIS_TELEGRAM_AGENDA_2026-11-24.md).
+
 24 ноября: подготовлены private Linux custody, реальный loopback callback и
 фабрика Calendar-клиента; 85 focused tests passed в Linux. PR108 CI SUCCESS;
 PR109 CI ещё выполняется. Google пока не подключён.

@@ -1,6 +1,6 @@
 """Single-leader polling process. No schema bootstrap and no executor/Docker access."""
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import json
 import os
 import re
@@ -31,12 +31,12 @@ def service_settings():
 
 
 class TelegramService:
-    def __init__(self, store, client, *, poll_seconds=2, max_failures=3):
+    def __init__(self, store, client, *, poll_seconds=2, max_failures=3, calendar=None):
         if not isinstance(client, ConfiguredTelegramHTTP) or not 0 <= poll_seconds <= 20 or not 1 <= max_failures <= 3:
             raise ValueError('telegram_service_limits_invalid')
         self.store, self.client = store, client
         self.poll_seconds, self.max_failures = poll_seconds, max_failures
-        self.bridge = TelegramBridge(store, client, client.owner)
+        self.bridge = TelegramBridge(store, client, client.owner, calendar=calendar)
         self._leader, self._pid = None, None
         self._stop = None
         self._heartbeat_at = None
@@ -137,9 +137,12 @@ def main():
     parser.add_argument('action', choices=['inspect', 'run'])
     parser.add_argument('--config', required=True)
     parser.add_argument('--approved-connection')
+    parser.add_argument('--calendar-config')
+    parser.add_argument('--approved-calendar')
     args = parser.parse_args()
     client = None
     store = None
+    resources = ExitStack()
     try:
         config = connection(args.config)
         if args.action == 'inspect':
@@ -149,7 +152,14 @@ def main():
             return
         store = Store(service_settings())
         client = ConfiguredTelegramHTTP(args.config, args.approved_connection, store.settings.source_revision)
-        service = TelegramService(store, client)
+        calendar = None
+        if bool(args.calendar_config) != bool(args.approved_calendar):
+            raise Denied('google_calendar_runtime_exact_approval_required')
+        if args.calendar_config:
+            from .google_calendar_runtime import calendar_runtime
+            calendar = resources.enter_context(calendar_runtime(args.calendar_config, args.approved_calendar,
+                                                store.settings.source_revision, client.owner))
+        service = TelegramService(store, client, calendar=calendar)
         stop = threading.Event()
         for signum in (signal.SIGTERM, signal.SIGINT):
             signal.signal(signum, lambda *_: stop.set())
@@ -158,6 +168,7 @@ def main():
         # No traceback containing credential-bearing URLs or secret-file values.
         parser.exit(1, 'telegram_service_failed_closed; inspect protected configuration and audit\n')
     finally:
+        resources.close()
         if client:
             client.close()
         if store:
