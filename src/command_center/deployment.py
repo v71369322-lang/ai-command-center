@@ -98,7 +98,11 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
             password_loopback_http=False, telegram_connection_digest=None,
             first_experiment_config=None, openai_key_file=None, github_token_file=None,
             first_experiment_telegram_readiness=False, planning_profile_directory=None,
-            planning_key_directory=None):
+            planning_key_directory=None, assistant_only=False):
+    if type(assistant_only) is not bool or assistant_only and any(v is not None for v in (
+            first_experiment_config, openai_key_file, github_token_file,
+            planning_profile_directory, planning_key_directory)):
+        raise ValueError('assistant_restriction_only_required')
     if (planning_profile_directory is None) != (planning_key_directory is None):
         raise ValueError('planning_all_bindings_required')
     if planning_profile_directory is not None and first_experiment_config is not None:
@@ -120,11 +124,15 @@ def prepare(source, directory, control_uid, execution_uid, data_root, *, owner_p
     base = json.loads(result.stdout)
     tags = {'api': 'acc-f1-app:local', 'worker': 'acc-f1-worker:local', 'broker': 'acc-f1-broker:local',
             'executor': 'acc-f1-executor:local', 'coding': 'acc-f2-executor:local'}
+    if assistant_only:
+        tags = {'api': tags['api']}
     images = {key: engine.json('image', 'inspect', tag)[0]['Id'] for key, tag in tags.items()}
     manifest = dict(schema=1, revision=revision, images=images, database_image=base['services']['db']['image'],
                     redis_image=base['services']['redis']['image'], migration_hash=migration_hash(source),
                     control_uid=control_uid, execution_uid=execution_uid, data_root=str(Path(data_root).resolve()),
                     source_root=str(source))
+    if assistant_only:
+        manifest['assistant_only'] = True
     if owner_password_origin:
         manifest['owner_login'] = {'origin': owner_password_origin, 'loopback_http': password_loopback_http}
     elif password_loopback_http:
@@ -162,6 +170,29 @@ def load_bundle(directory):
     return bundle
 
 
+def verify_restored_audit(query, checkpoint):
+    # Keyset pages keep PostgreSQL aggregate/sort temp files and operator memory
+    # bounded. The restored DB is isolated and has no concurrent writers.
+    previous, anchored, sequence = '0' * 64, False, 0
+    while True:
+        rows = json.loads(query('SELECT coalesce(json_agg(r ORDER BY sequence),\'[]\'::json) FROM '
+            f'(SELECT sequence,event,previous,digest FROM audit WHERE sequence>{sequence} '
+            'ORDER BY sequence LIMIT 256) r'))
+        if not rows:
+            break
+        for row in rows:
+            if (type(row['sequence']) is not int or row['sequence'] <= sequence
+                    or row['previous'] != previous
+                    or row['digest'] != checksum({'previous': previous, 'event': row['event']})):
+                raise ValueError('restored_audit_invalid')
+            if row['sequence'] == checkpoint['sequence']:
+                anchored = row['digest'] == checkpoint['digest']
+            sequence, previous = row['sequence'], row['digest']
+    if not anchored:
+        raise ValueError('restored_checkpoint_missing')
+    return previous
+
+
 class Deployment:
     def __init__(self, bundle, directory, engine=None, execution=None):
         self.bundle, self.m, self.directory = bundle, bundle['manifest'], Path(directory)
@@ -176,7 +207,8 @@ class Deployment:
         if os.getuid() != self.m['control_uid']:
             raise ValueError('dedicated_control_user_required')
         self.engine.preflight()
-        self.execution.preflight()
+        if not self.m.get('assistant_only'):
+            self.execution.preflight()
         # redis.sh remains a host bind, so immutable images alone are insufficient.
         # Boot, updates, backups and rollback must reject changed source too.
         source_check(self.m)
@@ -192,7 +224,8 @@ class Deployment:
                 check_binding(self.m)
             image_check(self.engine, {'voice': self.m['voice']['image']}, self.m['revision'])
         image_check(self.engine, {k: v for k, v in self.m['images'].items() if k not in {'executor', 'coding'}}, self.m['revision'])
-        image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
+        if not self.m.get('assistant_only'):
+            image_check(self.execution, {k: v for k, v in self.m['images'].items() if k in {'executor', 'coding'}}, self.m['revision'])
         if fresh:
             with socket.socket() as listener:
                 listener.bind(('127.0.0.1', 8000))
@@ -220,6 +253,10 @@ class Deployment:
                'F1_APP_PASSWORD_FILE': '/run/secrets/db_password', 'F1_RUNTIME_PASSWORD_FILE': '/run/secrets/db_runtime_password',
                'F1_IDENTITIES_FILE': '/run/secrets/identities', 'F1_REDIS_PASSWORD_FILE': '/run/secrets/redis_password',
                'F1_REDIS_URL': 'redis://redis:6379/0', 'F1_SOURCE_REVISION': self.m['revision']}
+        if self.m.get('assistant_only'):
+            env['F1_ASSISTANT_ONLY'] = '1'
+            from .maintenance_admission import entry_retry_code
+            code = entry_retry_code() + code
         for key, value in env.items():
             args += ['--env', key + '=' + value]
         for name in SECRETS - {'broker_token'}:
@@ -236,6 +273,10 @@ class Deployment:
                             "s=Store(Settings.load());s.checkpoint();"
                             "print(sum(t['state'] in {'RUNNING','CANCEL_REQUESTED','RECONCILING'} for t in s.snapshot()['tasks']))")
             if raw.strip() == b'0':
+                state_path = self.root / 'deployment.json'
+                current = json.loads(state_path.read_text()) if state_path.exists() else None
+                if current and load_bundle(current['directory'])['manifest'].get('assistant_only'):
+                    return
                 ledger = RuntimeLedger(self.root / 'runtime-ledger/ledger.sqlite')
                 ledger.verify()
                 if not ledger.runs():
@@ -342,17 +383,7 @@ class Deployment:
                 return self.engine.run('exec', name, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U',
                                        'f1_admin', '-d', 'restore_drill', '-Atc', statement).decode().strip()
 
-            rows = json.loads(query('SELECT json_agg(r ORDER BY sequence) FROM '
-                                    '(SELECT sequence,event,previous,digest FROM audit) r'))
-            previous, anchored = '0' * 64, False
-            for row in rows:
-                if row['previous'] != previous or row['digest'] != checksum({'previous': previous, 'event': row['event']}):
-                    raise ValueError('restored_audit_invalid')
-                if row['sequence'] == manifest['checkpoint']['sequence']:
-                    anchored = row['digest'] == manifest['checkpoint']['digest']
-                previous = row['digest']
-            if not anchored:
-                raise ValueError('restored_checkpoint_missing')
+            previous = verify_restored_audit(query, manifest['checkpoint'])
             # This target can never execute jobs, even if later inspected on a network.
             query("BEGIN; UPDATE control SET halted=true,recovery=true,epoch=epoch+1; "
                   "UPDATE approvals SET revoked=true; UPDATE owner_sessions SET revoked=true; "
@@ -420,6 +451,9 @@ class Deployment:
             metadata = self.engine.json('inspect', PROJECT + '-' + name + '-1')[0]
             if not metadata['State']['Running']:
                 raise ValueError('service_not_running:' + name)
+            if self.m.get('assistant_only'):
+                from .assistant_runtime import check_runtime
+                check_runtime(self.m, name, metadata, self.bundle['compose']['services'][name])
             if name == 'voice':
                 from .deployment_voice import check_runtime
                 check_runtime(self.m, metadata)
@@ -448,9 +482,14 @@ class Deployment:
                 'h=configured_host();assert h is not None;'
                 'h.preflight(Store(Settings.load(identities_required=False)),'
                 'RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]),RuntimeBackend())')
-        self.engine.run('exec', PROJECT + '-watchdog-1', 'python', '-c',
-            'import os;from command_center.runtime_ledger import RuntimeLedger;'
-            'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);l.verify();assert l.watchdog_ready()')
+        if self.m.get('assistant_only'):
+            for name in ('worker', 'runtime-broker', 'watchdog'):
+                if self.engine.run('ps', '-q', '--filter', 'name=^' + PROJECT + '-' + name + '-1$').strip():
+                    raise ValueError('developer_service_still_running:' + name)
+        else:
+            self.engine.run('exec', PROJECT + '-watchdog-1', 'python', '-c',
+                'import os;from command_center.runtime_ledger import RuntimeLedger;'
+                'l=RuntimeLedger(os.environ["F1_RUNTIME_LEDGER"]);l.verify();assert l.watchdog_ready()')
         if 'telegram' in self.m:
             code = ('from command_center.config import Settings;from command_center.store import Store;'
                     'from command_center.telegram_health import status;'
@@ -524,7 +563,12 @@ class Deployment:
             if previous:
                 self.quiesce()
                 self.backup()
-                self.compose('stop', *sorted(services(self.m) - {'db', 'redis'}))
+                old = load_bundle(previous['directory'])
+                if self.m.get('assistant_only') or old['manifest'].get('assistant_only'):
+                    Deployment(old, previous['directory'], self.engine, self.execution).compose(
+                        'stop', *sorted(services(old['manifest']) - {'db', 'redis'}))
+                else:
+                    self.compose('stop', *sorted(services(self.m) - {'db', 'redis'}))
             intent = {'phase': 'INTENT', 'bundle': checksum(self.bundle), 'revision': self.m['revision'],
                       'migration_hash': self.m['migration_hash'], 'database_image': self.m['database_image'],
                       'previous_bundle': previous['bundle'] if previous and previous['phase'] == 'VERIFIED' else None,
@@ -572,7 +616,10 @@ def main():
     parser.add_argument('--first-experiment-telegram-readiness', action='store_true')
     parser.add_argument('--planning-profile-directory')
     parser.add_argument('--planning-key-directory')
+    parser.add_argument('--assistant-only', action='store_true')
     args = parser.parse_args()
+    if args.assistant_only and args.action != 'prepare':
+        parser.error('assistant-only only applies to prepare')
     if args.action != 'prepare' and (args.planning_profile_directory is not None or args.planning_key_directory is not None):
         parser.error('planning bindings only apply to prepare')
     if args.action != 'prepare' and (args.first_experiment_telegram_readiness or any(v is not None for v in (
@@ -604,7 +651,7 @@ def main():
             github_token_file=args.github_token_file,
             first_experiment_telegram_readiness=args.first_experiment_telegram_readiness,
             planning_profile_directory=args.planning_profile_directory,
-            planning_key_directory=args.planning_key_directory)}))
+            planning_key_directory=args.planning_key_directory, assistant_only=args.assistant_only)}))
         return
     bundle = load_bundle(args.bundle)
     if args.active_state and (bundle['manifest']['data_root'] != str(Path(args.active_state).resolve())

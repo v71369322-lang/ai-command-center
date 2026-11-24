@@ -72,6 +72,7 @@ def service(m):
         'entrypoint': ['python', '-m', 'command_center.voice_worker'],
         'command': ['run', '--config', PROFILE, '--approved-profile', voice['profile_digest']],
         'environment': {'F1_SOURCE_REVISION': m['revision'], 'F1_DB_USER': 'f1_app', 'F1_DB_HOST': 'db',
+            **({'F1_ASSISTANT_ONLY': '1'} if m.get('assistant_only') else {}),
             'F1_DB_PASSWORD_FILE': '/run/secrets/db_password', 'HF_HUB_OFFLINE': '1',
             'HF_HUB_DISABLE_IMPLICIT_TOKEN': '1', 'TRANSFORMERS_OFFLINE': '1', 'OMP_NUM_THREADS': '1'},
         'secrets': ['db_password'],

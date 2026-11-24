@@ -17,6 +17,8 @@ from .telegram_transport import ConfiguredTelegramHTTP, TelegramHTTPError, conne
 
 
 def service_settings():
+    from .assistant_policy import assistant_only
+    assistant_only()
     """Only the application DB binding; no Redis, API-owner or admin credentials."""
     revision = os.environ.get('F1_SOURCE_REVISION', '')
     if (os.environ.get('F1_DB_USER', 'f1_app') != 'f1_app'

@@ -374,6 +374,9 @@ class TelegramBridge:
     def receive(self, update):
         self.guard()
         update_id, intent = self.normalize(update)
+        from .assistant_policy import assistant_only, PERSONAL_INTENTS
+        if assistant_only() and intent['kind'] not in PERSONAL_INTENTS:
+            intent = {'kind': 'assistant_disabled', 'disabled_intent_hash': digest(intent)}
         iid = self.profile + ':' + update_id
         with self.store.transaction() as session:
             self.store.check_audit(session)
@@ -429,6 +432,16 @@ class TelegramBridge:
         return self._apply_pending(iid, intent)
 
     def _apply_pending(self, iid, intent):
+        from .assistant_policy import assistant_only, PERSONAL_INTENTS
+        if assistant_only() and (intent['kind'] not in PERSONAL_INTENTS or intent['kind'] == 'assistant_disabled'):
+            with self.store.transaction() as session:
+                return self.finish(session, iid, 'Функции AI-разработчика отключены. '
+                                   'Jarvis сохраняет поручения, идеи и заметки; код и серверы обслуживает Codex.')
+        if assistant_only() and intent['kind'] == 'help':
+            with self.store.transaction() as session:
+                return self.finish(session, iid, 'Jarvis: отправьте текстовое или голосовое поручение. '
+                                   'Сохранённые запросы: /requests; проекты: /projects; '
+                                   'напоминания: /reminders. Разработка и платные AI-вызовы не включены.')
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
@@ -893,6 +906,15 @@ class TelegramBridge:
         return f'{label} {task.id}\n{summary}\nПодробнее: /status {task.id}'
 
     def collect_results(self):
+        from .assistant_policy import assistant_only
+        if assistant_only():
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                from .attention_schedule import collect
+                from .telegram_calendar import collect_reminders
+                collect(self, session)
+                collect_reminders(self, session)
+            return
         with self.store.transaction() as session:
             self.store.check_audit(session)
             for task in session.execute(self.scoped_tasks()).scalars():

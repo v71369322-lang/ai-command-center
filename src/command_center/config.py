@@ -39,6 +39,8 @@ class Settings:
 
     @classmethod
     def load(cls, *, identities_required=True):
+        from .assistant_policy import assistant_only
+        assistant_only()
         identities = json.loads(secret("F1_IDENTITIES_FILE")) if identities_required else {}
         if identities_required and set(identities) != {"owner", "operator", "agent"}:
             raise RuntimeError("Exactly three synthetic role bindings required")

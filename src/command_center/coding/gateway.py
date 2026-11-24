@@ -137,6 +137,8 @@ class Gateway:
 
     def f1_authority(self, s, task_id, fence):
         """Shared F1 grant, lease, fence, source and ledger-scope authority."""
+        from ..assistant_policy import require_developer
+        require_developer()
         c = self.config
         if not c.connected():
             raise Denied('integration_not_connected')

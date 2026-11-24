@@ -76,6 +76,29 @@ def test_request_only_issues_card_and_confirmation_reuses_normal_resume(bridge, 
     assert 'Обычная остановка снята' in fake.sent[-1]['text']
 
 
+@pytest.mark.parametrize('change', [None, 'unknown', 'busy', 'paid', 'profile', 'extra', 'legacy'])
+def test_assistant_resume_tolerates_only_idle_offline_heartbeat(bridge, store, monkeypatch, change):
+    service, _ = bridge
+    click = issued(bridge, store)
+    if change != 'legacy':
+        monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    event = {'profile': service.profile, 'profile_digest': 'a' * 64, 'model_fingerprint': 'b' * 64,
+             'state': 'PAUSED', 'paid_api': False}
+    if change == 'busy':
+        event['state'] = 'TRANSCRIBING'
+    elif change == 'paid':
+        event['paid_api'] = True
+    elif change == 'profile':
+        event['profile'] = 'other'
+    elif change == 'extra':
+        event['authority'] = True
+    with store.transaction() as session:
+        store.audit(session, 'unknown' if change == 'unknown' else 'telegram_voice_worker_heartbeat',
+                    'transcriber', **event)
+    service.receive(click)
+    assert store.snapshot()['halted'] is (change is not None)
+
+
 @pytest.mark.parametrize('concurrent', [False, True])
 def test_duplicate_callback_and_restart_commit_once(bridge, store, concurrent):
     service, fake = bridge
