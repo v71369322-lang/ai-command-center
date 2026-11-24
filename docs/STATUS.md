@@ -1,5 +1,12 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+24 ноября,16:12–16:14 Москва: по отдельному подтверждению владельца опубликован
+Google Apps Script bridge v1, exact Bridge.gs SHA256 ae2e2d7fd1a3…; ключ сохранён
+в защищённой локальной custody и Google ScriptProperties. Реальный HTTP: подписанное
+чтение PASS (3.11s), unsigned и bad-signature rejected. Calendar events не менялись.
+Это operator probe, не Telegram activation; VPS не затронут. CI PR112 ещё in_progress.
+[Публикация, проверка и оставшиеся gates](handoff/JARVIS_SCRIPT_BRIDGE_2026-11-24.md).
+
 24 ноября: подготовлен подписанный read-only Apps Script bridge и подключение к
 существующему Telegram agenda runtime.32 protocol/transport +49 PG checks passed;
 полный CI ещё не подтверждён. Google-файл сохранён и сверен по SHA256, публикация
