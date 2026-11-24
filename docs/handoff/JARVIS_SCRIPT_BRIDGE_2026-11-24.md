@@ -1,7 +1,8 @@
 # Signed Apps Script agenda bridge, 24 November 2026
 
 Based on verified PR111 sourcef5b0d17 plus local readiness/checkpoint commits through
-2b38fe3. No merge, VPS connection, deployment, paid AI call or Calendar event mutation.
+2b38fe3. No merge, VPS connection/deployment, paid AI call or Calendar event mutation.
+Google publication was separately approved and completed below.
 
 ## Implemented
 
@@ -14,8 +15,7 @@ titles/start/end with truncation indicated. No descriptions, guests, IDs or toke
 The manifest retains the already authorized calendar.readonly scope.
 
 The script uses ScriptProperties JARVIS_HMAC_KEY (64hex characters representing
-32random bytes) and JARVIS_CONNECTION (64hex connection binding). They are not yet
-provisioned. Missing/bad configuration, signature, freshness, interval or Google
+32random bytes) and JARVIS_CONNECTION (64hex connection binding). They were provisioned under the separate owner approval below. Missing/bad configuration, signature, freshness, interval or Google
 failure returns only unavailable. CacheService/LockService provide best-effort
 duplicate suppression, not durable replay protection; cache entries can be evicted.
 The cryptographic response binding/freshness is independent of that cache.
@@ -50,7 +50,7 @@ delivery, unchanged grants/tasks, replay and no Control lock during HTTP. Google
 Bot HTTP are mocked in these tests. No duplicate test runs are added together.
 Ruff, Bandit medium/high and Node syntax checks passed. Full final CI remains pending.
 
-## Google UI preparation (not published)
+## Google UI preparation (historical; publication update below)
 
 The already verified owner project now contains Bridge.gs. Its copied-back editor
 content matches the tested LF-normalized SHA256:
@@ -88,3 +88,31 @@ Official behavior references:
 https://developers.google.com/apps-script/guides/web
 https://developers.google.com/apps-script/guides/content
 https://developers.google.com/apps-script/guides/services/quotas
+
+## Approved Google publication and real HTTP acceptance
+
+Owner answered «Конечно» to the concrete request for public read-only Google
+publication plus protected HMAC key provisioning; VPS installation and paid calls
+were explicitly excluded. Approval observed 2026-11-24T13:07:08Z, bounded operation
+window through13:37:08Z. Final source was copied back from the Google editor and
+matched full SHA256 ae2e2d7fd1a365531fcc6db7e38752fafdcafc325b898b8bc004a32db3081550.
+Google confirmed successful deployment version1 at16:12 Moscow, execute as owner,
+access Anyone. No broader Google scope was requested.
+
+A fresh32byte shared key was generated outside Git in an owner-only ACL folder,
+and injected into the approved project's ScriptProperties without exposing it in
+model output, screenshots or logs. Connection metadata, exact deployment ID and
+live receipt are held in that private custody folder; no key was installed on VPS.
+The publication screenshot is local ignored .runtime/calendar-script-publication.png.
+
+Real Google HTTP operator probe against version1 using ScriptCalendarHTTP passed:
+signed primary Calendar read in3.11seconds, timezone Europe/Moscow; unsigned and
+bad-signature POSTs both returned generic unavailable. No event writes or paid AI.
+The probe uses a synthetic in-process owner identifier solely for transport validation;
+it does not assert real Telegram ownership, grant authority or activate production.
+Empty returned data is a successful read, not evidence of downstream bot integration.
+
+Gates1–2 above are now satisfied for this exact Google version/key only. Gates3–4
+remain: optional deployment binding/mounts, compatible assistant-only update path,
+final CI, fresh exact VPS approval, then owner Telegram/restart/failure acceptance.
+CI45398934953 for code HEAD8a676a7 remains in_progress at this checkpoint.

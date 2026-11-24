@@ -16,7 +16,7 @@ PURPOSE = 'assistant-only-update.v1'
 FILES = {'previous.json', 'plain.json', 'bundle.json', 'compose.json', 'connection.candidate.json'}
 
 
-def assemble(previous, plain, active, voice, previous_pin, plain_pin):
+def assemble(previous, plain, active, voice, previous_pin, plain_pin, calendar=None):
     for bundle, pin in ((previous, previous_pin), (plain, plain_pin)):
         validate_manifest(bundle['manifest'])
         validate_profile(bundle['compose'], bundle['manifest'])
@@ -26,9 +26,9 @@ def assemble(previous, plain, active, voice, previous_pin, plain_pin):
     fixed = ('migration_hash', 'database_image', 'redis_image', 'data_root',
              'control_uid', 'execution_uid', 'owner_login')
     if (any(old.get(k) != new.get(k) for k in fixed) or old['revision'] == new['revision']
-            or old.get('assistant_only') or new.get('assistant_only') is not True
+            or new.get('assistant_only') is not True
             or not {'telegram', 'voice'} <= set(old)
-            or any(k in new for k in ('voice', 'telegram', 'planning', 'first_experiment'))
+            or any(k in new for k in ('voice', 'telegram', 'planning', 'first_experiment', 'calendar_script'))
             or any(k in old for k in ('planning', 'first_experiment'))):
         raise ValueError('assistant_restriction_only_transition_required')
     if (active.mode != 'live' or active.source_revision != old['revision']
@@ -44,6 +44,8 @@ def assemble(previous, plain, active, voice, previous_pin, plain_pin):
     target = deepcopy(plain)
     target['manifest']['telegram'] = {**old['telegram'], 'connection_digest': digest(staged.model_dump())}
     target['manifest']['voice'] = deepcopy(voice)
+    if calendar is not None:
+        target['manifest']['calendar_script'] = deepcopy(calendar)
     target['compose'] = render(plain['compose'], target['manifest'])
     return target, staged
 
@@ -83,13 +85,16 @@ def prepare_profile(previous_directory, plain_directory, profile_directory, imag
     return {'status': 'ASSISTANT_VOICE_PROFILE_PREPARED', 'voice': voice, 'paid_calls': 0}
 
 
-def prepare(previous_directory, plain_directory, output, voice, previous_pin, plain_pin):
+def prepare(previous_directory, plain_directory, output, voice, previous_pin, plain_pin, calendar=None):
     previous, plain = load_bundle(previous_directory), load_bundle(plain_directory)
     uid = plain['manifest']['control_uid']
     output = private_output(output, uid)
     original = predecessor(previous, previous_directory, previous_pin)
-    target, staged = assemble(previous, plain, original[2], voice, previous_pin, plain_pin)
+    target, staged = assemble(previous, plain, original[2], voice, previous_pin, plain_pin, calendar)
     source_check(target['manifest'])
+    if 'calendar_script' in target['manifest']:
+        from .deployment_calendar import check_binding as check_calendar
+        check_calendar(target['manifest'])
     before = check_binding(previous['manifest'])
     after = check_binding(target['manifest'])
     if after.model_dump() != {**before.model_dump(), 'source_revision': plain['manifest']['revision'],
@@ -122,7 +127,8 @@ def inspect(directory, candidate_pin, preparation_pin):
     previous, plain, saved = documents['previous.json'], documents['plain.json'], documents['bundle.json']
     target, staged = assemble(previous, plain, TelegramConnection.model_validate({
         **documents['connection.candidate.json'], 'source_revision': previous['manifest']['revision']}),
-        saved['manifest']['voice'], receipt['previous_bundle'], receipt['plain_bundle'])
+        saved['manifest']['voice'], receipt['previous_bundle'], receipt['plain_bundle'],
+        saved['manifest'].get('calendar_script'))
     expected = {'schema': 1, 'purpose': PURPOSE, 'state': 'STAGED_NOT_ACTIVATED',
         'previous_bundle': receipt['previous_bundle'], 'plain_bundle': receipt['plain_bundle'],
         'candidate_bundle': checksum(target), 'files': {k: raw_pin(v) for k, v in documents.items()},
@@ -139,6 +145,9 @@ def inspect(directory, candidate_pin, preparation_pin):
         if (item.resolve() != item or info.st_uid != os.getuid() or info.st_mode & 0o077
                 or item != path and (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1)):
             raise ValueError('assistant_private_custody_required')
+    if 'calendar_script' in target['manifest']:
+        from .deployment_calendar import check_binding as check_calendar
+        check_calendar(target['manifest'])
     before, after = check_binding(previous['manifest']), check_binding(target['manifest'])
     if after.model_dump() != {**before.model_dump(), 'source_revision': plain['manifest']['revision'],
                              'connection_digest': digest(staged.model_dump())}:

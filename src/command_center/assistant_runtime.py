@@ -13,6 +13,8 @@ def check_runtime(m, name, metadata, service):
         raise ValueError('assistant_host_access_forbidden')
     if name not in {'api', 'telegram', 'voice'}:
         return
+    if name == 'telegram' and 'calendar_script' in m and config.get('Cmd') != service['command']:
+        raise ValueError('calendar_runtime_command_changed')
     expected_image = m['voice']['image'] if name == 'voice' else m['images']['api']
     env = dict(item.split('=', 1) for item in config.get('Env', []) if '=' in item)
     if (metadata['Image'] != expected_image or env.get('F1_ASSISTANT_ONLY') != '1'

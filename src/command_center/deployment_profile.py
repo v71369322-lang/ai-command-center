@@ -27,7 +27,7 @@ def absolute(value):
 
 
 def validate_manifest(m):
-    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice', 'assistant_only'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
+    if set(m) - {'owner_login', 'telegram', 'first_experiment', 'planning', 'voice', 'assistant_only', 'calendar_script'} != {'schema', 'revision', 'images', 'database_image', 'redis_image', 'migration_hash',
                   'control_uid', 'execution_uid', 'data_root', 'source_root'} or m['schema'] != 1:
         raise ValueError('release_schema_invalid')
     if 'assistant_only' in m and (m['assistant_only'] is not True or any(
@@ -68,6 +68,9 @@ def validate_manifest(m):
     if 'planning' in m:
         from .deployment_planning import validate_binding
         validate_binding(m)
+    if 'calendar_script' in m:
+        from .deployment_calendar import validate_binding
+        validate_binding(m)
     if 'voice' in m:
         from .deployment_voice import validate_binding
         validate_binding(m)
@@ -107,6 +110,11 @@ def telegram_service(m):
         from .deployment_planning import environment, mounts
         service['environment'].update(environment(m, 'telegram'))
         service['volumes'] += mounts(m, 'telegram')
+    if 'calendar_script' in m:
+        from .deployment_calendar import arguments, mounts
+        service['command'] += arguments(m)
+        service['volumes'] += mounts(m)
+        service['tmpfs'].append('/run/calendar:rw,noexec,nosuid,nodev,size=16k,mode=0700')
     if m.get('assistant_only'):
         service['environment']['F1_ASSISTANT_ONLY'] = '1'
     return service
