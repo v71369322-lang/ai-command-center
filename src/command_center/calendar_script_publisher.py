@@ -6,11 +6,11 @@ from .google_script_calendar_write import ScriptWriteHTTP
 from .store import Denied
 
 
-def publish(store, client, draft_id, operation_id):
+def publish(store, client, draft_id, operation_id, *, admission=None):
     if not isinstance(client, ScriptWriteHTTP):
         raise Denied('calendar_write_trusted_transport_required')
     plan = claim_script_publication(store, draft_id, operation_id,
-        client.profile.calendar_id, client.profile.key_fingerprint)
+        client.profile.calendar_id, client.profile.key_fingerprint, admission=admission)
     if plan['action'] == 'none':
         return plan['state']
     try:

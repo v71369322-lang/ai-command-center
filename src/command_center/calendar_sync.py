@@ -229,7 +229,7 @@ def publication_plan(store, draft_id):
         return {'request': request, 'request_hash': state['request_hash'], 'draft_id': draft_id}
 
 
-def claim_script_publication(store, draft_id, operation_id, calendar_id, credential_fingerprint):
+def claim_script_publication(store, draft_id, operation_id, calendar_id, credential_fingerprint, *, admission=None):
     """One atomic send claim. A crash after it permits only read reconciliation."""
     from .models import Control
     _uuid(operation_id, 'google_calendar_operation_invalid')
@@ -238,9 +238,18 @@ def claim_script_publication(store, draft_id, operation_id, calendar_id, credent
         control = session.get(Control, 1)
         if control.halted or control.recovery:
             raise Denied('control_blocked')
+        if admission is not None:
+            from datetime import datetime
+            if (admission.get('revision') != store.settings.source_revision
+                    or admission.get('epoch') != control.epoch
+                    or store.now(session) >= datetime.fromisoformat(admission['expires_at'])):
+                raise Denied('telegram_calendar_write_card_stale')
         state = sync_state(session, draft_id)
         binding = current_binding(session)
         draft = get_draft_locked(session, draft_id)
+        if admission is not None and (admission.get('binding_version') != binding.get('version')
+                or admission.get('document_hash') != digest(draft['document'])):
+            raise Denied('google_calendar_publication_context_changed')
         if (not binding.get('enabled') or binding['calendar_id'] != calendar_id
                 or binding['credential_fingerprint'] != credential_fingerprint
                 or draft['state'] != 'CONFIRMED_LOCAL'):

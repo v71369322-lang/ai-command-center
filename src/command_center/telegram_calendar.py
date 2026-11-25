@@ -171,6 +171,7 @@ def _verify(bridge, session, intent):
                 or issued.event.get('epoch') != control.epoch or control.halted or control.recovery
                 or bridge.store.now(session) >= datetime.fromisoformat(issued.event['expires_at'])):
             raise Denied('telegram_calendar_write_card_stale')
+    return issued.event
 
 
 def apply_decision(bridge, iid, intent):
@@ -181,7 +182,7 @@ def apply_decision(bridge, iid, intent):
             return
         if row.state != 'RECEIVED':
             raise Denied('telegram_calendar_not_pending')
-        _verify(bridge, session, intent)
+        approval = _verify(bridge, session, intent)
         from .calendar_drafts import get_draft_locked
         current = get_draft_locked(session, intent['draft_id'])
     writer = getattr(bridge, 'calendar_writer', None)
@@ -197,7 +198,8 @@ def apply_decision(bridge, iid, intent):
         # The same operation identifier survives callback redelivery/restarts.
         prepare_id = _operation(intent['draft_id'], 'script-prepare')
         prepare_sync(bridge.store, 'owner', intent['draft_id'], prepare_id)
-        publication = publish(bridge.store, writer, intent['draft_id'], _operation(iid, 'script-send'))
+        publication = publish(bridge.store, writer, intent['draft_id'], _operation(iid, 'script-send'),
+                              admission=approval)
     with bridge.store.transaction() as session:
         row = session.get(TelegramInbox, iid)
         if row.state != 'DONE':
@@ -216,7 +218,7 @@ def list_reply(session, profile=None, writer=None):
     from .telegram_calendar_voice import pending_count
     voices = pending_count(session, profile) if profile else 0
     connection = ('Создание событий Google настроено; новое событие требует подтверждения.' if writer
-                  else 'Запись в Google Calendar ещё не подключена.')
+                  else 'Google Calendar ещё не подключён для записи.')
     if not rows:
         voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.\n' if voices else '\n'
         return ('Черновиков календаря пока нет.' + voice + 'Пример:\n'
