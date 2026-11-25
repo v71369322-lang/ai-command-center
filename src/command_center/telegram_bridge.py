@@ -159,6 +159,10 @@ class TelegramBridge:
                 from .telegram_voice_requests import parse_message
             return str(uid), parse_message(message, sensitive)
         self.check_text(value)
+        from .telegram_voice_transcripts import parse_edit
+        voice_edit = parse_edit(message)
+        if voice_edit:
+            return str(uid), voice_edit
         value = dict(BUTTONS).get(value, value)
         from .telegram_agenda import parse as parse_agenda
         agenda = parse_agenda(value)
@@ -685,6 +689,9 @@ class TelegramBridge:
         elif kind == 'voice_confirm':
             from .telegram_voice_transcripts import decide
             decide(self, iid, intent)
+        elif kind == 'voice_edit':
+            from .telegram_voice_transcripts import edit
+            edit(self, iid, intent)
         elif kind == 'plan_prepare':
             from .telegram_planning import prepare
             prepare(self, iid, intent)
