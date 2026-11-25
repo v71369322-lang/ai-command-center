@@ -8,6 +8,7 @@ Reports omit transcript/reference text. Lexical metrics always need human review
 import argparse
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -49,7 +50,12 @@ def main():
     parser.add_argument('--cases', type=Path, required=True)
     parser.add_argument('--beam', type=int, choices=(1, 5), required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--review-output', type=Path,
+                        help='Opt-in private transcript file; must not exist. Keep outside Git.')
     args = parser.parse_args()
+    if args.review_output and (args.review_output.exists()
+                               or args.review_output.resolve() == args.output.resolve()):
+        parser.error('private review output must be a new, separate file')
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
     fingerprint = verify_model(args.model.resolve(), manifest)
     cases = json.loads(args.cases.read_text(encoding='utf-8-sig'))
@@ -64,7 +70,7 @@ def main():
     model = WhisperModel(str(args.model.resolve()), device='cpu', compute_type='int8',
                          cpu_threads=1, num_workers=1, local_files_only=True)
     load_seconds = time.perf_counter() - started
-    results = []
+    results, review = [], []
     for case in cases:
         audio = (args.cases.parent / case['audio']).read_bytes()
         started = time.perf_counter()
@@ -78,6 +84,8 @@ def main():
             'reference_sha256': sha256(case['reference'].encode()).hexdigest(),
             'audio_seconds': len(samples) / 16000, 'decode_inference_seconds': round(elapsed, 3),
             **assess(case['reference'], transcript, case.get('critical_phrases', []))})
+        if args.review_output:
+            review.append({'id': case['id'], 'reference': case['reference'], 'transcript': transcript})
     report = {'model_fingerprint': fingerprint, 'beam': args.beam, 'threads': 1,
               'compute_type': 'int8', 'load_seconds': round(load_seconds, 3),
               'peak_working_set_mib': round(peak_memory(), 1), 'platform': sys.platform,
@@ -85,6 +93,12 @@ def main():
               'ctranslate2_version': ctranslate2.__version__,
               'paid_api': False, 'production_changed': False, 'cases': results}
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    if args.review_output:
+        # O_EXCL prevents symlink/replacement races; Windows callers must also use
+        # a private parent ACL (POSIX mode bits alone do not restrict Windows ACLs).
+        descriptor = os.open(args.review_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
+            json.dump(review, stream, ensure_ascii=False, indent=2)
     print(json.dumps({'cases': len(results), 'beam': args.beam,
                       'peak_working_set_mib': report['peak_working_set_mib'], 'paid_api': False}))
 

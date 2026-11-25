@@ -18,6 +18,10 @@ Base beam1/5:5 лексических ошибок; Small beam1:2; Small beam5:0
 Small около19–22s/730MiB против Base5–6s/353MiB на этом PC; не VPS SLA.
 Подготовлен offline evaluator,23 focused tests PASS; runtime/модель не менялись,
 новый CI не запускался. [Методика, результаты и ограничения](jarvis-2/VOICE_QUALITY.md).
+Следующая проверка на реальном подтверждённом5s voice: Small точнее в тишине,
+но после добавления белого шума10dB обе модели меняют ключевые слова.
+Small не принят к установке; реальная дорожная речь и Calendar write не приняты.
+Аудио и подробные расшифровки — только в закрытой локальной custody, вне Git.
 Платные AI/Calendar writes не разрешены. CI установленного3bcf8e4 SUCCESS.
 [Установка, замеры и ограничения](handoff/JARVIS_RESPONSE_LIVE_2026-11-25.md).
 
