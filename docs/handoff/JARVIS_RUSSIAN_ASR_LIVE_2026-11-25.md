@@ -103,6 +103,11 @@ interlocks as an ad hoc repair. A later reviewed fix should handle only bounded
 transaction-entry contention without replaying network/business operations.
 At14:54:31UTC the normal exact poller had run over3.5minutes since restart,
 with fresh heartbeat14:54:23 and voice IDLE14:54:16. No new poller stop then.
+Final15:01:50UTC read-only check: OPEN epoch65/recovery=false, Telegram heartbeat
+15:01:40UTC, voice IDLE15:01:50UTC; normal poller over10minutes since restart.
+Stock voice model custody/profile/runtime boundary checks passed again on exact
+installed bundle/model/image. The last real /help reply was visibly confirmed
+in Telegram. Fresh owner phone recording still not received at this checkpoint.
 
 Owner browser /resume plus actual confirmation restored OPEN epoch65,
 recovery=false. Voice was briefly stopped in bounded120s owner windows so its
