@@ -8,7 +8,11 @@
 Реальный Telegram с работающим voice: /help UI→SENT6.02s, календарь14.09s;
 inbox→SENT3.38s/10.85s. Предыдущий Calendar53.31s включал другую очередь — не строгий A/B.
 Лимит Telegram фактически1CPU,256MiB; пять сервисов, OPEN epoch59, recovery=false.
-Voice IDLE, но реальных voice intake0: phone-ASR→save ещё не принят.
+Первый реальный phone voice25 ноября:5s audio, intake09:24:01UTC →
+transcript09:24:11UTC → owner save09:27:45UTC; связанная запись NEEDS_PLANNING,
+task_created=false. Это сохранённый запрос, не выполненная задача/событие.
+Один короткий пример не подтверждает качество имён, дат и речи в дороге.
+[Требования к качеству голоса и безопасной записи](jarvis-2/VOICE_QUALITY.md).
 Платные AI/Calendar writes не разрешены. CI установленного3bcf8e4 SUCCESS.
 [Установка, замеры и ограничения](handoff/JARVIS_RESPONSE_LIVE_2026-11-25.md).
 
