@@ -43,7 +43,7 @@ class MockTelegramHTTP:
 
 
 class TelegramBridge:
-    def __init__(self, store, client, owner_id, *, calendar=None):
+    def __init__(self, store, client, owner_id, *, calendar=None, calendar_writer=None):
         if (type(owner_id) is not int or not 0 < owner_id < 2**52
                 or not isinstance(client, (MockTelegramHTTP, ConfiguredTelegramHTTP))):
             raise ValueError('synthetic_private_owner_binding_required')
@@ -55,6 +55,12 @@ class TelegramBridge:
                 or calendar.profile.source_revision != store.settings.source_revision):
             raise Denied('telegram_calendar_connection_scope_mismatch')
         self.calendar = calendar
+        from .google_script_calendar_write import ScriptWriteHTTP
+        if calendar_writer is not None and (not isinstance(calendar_writer, ScriptWriteHTTP)
+                or calendar_writer.profile.owner_id != owner_id
+                or calendar_writer.profile.source_revision != store.settings.source_revision):
+            raise Denied('telegram_calendar_write_scope_mismatch')
+        self.calendar_writer = calendar_writer
         self.profile = digest({'owner': owner_id, 'revision': store.settings.source_revision, 'mode': 'http_mock'})
         if isinstance(client, ConfiguredTelegramHTTP):
             if client.owner != owner_id or client.revision != store.settings.source_revision:
@@ -743,7 +749,7 @@ class TelegramBridge:
                     reply = telegram_reply(session)
                 elif kind == 'calendar_list':
                     from .telegram_calendar import list_reply
-                    reply = list_reply(session, self.profile)
+                    reply = list_reply(session, self.profile, self.calendar_writer)
                 elif kind == 'voice':
                     from .telegram_voice_requests import reply as voice_reply
                     reply = voice_reply(session, self.profile)
@@ -816,6 +822,9 @@ class TelegramBridge:
                     if not intent['text'].strip():
                         raise Denied('telegram_empty_request')
                     self.guard()
+                    from .calendar_dialogue import handle_locked
+                    if handle_locked(self, session, iid, intent['text']):
+                        return {'inbox_id': iid, 'state': 'DONE', 'task_id': None}
                     row.state = 'NEEDS_PLANNING'
                     from .telegram_project_picker import keyboard as picker_keyboard, issue
                     number = iid.rsplit(':', 1)[1]

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, text
 
 from .attention_schedule import current as reminder_schedule
-from .calendar_drafts import create, decide, list_drafts_locked
+from .calendar_drafts import create_locked, decide, list_drafts_locked
 from .calendar_sync import sync_state
 from .models import Audit, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
@@ -107,23 +107,34 @@ def create_card(bridge, iid, intent):
             return
         if row.state != 'RECEIVED':
             raise Denied('telegram_calendar_not_pending')
-        document = _document(session, intent)
-    draft = create(bridge.store, 'owner', document, _operation(iid, 'create'), digest(intent))
-    with bridge.store.transaction() as session:
-        bridge.store.check_audit(session)
-        row = session.get(TelegramInbox, iid)
-        if row.state == 'DONE':
-            return
-        if row.state != 'RECEIVED':
-            raise Denied('telegram_calendar_not_pending')
-        text = (f"Черновик календаря\n{draft['document']['title']}\n"
-                f"{draft['document']['start']} — {draft['document']['end']}\n"
-                f"Telegram напомнит за {draft['document']['telegram_reminder_minutes']} мин.\n\n"
-                'Подтверждение пока сохранит событие локально. Google ещё не подключён.')
-        delivery = bridge.finish(session, iid, text, keyboard(draft['id'], draft['version']))
-        bridge.store.audit(session, ISSUED, 'owner', profile=bridge.profile, draft_id=draft['id'],
-                           version=draft['version'], delivery_id=delivery,
-                           document_hash=digest(draft['document']))
+        create_card_locked(bridge, session, iid, intent)
+
+
+def create_card_locked(bridge, session, iid, intent):
+    document = _document(session, intent)
+    draft = create_locked(bridge.store, session, 'owner', document, _operation(iid, 'create'), digest(intent))
+    writer = getattr(bridge, 'calendar_writer', None)
+    delivery_text = ('Подтверждение создаст событие в Google Calendar: ' + writer.profile.calendar_label + '.'
+                     if writer else 'Подтверждение пока сохранит событие локально. Запись в Google ещё не подключена.')
+    text = (f"Черновик календаря\n{document['title']}\n"
+            f"{document['start']} — {document['end']}\n"
+            f"Часовой пояс: {document['timezone']}.\n"
+            f"Напоминание по умолчанию: за {document['telegram_reminder_minutes']} мин.\n\n" + delivery_text)
+    delivery = bridge.finish(session, iid, text, keyboard(draft['id'], draft['version']))
+    extra = {}
+    if writer:
+        from .models import Control
+        from .calendar_sync import current_binding
+        binding = current_binding(session)
+        if (not binding.get('enabled') or binding['calendar_id'] != writer.profile.calendar_id
+                or binding['credential_fingerprint'] != writer.profile.key_fingerprint):
+            raise Denied('calendar_write_binding_not_configured')
+        extra = {'write_binding': digest(writer.profile.model_dump()),
+                 'binding_version': binding['version'],
+                 'epoch': session.get(Control, 1).epoch,
+                 'expires_at': (bridge.store.now(session) + timedelta(minutes=10)).isoformat()}
+    bridge.store.audit(session, ISSUED, 'owner', profile=bridge.profile, draft_id=draft['id'],
+        version=draft['version'], delivery_id=delivery, document_hash=digest(document), **extra)
 
 
 def _verify(bridge, session, intent):
@@ -135,12 +146,12 @@ def _verify(bridge, session, intent):
     expected = keyboard(intent['draft_id'], intent['version'])
     if canonical(delivery.body.get('reply_markup')) != canonical(expected):
         raise Denied('telegram_calendar_card_not_observed')
-    issued = session.execute(select(Audit).where(
+    issued = session.scalar(select(Audit).where(
         Audit.event['kind'].as_string() == ISSUED,
         Audit.event['profile'].as_string() == bridge.profile,
         Audit.event['draft_id'].as_string() == intent['draft_id'],
         Audit.event['version'].as_integer() == intent['version'],
-        Audit.event['delivery_id'].as_string() == delivery.id)).first()
+        Audit.event['delivery_id'].as_string() == delivery.id).limit(1))
     observed = session.execute(select(Audit).where(
         Audit.event['kind'].as_string() == 'telegram_delivery_observed',
         Audit.event['delivery_id'].as_string() == delivery.id,
@@ -148,6 +159,19 @@ def _verify(bridge, session, intent):
         Audit.event['state'].as_string() == 'SENT')).first()
     if not issued or not observed:
         raise Denied('telegram_calendar_card_not_observed')
+    writer = getattr(bridge, 'calendar_writer', None)
+    if intent['confirm'] and (writer is not None or 'write_binding' in issued.event):
+        from .models import Control
+        from .calendar_sync import current_binding
+        control = session.get(Control, 1)
+        binding = current_binding(session)
+        if (writer is None or issued.event.get('write_binding') != digest(writer.profile.model_dump())
+                or not binding.get('enabled') or issued.event.get('binding_version') != binding['version']
+                or issued.event.get('revision') != bridge.store.settings.source_revision
+                or issued.event.get('epoch') != control.epoch or control.halted or control.recovery
+                or bridge.store.now(session) >= datetime.fromisoformat(issued.event['expires_at'])):
+            raise Denied('telegram_calendar_write_card_stale')
+    return issued.event
 
 
 def apply_decision(bridge, iid, intent):
@@ -158,27 +182,48 @@ def apply_decision(bridge, iid, intent):
             return
         if row.state != 'RECEIVED':
             raise Denied('telegram_calendar_not_pending')
-        _verify(bridge, session, intent)
-    result = decide(bridge.store, 'owner', intent['draft_id'], intent['version'],
-                    _operation(iid, 'decision'), intent['confirm'])
+        approval = _verify(bridge, session, intent)
+        from .calendar_drafts import get_draft_locked
+        current = get_draft_locked(session, intent['draft_id'])
+    writer = getattr(bridge, 'calendar_writer', None)
+    if writer and intent['confirm'] and current['state'] == 'CONFIRMED_LOCAL':
+        result = current
+    else:
+        result = decide(bridge.store, 'owner', intent['draft_id'], intent['version'],
+                        _operation(iid, 'decision'), intent['confirm'])
+    publication = None
+    if writer and result['state'] == 'CONFIRMED_LOCAL':
+        from .calendar_sync import prepare_sync
+        from .calendar_script_publisher import publish
+        # The same operation identifier survives callback redelivery/restarts.
+        prepare_id = _operation(intent['draft_id'], 'script-prepare')
+        prepare_sync(bridge.store, 'owner', intent['draft_id'], prepare_id)
+        publication = publish(bridge.store, writer, intent['draft_id'], _operation(iid, 'script-send'),
+                              admission=approval)
     with bridge.store.transaction() as session:
         row = session.get(TelegramInbox, iid)
         if row.state != 'DONE':
             text = ('Событие подтверждено локально. Google Calendar ещё не подключён; '
                     'внешний вызов не выполнялся.' if result['state'] == 'CONFIRMED_LOCAL'
                     else 'Черновик календаря отменён. Внешний вызов не выполнялся.')
+            if publication:
+                text = ('Встреча создана в Google Calendar: ' + writer.profile.calendar_label + '.'
+                        if publication['state'] == 'SYNCED' else
+                        'Ответ Google не подтверждён. Результат требует сверки; повторно встречу не создаю.')
             bridge.finish(session, iid, text)
 
 
-def list_reply(session, profile=None):
+def list_reply(session, profile=None, writer=None):
     rows = list_drafts_locked(session, 'owner', 5)
     from .telegram_calendar_voice import pending_count
     voices = pending_count(session, profile) if profile else 0
+    connection = ('Создание событий Google настроено; новое событие требует подтверждения.' if writer
+                  else 'Google Calendar ещё не подключён для записи.')
     if not rows:
         voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.\n' if voices else '\n'
         return ('Черновиков календаря пока нет.' + voice + 'Пример:\n'
                 '/calendar завтра в 15:00 на 30 минут, напомни за 20 минут — Созвон\n\n'
-                'Google Calendar ещё не подключён.')
+                + connection)
     labels = {'DRAFT': 'ждёт подтверждения', 'CONFIRMED_LOCAL': 'подтверждено локально',
               'CANCELLED': 'отменено'}
     sync_labels = {'NOT_PREPARED': '', 'PREPARED': ' · Google подготовлен',
@@ -188,7 +233,7 @@ def list_reply(session, profile=None):
              f"{sync_labels[sync_state(session, row['id'])['state']]}" for row in rows]
     voice = f'\nГолосовых заметок, ожидающих расшифровки: {voices}.' if voices else ''
     return ('Последние события календаря:\n' + '\n'.join(lines) + voice
-            + '\n\nGoogle Calendar ещё не подключён; просмотр ничего не отправляет.')
+            + '\n\n' + connection + ' Просмотр ничего не отправляет.')
 
 
 def collect_reminders(bridge, session):

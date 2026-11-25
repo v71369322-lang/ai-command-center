@@ -14,6 +14,72 @@ from test_voice_release import voice_release as voice_release
 from test_deployment import release as release
 
 
+def write_binding(plain, owner):
+    from command_center.deployment_calendar import WRITE_KEY
+    from command_center.google_script_calendar_write import ScriptWriteProfile, ScriptWriteConfig
+    directory = Path(plain['manifest']['data_root']) / 'calendar/create-v1'
+    directory.mkdir(mode=0o700)
+    key = bytes.fromhex('cd' * 32)  # Public synthetic fixture only.
+    p = ScriptWriteProfile(enabled=True, create_enabled=True, owner_id=owner,
+        source_revision=plain['manifest']['revision'], deployment_id='synthetic_create_deployment_123',
+        connection_id='e' * 64, key_fingerprint=hashlib.sha256(key).hexdigest(),
+        calendar_id='synthetic@group.calendar.google.com', calendar_label='Jarvis')
+    config = ScriptWriteConfig(profile=p, key_file=WRITE_KEY)
+    atomic_json(directory / 'connection.json', config.model_dump())
+    (directory / 'calendar.key').write_bytes(key)
+    (directory / 'calendar.key').chmod(0o600)
+    return {'directory': str(directory), 'profile': p.model_dump(), 'config_sha256': digest(config.model_dump())}
+
+
+def test_optional_create_binding_is_exact_and_only_telegram_gets_separate_key(assistant_release):
+    args, old, plain, active, _ = assistant_release
+    calendar = binding(plain, active.owner_id)
+    calendar['write'] = write_binding(plain, active.owner_id)
+    target, _ = candidate.assemble(old, plain, active, args['voice'], checksum(old), checksum(plain), calendar)
+    check_binding(target['manifest'])
+    telegram = target['compose']['services']['telegram']
+    assert telegram['command'][-4:] == ['--calendar-write-config', '/run/calendar/write-connection.json',
+                                      '--approved-calendar-write', calendar['write']['config_sha256']]
+    for name, service in target['compose']['services'].items():
+        mounts = [v for v in service.get('volumes', []) if v['target'].startswith('/run/calendar/write')]
+        assert len(mounts) == (2 if name == 'telegram' else 0)
+        assert all(v['read_only'] for v in mounts)
+
+
+@pytest.mark.parametrize('attack', ['owner', 'revision', 'enabled', 'key_reuse', 'connection_reuse',
+                                  'config_pin', 'directory', 'key_bytes', 'writable', 'alias', 'deployment_reuse'])
+def test_create_binding_rejects_scope_and_custody_changes(assistant_release, attack):
+    args, old, plain, active, _ = assistant_release
+    calendar = binding(plain, active.owner_id)
+    calendar['write'] = write_binding(plain, active.owner_id)
+    changed = calendar['write']
+    if attack == 'owner':
+        changed['profile']['owner_id'] += 1
+    elif attack == 'revision':
+        changed['profile']['source_revision'] = 'e' * 40
+    elif attack == 'enabled':
+        changed['profile']['create_enabled'] = False
+    elif attack == 'key_reuse':
+        changed['profile']['key_fingerprint'] = calendar['profile']['key_fingerprint']
+    elif attack == 'connection_reuse':
+        changed['profile']['connection_id'] = calendar['profile']['connection_id']
+    elif attack == 'alias':
+        changed['profile']['calendar_id'] = 'primary'
+    elif attack == 'deployment_reuse':
+        changed['profile']['deployment_id'] = calendar['profile']['deployment_id']
+    elif attack == 'config_pin':
+        changed['config_sha256'] = '0' * 64
+    elif attack == 'directory':
+        changed['directory'] = str(Path(plain['manifest']['data_root']) / 'telegram')
+    elif attack == 'key_bytes':
+        (Path(changed['directory']) / 'calendar.key').write_bytes(b'x' * 32)
+    else:
+        Path(changed['directory']).chmod(0o755)
+    with pytest.raises((ValueError, Denied)):
+        target, _ = candidate.assemble(old, plain, active, args['voice'], checksum(old), checksum(plain), calendar)
+        check_binding(target['manifest'])
+
+
 def binding(plain, owner):
     directory = Path(plain['manifest']['data_root']) / 'calendar/v1'
     directory.parent.mkdir(mode=0o700)

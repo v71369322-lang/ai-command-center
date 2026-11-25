@@ -98,6 +98,12 @@ def _states(session):
 
 def create(store, role, document, operation_id, source_hash):
     """Create one local draft. No provider action or task is produced."""
+    with store.transaction() as session:
+        return create_locked(store, session, role, document, operation_id, source_hash)
+
+
+def create_locked(store, session, role, document, operation_id, source_hash):
+    """Same draft operation within the caller's existing authority transaction."""
     if role != 'owner':
         raise Denied('owner_required')
     document = validate(document)
@@ -105,21 +111,20 @@ def create(store, role, document, operation_id, source_hash):
     if not isinstance(source_hash, str) or not re.fullmatch(r'[a-f0-9]{64}', source_hash):
         raise Denied('calendar_source_invalid')
     fingerprint = digest({'document': document, 'source_hash': source_hash})
-    with store.transaction() as session:
-        store.check_audit(session)
-        rows = _history(session)
-        duplicate = next((row for row in rows if row.event.get('operation_id') == operation_id), None)
-        if duplicate:
-            if duplicate.event.get('input_hash') != fingerprint:
-                raise Denied('calendar_idempotency_conflict')
-            return _states(session)[duplicate.event['draft_id']]
-        if sum(row.event['kind'] == CREATED for row in rows) >= MAX_DRAFTS:
-            raise Denied('calendar_history_limit')
-        draft_id = str(uuid4())
-        store.audit(session, CREATED, 'owner', draft_id=draft_id, version=1,
-                    document=document, document_hash=digest(document), source_hash=source_hash,
-                    operation_id=operation_id, input_hash=fingerprint)
-        return _states(session)[draft_id]
+    store.check_audit(session)
+    rows = _history(session)
+    duplicate = next((row for row in rows if row.event.get('operation_id') == operation_id), None)
+    if duplicate:
+        if duplicate.event.get('input_hash') != fingerprint:
+            raise Denied('calendar_idempotency_conflict')
+        return _states(session)[duplicate.event['draft_id']]
+    if sum(row.event['kind'] == CREATED for row in rows) >= MAX_DRAFTS:
+        raise Denied('calendar_history_limit')
+    draft_id = str(uuid4())
+    store.audit(session, CREATED, 'owner', draft_id=draft_id, version=1,
+                document=document, document_hash=digest(document), source_hash=source_hash,
+                operation_id=operation_id, input_hash=fingerprint)
+    return _states(session)[draft_id]
 
 
 def decide(store, role, draft_id, expected_version, operation_id, confirm):

@@ -31,12 +31,12 @@ def service_settings():
 
 
 class TelegramService:
-    def __init__(self, store, client, *, poll_seconds=2, max_failures=3, calendar=None):
+    def __init__(self, store, client, *, poll_seconds=2, max_failures=3, calendar=None, calendar_writer=None):
         if not isinstance(client, ConfiguredTelegramHTTP) or not 0 <= poll_seconds <= 20 or not 1 <= max_failures <= 3:
             raise ValueError('telegram_service_limits_invalid')
         self.store, self.client = store, client
         self.poll_seconds, self.max_failures = poll_seconds, max_failures
-        self.bridge = TelegramBridge(store, client, client.owner, calendar=calendar)
+        self.bridge = TelegramBridge(store, client, client.owner, calendar=calendar, calendar_writer=calendar_writer)
         self._leader, self._pid = None, None
         self._stop = None
         self._heartbeat_at = None
@@ -141,6 +141,8 @@ def main():
     calendar_options.add_argument('--calendar-config')
     calendar_options.add_argument('--calendar-script-config')
     parser.add_argument('--approved-calendar')
+    parser.add_argument('--calendar-write-config')
+    parser.add_argument('--approved-calendar-write')
     args = parser.parse_args()
     client = None
     store = None
@@ -165,7 +167,14 @@ def main():
             from .google_script_calendar import script_calendar_runtime
             calendar = resources.enter_context(script_calendar_runtime(args.calendar_script_config,
                 args.approved_calendar, store.settings.source_revision, client.owner))
-        service = TelegramService(store, client, calendar=calendar)
+        if bool(args.calendar_write_config) != bool(args.approved_calendar_write):
+            raise Denied('calendar_write_runtime_exact_connection_required')
+        writer = None
+        if args.calendar_write_config:
+            from .google_script_calendar_write import script_write_runtime
+            writer = resources.enter_context(script_write_runtime(args.calendar_write_config,
+                args.approved_calendar_write, store.settings.source_revision, client.owner))
+        service = TelegramService(store, client, calendar=calendar, calendar_writer=writer)
         stop = threading.Event()
         for signum in (signal.SIGTERM, signal.SIGINT):
             signal.signal(signum, lambda *_: stop.set())

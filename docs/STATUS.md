@@ -4,6 +4,13 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+25 ноября, следующий локальный срез: диалог уточнения встречи и подтверждённое
+создание через отдельный opt-in Google bridge. Существующие draft/sync/owner
+interlocks переиспользованы; UNKNOWN до внешнего вызова, затем только readback,
+фиксированный event ID защищает от дублей.55 локальных проверок PASS;
+PG/Linux CI ещё требуется. На VPS остаётся1e5dd99, Google read-only не менялся.
+[Реализация, ограничения и необходимые gates](handoff/JARVIS_CALENDAR_CREATE_2026-11-25.md).
+
 25 ноября: PR117/exact1e5dd99 с фиксированным GigaAM установлен по отдельному
 подтверждению владельца; deployment/activation VERIFIED. Linux network-none
 1CPU/1GiB actual decoder:5s→1.172s,120s→10.614s, cgroup peak824.2MiB, OOM=false.
