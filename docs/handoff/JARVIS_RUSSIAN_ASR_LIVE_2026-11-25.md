@@ -122,9 +122,22 @@ SENT14:52:42.125047UTC,3.96034s. Not UI-to-SENT or an SLA. Actual natural-langua
 Calendar read reply was also visible in Telegram; no events changed.
 Ledger remains actual4 historical units/reserved0/uncertain0. No paid call.
 
-Fresh phone voice acceptance on the installed model is pending. Owner asked to
-send a short test voice and provide actual wording, without pressing Save or
-Calendar actions. Existing private offline phone tests do not replace this gate.
+Fresh3s phone voice was received17:36:46.704342UTC; owner supplied its actual
+wording in this chat. Installed ASR proposal17:36:58.836942UTC matched all owner
+words exactly, with punctuation added; text hash verified and the same card
+visibly read in Telegram. SENT17:37:03.568942UTC: intake→proposal12.1326s and
+intake→SENT16.8646s, not model-only speed or phone UI-to-SENT latency.
+Worker STARTED17:36:53.318404UTC:6.614062s before worker start,5.518538s from
+start through download/guards/ASR/proposal,4.732s proposal→SENT. Current evidence
+does not isolate inference alone. This reveals remaining pipeline overhead.
+No ACCEPTED event for this proposal; Save was not pressed, no request/task or
+Calendar event created from it. Ledger unchanged, actual4/reserved0/uncertain0.
+At17:37:58UTC OPEN epoch65, fresh Telegram/voice IDLE heartbeats on1e5dd99.
+No telegram_service_stopped or voice transcription failure event since15:02UTC;
+this is over2.5hours of observed operation after recovery, not an uptime SLA.
+This passes one short real-phone transcription/readback example, not general
+road-speech or Calendar acceptance. Calendar integration remains read-only;
+the test phrase also omitted a meeting time, which must not be invented.
 Do not claim automatic tasks, Calendar writes, road-speech quality or phase2
 completion. Next product work remains voice acceptance, safe Calendar writes,
 tasks/reminders and the complete usable phase2 scenario.

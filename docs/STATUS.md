@@ -11,7 +11,10 @@
 voice IDLE; реальный /help inbox→SENT3.96s и чтение Calendar подтверждены.
 Во время работ Telegram дважды завершился1 без OOM; bounded diagnostic20циклов
 прошёл, exact контейнер восстановлен. Причина ранних остановок не доказана;
-устойчивость требует дальнейшего наблюдения. Новая phone voice приёмка ожидается.
+устойчивость требует дальнейшего наблюдения. Свежая3s phone voice17:36UTC:
+все слова совпали с owner-текстом, пунктуация добавлена, карточка видна в Telegram;
+intake→proposal12.13s, intake→SENT16.86s. Это один положительный пример,
+не SLA/road acceptance; Save не нажат, Calendar по-прежнему read-only.
 В PostgreSQL в оба момента найден3s statement_timeout на SELECT control —
 указание на contention при обслуживании, не доказательство нового ASR OOM.
 Backup quota почти заполнена:777679bytes свободно; следующий выпуск требует
