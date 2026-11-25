@@ -227,3 +227,35 @@ def publication_plan(store, draft_id):
                 or state['request_hash'] != digest(request)):
             raise Denied('google_calendar_publication_context_changed')
         return {'request': request, 'request_hash': state['request_hash'], 'draft_id': draft_id}
+
+
+def claim_script_publication(store, draft_id, operation_id, calendar_id, credential_fingerprint):
+    """One atomic send claim. A crash after it permits only read reconciliation."""
+    from .models import Control
+    _uuid(operation_id, 'google_calendar_operation_invalid')
+    with store.transaction() as session:
+        store.check_audit(session)
+        control = session.get(Control, 1)
+        if control.halted or control.recovery:
+            raise Denied('control_blocked')
+        state = sync_state(session, draft_id)
+        binding = current_binding(session)
+        draft = get_draft_locked(session, draft_id)
+        if (not binding.get('enabled') or binding['calendar_id'] != calendar_id
+                or binding['credential_fingerprint'] != credential_fingerprint
+                or draft['state'] != 'CONFIRMED_LOCAL'):
+            raise Denied('google_calendar_publication_context_changed')
+        request = insert_request(calendar_id, draft_id, draft['document'])
+        if state['state'] not in {'PREPARED', 'UNKNOWN', 'SYNCED'}:
+            raise Denied('google_calendar_publication_not_prepared')
+        if (state['binding_version'] != binding['version'] or state['document_hash'] != digest(draft['document'])
+                or state['request_hash'] != digest(request)):
+            raise Denied('google_calendar_publication_context_changed')
+        action = 'none' if state['state'] == 'SYNCED' else 'get'
+        if state['state'] == 'PREPARED':
+            store.audit(session, UNKNOWN, 'calendar_publisher', draft_id=draft_id,
+                request_hash=state['request_hash'], operation_id=operation_id,
+                retry_permitted=False, reconciliation_required=True)
+            action = 'create'
+        return {'action': action, 'state': sync_state(session, draft_id),
+                'document': draft['document'], 'request_hash': state['request_hash']}
