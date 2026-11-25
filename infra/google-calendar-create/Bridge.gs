@@ -44,7 +44,7 @@ function doGet() {
 function jarvisGoogle_(calendar, draftId, method, body) {
   let event;
   if (method === 'get') {
-    const result = Calendar.Events.list(calendar, {privateExtendedProperty:'commanderDraftId=' + draftId,
+    const result = Calendar.Events.list(calendar, {privateExtendedProperty:['commanderDraftId=' + draftId],
       maxResults:2,showDeleted:false,singleEvents:true});
     const items = result.items || [];
     if (!Array.isArray(items) || items.length > 1 || result.nextPageToken) throw new Error('ambiguous');

@@ -23,7 +23,9 @@ const sandbox = {
       if (calendar !== 'synthetic@group.calendar.google.com' || options.maxResults !== 2 ||
           options.showDeleted !== false || options.singleEvents !== true) throw Error('unbounded lookup');
       if(input.provider_failure) throw Error('private provider failure');
-      const draft = options.privateExtendedProperty.split('=')[1];
+      if (!Array.isArray(options.privateExtendedProperty) || options.privateExtendedProperty.length !== 1)
+        throw Error('lookup binding');
+      const draft = options.privateExtendedProperty[0].split('=')[1];
       return {items:Object.values(events).filter(e => e.extendedProperties.private.commanderDraftId === draft)};
     },
     insert(d, calendar, options) {
