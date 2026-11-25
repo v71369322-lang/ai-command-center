@@ -193,7 +193,7 @@ def main():
     import threading
     import time
 
-    from .offline_speech import OfflineSpeech
+    from .speech_models import decoder as speech_decoder
     from .store import Store
     from .telegram_bridge import TelegramBridge
     from .telegram_service import service_settings
@@ -227,7 +227,7 @@ def main():
         if since.tzinfo is None or since.utcoffset() is None:
             raise Denied('voice_since_timezone_required')
         # Load offline model before opening a credential-bearing HTTP client.
-        decoder = OfflineSpeech(profile.model_directory, profile.model_manifest)
+        decoder = speech_decoder(profile.model_directory, profile.model_manifest)
         client = ConfiguredTelegramHTTP(profile.connection_file, profile.connection_digest, profile.source_revision)
         store = Store(settings)
         bridge = TelegramBridge(store, client, client.owner)

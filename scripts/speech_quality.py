@@ -15,6 +15,7 @@ import time
 
 from command_center.offline_speech import decode_audio, verify_model
 from command_center.speech_quality import assess
+from command_center.speech_models import decoder as bound_decoder, model_files
 
 
 def peak_memory():
@@ -49,6 +50,8 @@ def main():
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--cases', type=Path, required=True)
     parser.add_argument('--beam', type=int, choices=(1, 5), required=True)
+    parser.add_argument('--mode', choices=('whisper-experiment', 'bound-decoder'), default='whisper-experiment',
+                        help='Bound mode uses the actual worker decoder; beam is then ignored.')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--review-output', type=Path,
                         help='Opt-in private transcript file; must not exist. Keep outside Git.')
@@ -57,7 +60,7 @@ def main():
                                or args.review_output.resolve() == args.output.resolve()):
         parser.error('private review output must be a new, separate file')
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
-    fingerprint = verify_model(args.model.resolve(), manifest)
+    fingerprint = verify_model(args.model.resolve(), manifest, files=model_files(manifest))
     cases = json.loads(args.cases.read_text(encoding='utf-8-sig'))
     if not isinstance(cases, list) or not 1 <= len(cases) <= 32:
         raise ValueError('speech_evaluation_cases_invalid')
@@ -67,26 +70,33 @@ def main():
     onnxruntime.disable_telemetry_events()
     from faster_whisper import WhisperModel
     started = time.perf_counter()
-    model = WhisperModel(str(args.model.resolve()), device='cpu', compute_type='int8',
-                         cpu_threads=1, num_workers=1, local_files_only=True)
+    model = (bound_decoder(args.model.resolve(), manifest) if args.mode == 'bound-decoder'
+             else WhisperModel(str(args.model.resolve()), device='cpu', compute_type='int8',
+                               cpu_threads=1, num_workers=1, local_files_only=True))
     load_seconds = time.perf_counter() - started
     results, review = [], []
     for case in cases:
         audio = (args.cases.parent / case['audio']).read_bytes()
         started = time.perf_counter()
-        samples = decode_audio(audio)
-        segments, _ = model.transcribe(samples, language='ru', task='transcribe',
-            beam_size=args.beam, best_of=1, temperature=0, condition_on_previous_text=False,
-            vad_filter=True, vad_parameters={'min_silence_duration_ms': 500})
-        transcript = ' '.join(segment.text.strip() for segment in segments).strip()
+        if args.mode == 'bound-decoder':
+            response = model.transcribe(audio)
+            transcript, duration = response['text'], response['duration_seconds']
+        else:
+            samples = decode_audio(audio)
+            duration = len(samples) / 16000
+            segments, _ = model.transcribe(samples, language='ru', task='transcribe',
+                beam_size=args.beam, best_of=1, temperature=0, condition_on_previous_text=False,
+                vad_filter=True, vad_parameters={'min_silence_duration_ms': 500})
+            transcript = ' '.join(segment.text.strip() for segment in segments).strip()
         elapsed = time.perf_counter() - started
         results.append({'id': case['id'], 'audio_sha256': sha256(audio).hexdigest(),
             'reference_sha256': sha256(case['reference'].encode()).hexdigest(),
-            'audio_seconds': len(samples) / 16000, 'decode_inference_seconds': round(elapsed, 3),
+            'audio_seconds': duration, 'decode_inference_seconds': round(elapsed, 3),
             **assess(case['reference'], transcript, case.get('critical_phrases', []))})
         if args.review_output:
             review.append({'id': case['id'], 'reference': case['reference'], 'transcript': transcript})
-    report = {'model_fingerprint': fingerprint, 'beam': args.beam, 'threads': 1,
+    report = {'model_fingerprint': fingerprint, 'mode': args.mode,
+              'beam': args.beam if args.mode == 'whisper-experiment' else None, 'threads': 1,
               'compute_type': 'int8', 'load_seconds': round(load_seconds, 3),
               'peak_working_set_mib': round(peak_memory(), 1), 'platform': sys.platform,
               'faster_whisper_version': faster_whisper.__version__,

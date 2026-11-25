@@ -90,6 +90,8 @@ def main():
     p = actions.add_parser('profile')
     for key in ('previous-directory', 'plain-directory', 'profile-directory', 'image'):
         p.add_argument('--' + key, required=True)
+    p.add_argument('--model-directory')
+    p.add_argument('--model-manifest-file')
     p = actions.add_parser('prepare')
     for key in ('previous-directory', 'plain-directory', 'output', 'voice-binding-file', 'previous-pin', 'plain-pin'):
         p.add_argument('--' + key, required=True)
@@ -108,6 +110,9 @@ def main():
     action = args.pop('action')
     try:
         if action == 'profile':
+            model_file = args.pop('model_manifest_file')
+            if model_file:
+                args['model_manifest'] = read_json(model_file)
             result = prepare_profile(**args)
         elif action == 'prepare':
             calendar_file = args.pop('calendar_binding_file')

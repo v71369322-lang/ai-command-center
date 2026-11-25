@@ -1,0 +1,10 @@
+{
+  "repository": "istupakov/gigaam-v3-onnx",
+  "revision": "322c3b29492673eb7d0b434bfa9dfb8653e34d02",
+  "files": {
+    "LICENSE.txt": "f00de6715714c7a63d08639cdbfaa40224eefc407302614bd19f1a8b98c875aa",
+    "config.json": "0641fcf73f4af791c73f05083e38a658ff5dcbee3534a0c61396c10f4b97f0fe",
+    "v3_e2e_ctc.int8.onnx": "2e3fcb7a7b66030336fd10c2fcfb033bd1dc7e1bf238fe5cfd83b1d0cfc9d28e",
+    "v3_e2e_ctc_vocab.txt": "142de7570b3de5b3035ce111a89c228e80e6085273731d944093ddf24fa539cd"
+  }
+}
