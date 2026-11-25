@@ -13,8 +13,31 @@ from .telegram_voice_requests import INTAKE, verify_transcript
 PROPOSED = 'telegram_voice_transcript_proposed'
 ACCEPTED = 'telegram_voice_transcript_accepted'
 DECIDED = 'telegram_voice_transcript_decided'
+CORRECTED = 'telegram_voice_transcript_corrected'
+TITLE = 'Расшифровка голосового поручения:'
+EDIT_TITLE = 'Текст с вашей правкой:'
 LABEL_ACCEPT = 'Сохранить запрос'
 LABEL_REJECT = 'Удалить расшифровку'
+
+
+def parse_edit(message):
+    """Reply metadata only routes the message; observed delivery grants binding."""
+    reply = message.get('reply_to_message')
+    if not isinstance(reply, dict) or not isinstance(reply.get('text'), str):
+        return None
+    if reply['text'].split('\n', 1)[0] not in {TITLE, EDIT_TITLE}:
+        return None
+    if (type(reply.get('message_id')) is not int or reply['message_id'] <= 0
+            or not isinstance(message.get('text'), str) or not message['text'].strip()):
+        raise Denied('telegram_voice_edit_invalid')
+    return {'kind': 'voice_edit', 'reply_message_id': reply['message_id'], 'text': message['text']}
+
+
+def preview(value, *, corrected=False):
+    return ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value
+            + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
+            '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
+            ' событие календаря, AI и выполнение не запускаются.')
 
 
 def keyboard(proposal_id):
@@ -71,8 +94,7 @@ def propose(bridge, voice_inbox_id, response, request, *, expected_epoch=None):
             if any(existing.event.get(key) != value for key, value in event.items()):
                 raise Denied('telegram_voice_transcript_conflict')
             return {'proposal_id': proposal_id, 'delivery_id': existing.event['delivery_id']}
-        text = ('Расшифровка голосового поручения:\n\n' + transcript['text']
-                + '\n\nПроверьте текст. Сохранение создаст только запрос без запуска AI или проекта.')
+        text = preview(transcript['text'])
         delivery = bridge.enqueue(session, f'voice-transcript:{proposal_id}', text, keyboard(proposal_id))
         bridge.store.audit(session, PROPOSED, 'transcriber', **event, delivery_id=delivery,
                            confirmed=False, task_created=False, project_selected=False)
@@ -81,7 +103,7 @@ def propose(bridge, voice_inbox_id, response, request, *, expected_epoch=None):
 
 def _proposal(bridge, session, intent):
     record = session.execute(select(Audit).where(
-        Audit.event['kind'].as_string() == PROPOSED,
+        Audit.event['kind'].as_string().in_((PROPOSED, CORRECTED)),
         Audit.event['profile'].as_string() == bridge.profile,
         Audit.event['proposal_id'].as_string() == intent['proposal_id'])).scalar_one_or_none()
     if not record:
@@ -97,11 +119,93 @@ def _proposal(bridge, session, intent):
     if (not delivery or delivery.profile != bridge.profile or delivery.state != 'SENT'
             or delivery.message_id != intent['message_id'] or not observed
             or canonical(delivery.body.get('reply_markup')) != canonical(keyboard(intent['proposal_id']))
-            or not source or source.fingerprint != event.get('voice_fingerprint')
+            or not source or source.profile != bridge.profile or source.intent.get('kind') != 'voice_request'
+            or source.fingerprint != digest(source.intent) or source.fingerprint != event.get('voice_fingerprint')
             or event.get('text_hash') != digest(event.get('text'))):
         raise Denied('telegram_voice_transcript_card_invalid')
+    if event['kind'] == CORRECTED:
+        edited = session.get(TelegramInbox, event.get('owner_inbox_id'))
+        anchored = edited and session.scalar(select(Audit.sequence).where(
+            Audit.event['kind'].as_string() == 'telegram_update_received',
+            Audit.event['actor'].as_string() == 'owner',
+            Audit.event['profile'].as_string() == bridge.profile,
+            Audit.event['update_id'].as_string() == edited.id.removeprefix(bridge.profile + ':'),
+            Audit.event['intent_hash'].as_string() == edited.fingerprint).limit(1))
+        if (event.get('actor') != 'owner' or not edited or not anchored or edited.state != 'DONE'
+                or edited.profile != bridge.profile or edited.fingerprint != digest(edited.intent)
+                or edited.fingerprint != event.get('owner_fingerprint')
+                or edited.intent.get('kind') != 'voice_edit' or edited.intent.get('text') != event['text']):
+            raise Denied('telegram_voice_correction_integrity')
     bridge.check_text(event['text'])
     return event
+
+
+def _family(session, profile, proposal):
+    return select(Audit.event['proposal_id'].as_string()).where(
+        Audit.event['kind'].as_string().in_((PROPOSED, CORRECTED)),
+        Audit.event['profile'].as_string() == profile,
+        Audit.event['voice_inbox_id'].as_string() == proposal['voice_inbox_id'])
+
+
+def _closed_or_stale(bridge, session, iid, proposal):
+    family = _family(session, bridge.profile, proposal)
+    previous = session.scalar(select(Audit.sequence).where(
+        Audit.event['kind'].as_string().in_((DECIDED, ACCEPTED)),
+        Audit.event['profile'].as_string() == bridge.profile,
+        Audit.event['proposal_id'].as_string().in_(family)).limit(1))
+    if previous is not None:
+        bridge.finish(session, iid, 'Эта расшифровка уже обработана. Повторный запрос не создан.')
+        return True
+    latest = session.scalar(select(Audit.event['proposal_id'].as_string()).where(
+        Audit.event['kind'].as_string().in_((PROPOSED, CORRECTED)),
+        Audit.event['profile'].as_string() == bridge.profile,
+        Audit.event['voice_inbox_id'].as_string() == proposal['voice_inbox_id'])
+        .order_by(Audit.sequence.desc()).limit(1))
+    if latest != proposal['proposal_id']:
+        bridge.finish(session, iid, 'Текст уже исправлен. Используйте последнюю карточку с вашей правкой.'
+                      ' Запрос не создан.')
+        return True
+    return False
+
+
+def edit(bridge, iid, intent):
+    """Owner replacement is a new proposal, never a rewritten model transcript."""
+    with bridge.store.transaction() as session:
+        bridge.guard()
+        bridge.store.check_audit(session)
+        row = session.get(TelegramInbox, iid)
+        if row.state == 'DONE':
+            return
+        if row.state != 'RECEIVED' or row.intent != intent:
+            raise Denied('telegram_voice_edit_not_pending')
+        delivery = session.scalar(select(TelegramDelivery).where(
+            TelegramDelivery.profile == bridge.profile,
+            TelegramDelivery.message_id == intent['reply_message_id'], TelegramDelivery.state == 'SENT'))
+        record = delivery and session.scalar(select(Audit).where(
+            Audit.event['kind'].as_string().in_((PROPOSED, CORRECTED)),
+            Audit.event['profile'].as_string() == bridge.profile,
+            Audit.event['delivery_id'].as_string() == delivery.id))
+        if not record:
+            bridge.finish(session, iid, 'Не удалось связать ответ с карточкой расшифровки.'
+                          ' Ответьте на сообщение бота с текстом расшифровки. Запрос не создан.')
+            return
+        proposal = _proposal(bridge, session, {'proposal_id': record.event['proposal_id'],
+                                             'message_id': intent['reply_message_id']})
+        if _closed_or_stale(bridge, session, iid, proposal):
+            return
+        bridge.check_text(intent['text'])
+        if intent['text'] == proposal['text']:
+            bridge.finish(session, iid, 'Текст совпадает с карточкой. Новая версия не создана;'
+                          ' сохраните запрос кнопкой в последней карточке.')
+            return
+        proposal_id = str(uuid5(NAMESPACE_URL, 'acc:voice-correction:' + iid))
+        delivery_id = bridge.finish(session, iid, preview(intent['text'], corrected=True), keyboard(proposal_id))
+        bridge.store.audit(session, CORRECTED, 'owner', profile=bridge.profile, proposal_id=proposal_id,
+            previous_proposal_id=proposal['proposal_id'], voice_inbox_id=proposal['voice_inbox_id'],
+            voice_fingerprint=proposal['voice_fingerprint'], audio_sha256=proposal['audio_sha256'],
+            text=intent['text'], text_hash=digest(intent['text']), owner_inbox_id=iid,
+            owner_fingerprint=row.fingerprint, delivery_id=delivery_id,
+            confirmed=False, task_created=False, project_selected=False)
 
 
 def decide(bridge, iid, intent):
@@ -113,13 +217,8 @@ def decide(bridge, iid, intent):
         if row.state != 'RECEIVED':
             raise Denied('telegram_voice_confirmation_not_pending')
         proposal = _proposal(bridge, session, intent)
-        # Different callback update IDs must not save the same speech twice.
-        previous = session.scalar(select(Audit.sequence).where(
-            Audit.event['kind'].as_string().in_((DECIDED, ACCEPTED)),
-            Audit.event['profile'].as_string() == bridge.profile,
-            Audit.event['proposal_id'].as_string() == intent['proposal_id']).limit(1))
-        if previous is not None:
-            bridge.finish(session, iid, 'Эта расшифровка уже обработана. Повторный запрос не создан.')
+        # All corrected cards share the same one-save boundary as the raw ASR.
+        if _closed_or_stale(bridge, session, iid, proposal):
             return
         bridge.store.audit(session, DECIDED, 'owner', profile=bridge.profile,
                            proposal_id=intent['proposal_id'], confirmed=intent['confirm'])
