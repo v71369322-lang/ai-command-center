@@ -4,6 +4,14 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+25 ноября: PR115/exact3bcf8e4 установлен штатно с первого apply; оба журнала VERIFIED.
+Реальный Telegram с работающим voice: /help UI→SENT6.02s, календарь14.09s;
+inbox→SENT3.38s/10.85s. Предыдущий Calendar53.31s включал другую очередь — не строгий A/B.
+Лимит Telegram фактически1CPU,256MiB; пять сервисов, OPEN epoch59, recovery=false.
+Voice IDLE, но реальных voice intake0: phone-ASR→save ещё не принят.
+Платные AI/Calendar writes не разрешены. CI установленного3bcf8e4 SUCCESS.
+[Установка, замеры и ограничения](handoff/JARVIS_RESPONSE_LIVE_2026-11-25.md).
+
 Продолжение24 ноября: PR114/exact8160817 CI45433386782/45433386877 SUCCESS.
 Готовится явный Telegram CPU budget1 вместо legacy0.25 и естественные read-only
 Calendar aliases. Read-only cgroup probe:85389 throttled periods из91888;
