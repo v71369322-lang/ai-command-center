@@ -46,6 +46,8 @@ reserved0, uncertain0; Telegram heartbeat fresh and voice IDLE on42b8238.
 
 Real /help reply visibly observed in Telegram: received11:17:56.269678UTC,
 SENT11:17:59.927714UTC, inbox→SENT3.658s. This is not UI→SENT or an SLA.
+Real natural-language Calendar query also produced the Google Calendar read reply
+visibly in Telegram after the upgrade. Events were not changed.
 No new phone voice had arrived at this checkpoint. Owner was asked once to send
 a short new test voice; existing previous voice had already been saved and cannot
 serve as the positive pending-correction acceptance case.
