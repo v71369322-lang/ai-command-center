@@ -9,8 +9,13 @@
 1.70–1.90s на этом PC. Whole120s превысил1GiB; реализованы15s окна с проверкой
 покрытия и без склейки повторяющихся слов. Рабочий decoder прошёл resource-test:
 120s безопасно отклонены по старому2000-byte пределу, пик414.4MiB, без OOM.
-Изменение модели пока НЕ установлено.46 local tests PASS; итоговый CI проверять
-по новому PR. [Измерения, pinning, границы и выпуск](handoff/JARVIS_RUSSIAN_ASR_2026-11-25.md).
+Изменение модели пока НЕ установлено. PR117/exact1e5dd99: CI45621267384 и45621267808
+SUCCESS; основная suite2742 PASS/1 skipped/1 warning; отдельная speech44 PASS.
+Положительный120s synthetic resource-test прошёл целиком:39.754s/395.0MiB,
+1322byte output; имена/даты/числа/отрицания в дополнительных synthetic примерах
+проверены, две дополнительные шумовые копии сохранили ключевые фразы.
+Source/model archive подготовлены и проверены. Нового разрешения на deployment нет.
+[Измерения, pinning, границы и выпуск](handoff/JARVIS_RUSSIAN_ASR_2026-11-25.md).
 
 25 ноября: PR116/exact42b8238 установлен штатно; deployment и activation VERIFIED.
 Owner browser resume подтверждён: OPEN epoch62, recovery=false; voice fresh IDLE.
