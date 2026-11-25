@@ -45,8 +45,13 @@ to create again. Verified responses use existing SYNCED evidence and deduplicati
 `infra/google-calendar/Bridge.gs` and its Google deployment are unchanged.
 The create/get bridge uses a distinct HMAC purpose, connection and key, signs
 the explicit calendar ID (not the account-dependent primary alias) and document hash, admits only create/get and one fixed calendar
-from ScriptProperties, and calls only the fixed Google Calendar API origin.
-TLS checks remain enabled; bearer credentials stay inside Apps Script and are
+from ScriptProperties, and calls only Calendar.Events.list/insert through the
+Google Advanced Calendar service. The manifest enables Calendar v3 and requests
+only calendar.events.owned, without external_request or manual bearer handling.
+On an Apps Script default Cloud project Google documents automatic API enabling
+when this service is added; a standard Cloud project still needs a separate
+API-availability check. Real consent/API access remains untested here.
+Google credentials stay inside Apps Script's own authorization flow and are
 not returned to Telegram/VPS/AI. No update/delete/invite/attachments/guest writes.
 Event ID is the draft UUID without hyphens, with private draft/document binding;
 existing conflicting content is rejected. Lost insert responses are read back.
@@ -93,4 +98,4 @@ it is not a real Google acceptance or permission grant.
 
 Primary implementation references:
 - https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
-- https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app
+- https://developers.google.com/apps-script/guides/services/advanced

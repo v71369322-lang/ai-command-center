@@ -163,3 +163,10 @@ def test_missing_meeting_fields_are_not_filled_by_parser():
     assert extract('Запиши завтра или послезавтра встречу', initial=True) == {'ambiguous': True}
     assert extract('Запиши 2026-02-30 встречу', initial=True) == {'ambiguous': True}
     assert extract('Прочитать книгу', initial=True) is None
+
+
+def test_create_package_uses_owned_events_service_without_external_fetch_scope():
+    manifest = json.loads((Path(__file__).parents[1] / 'infra/google-calendar-create/appsscript.json').read_text())
+    assert manifest['oauthScopes'] == ['https://www.googleapis.com/auth/calendar.events.owned']
+    assert manifest['dependencies']['enabledAdvancedServices'] == [
+        {'userSymbol': 'Calendar', 'version': 'v3', 'serviceId': 'calendar'}]

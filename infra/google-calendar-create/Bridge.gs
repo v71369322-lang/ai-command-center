@@ -41,20 +41,19 @@ function jarvisDocument_(d, hash) {
 function doGet() {
   return ContentService.createTextOutput('{"error":"unavailable"}').setMimeType(ContentService.MimeType.JSON);
 }
-function jarvisGoogle_(calendar, id, method, body) {
-  const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calendar) +
-    '/events' + (method === 'get' ? '/' + id : '?sendUpdates=none&supportsAttachments=false');
-  const options = {method, headers:{Authorization:'Bearer ' + ScriptApp.getOAuthToken()},
-    muteHttpExceptions:true, followRedirects:false, validateHttpsCertificates:true};
-  if (body) { options.contentType = 'application/json'; options.payload = JSON.stringify(body); }
-  const response = UrlFetchApp.fetch(url, options);
-  const code = response.getResponseCode();
-  if (code === 404 && method === 'get') return null;
-  if (code === 409 && method === 'post') return jarvisGoogle_(calendar, id, 'get');
-  if (code !== 200 && code !== 201) throw new Error('provider');
-  const text = response.getContentText();
-  if (text.length > 20000) throw new Error('provider_size');
-  return JSON.parse(text);
+function jarvisGoogle_(calendar, draftId, method, body) {
+  let event;
+  if (method === 'get') {
+    const result = Calendar.Events.list(calendar, {privateExtendedProperty:'commanderDraftId=' + draftId,
+      maxResults:2,showDeleted:false,singleEvents:true});
+    const items = result.items || [];
+    if (!Array.isArray(items) || items.length > 1 || result.nextPageToken) throw new Error('ambiguous');
+    event = items.length ? items[0] : null;
+  } else if (method === 'create') {
+    event = Calendar.Events.insert(body, calendar, {sendUpdates:'none',supportsAttachments:false});
+  } else { throw new Error('method'); }
+  if (JSON.stringify(event).length > 20000) throw new Error('provider_size');
+  return event;
 }
 function jarvisExact_(event, request) {
   const d = request.document, id = request.draft_id.replace(/-/g, '');
@@ -105,10 +104,10 @@ function doPost(e) {
     let event;
     try {
       const id = r.draft_id.replace(/-/g, ''), d = r.document;
-      event = jarvisGoogle_(calendar, id, 'get');
+      event = jarvisGoogle_(calendar, r.draft_id, 'get');
       if (!event && r.action === 'create') {
         if (+new Date(d.start) <= Date.now()) throw new Error('past');
-        event = jarvisGoogle_(calendar, id, 'post', {id,summary:d.title,description:d.note,
+        event = jarvisGoogle_(calendar, r.draft_id, 'create', {id,summary:d.title,description:d.note,
           start:{dateTime:d.start,timeZone:d.timezone},end:{dateTime:d.end,timeZone:d.timezone},
           attendees:[], guestsCanInviteOthers:false,guestsCanModify:false,guestsCanSeeOtherGuests:false,
           reminders:{useDefault:false,overrides:[{method:'popup',minutes:d.telegram_reminder_minutes}]},

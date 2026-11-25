@@ -47,7 +47,7 @@ def test_optional_create_binding_is_exact_and_only_telegram_gets_separate_key(as
 
 
 @pytest.mark.parametrize('attack', ['owner', 'revision', 'enabled', 'key_reuse', 'connection_reuse',
-                                  'config_pin', 'directory', 'key_bytes', 'writable'])
+                                  'config_pin', 'directory', 'key_bytes', 'writable', 'alias', 'deployment_reuse'])
 def test_create_binding_rejects_scope_and_custody_changes(assistant_release, attack):
     args, old, plain, active, _ = assistant_release
     calendar = binding(plain, active.owner_id)
@@ -63,6 +63,10 @@ def test_create_binding_rejects_scope_and_custody_changes(assistant_release, att
         changed['profile']['key_fingerprint'] = calendar['profile']['key_fingerprint']
     elif attack == 'connection_reuse':
         changed['profile']['connection_id'] = calendar['profile']['connection_id']
+    elif attack == 'alias':
+        changed['profile']['calendar_id'] = 'primary'
+    elif attack == 'deployment_reuse':
+        changed['profile']['deployment_id'] = calendar['profile']['deployment_id']
     elif attack == 'config_pin':
         changed['config_sha256'] = '0' * 64
     elif attack == 'directory':

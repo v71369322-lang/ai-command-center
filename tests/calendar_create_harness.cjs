@@ -17,28 +17,25 @@ const sandbox = {
     JARVIS_CONNECTION:connection,JARVIS_CALENDAR_ID:'synthetic@group.calendar.google.com',
     JARVIS_CREATE_ENABLED:input.disabled?'0':'1'})[name]})},
   LockService:{getScriptLock: () => ({tryLock: () => !input.busy,releaseLock(){}})},
-  ScriptApp:{getOAuthToken: () => 'PUBLIC_SYNTHETIC_FIXTURE'},
-  UrlFetchApp:{fetch(url, options) {
-    const parsed = new URL(url);
-    if (parsed.origin !== 'https://www.googleapis.com' || options.followRedirects !== false ||
-        options.validateHttpsCertificates !== true ||
-        !parsed.pathname.startsWith('/calendar/v3/calendars/synthetic%40group.calendar.google.com/events'))
-      throw Error('unsafe request');
-    let code, body;
-    if (options.method === 'get') {
-      reads++; const id = parsed.pathname.split('/').pop(); body = events[id]; code = body?200:404;
-    } else if (options.method === 'post') {
-      if (parsed.searchParams.get('sendUpdates') !== 'none') throw Error('notifications');
-      const d = JSON.parse(options.payload);
-      if (d.attendees.length || d.guestsCanInviteOthers || d.guestsCanModify) throw Error('attendees');
-      if (events[d.id]) {code=409;body={};}
-      else {
-        writes++;body={...d,status:'confirmed',etag:'"synthetic-etag"'};events[d.id]=body;code=201;
-        if (input.lose_response) throw Error('timeout after commit');
-      }
-    } else throw Error('arbitrary method');
-    if (input.provider_failure) {code=503;body={private:'never expose'};}
-    return {getResponseCode:()=>code,getContentText:()=>JSON.stringify(body || {})};
+  Calendar:{Events:{
+    list(calendar, options) {
+      reads++;
+      if (calendar !== 'synthetic@group.calendar.google.com' || options.maxResults !== 2 ||
+          options.showDeleted !== false || options.singleEvents !== true) throw Error('unbounded lookup');
+      if(input.provider_failure) throw Error('private provider failure');
+      const draft = options.privateExtendedProperty.split('=')[1];
+      return {items:Object.values(events).filter(e => e.extendedProperties.private.commanderDraftId === draft)};
+    },
+    insert(d, calendar, options) {
+      if (calendar !== 'synthetic@group.calendar.google.com' || options.sendUpdates !== 'none' ||
+          options.supportsAttachments !== false || d.attendees.length || d.guestsCanInviteOthers ||
+          d.guestsCanModify) throw Error('unsafe insert');
+      if(events[d.id]) throw Error('409 conflict');
+      if(input.provider_failure) throw Error('private provider failure');
+      writes++; const event = {...d,status:'confirmed',etag:'"synthetic-etag"'};events[d.id]=event;
+      if(input.lose_response) throw Error('timeout after commit');
+      return event;
+    }
   }},
   ContentService:{MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})}
 };

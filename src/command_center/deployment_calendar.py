@@ -48,6 +48,7 @@ def validate_write(m):
             or not directory.is_absolute() or '..' in directory.parts
             or not directory.is_relative_to(Path(m['data_root']) / 'calendar')
             or str(directory) == m['calendar_script']['directory']
+            or p.calendar_id == 'primary' or p.deployment_id == read['deployment_id']
             or p.key_fingerprint == read['key_fingerprint'] or p.connection_id == read['connection_id']):
         raise ValueError('calendar_write_exact_binding_required')
     return config
