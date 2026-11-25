@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-25",
+  "fixture_type": "synthetic speech, no road noise, no user audio",
+  "environment": "Windows CPU int8, one thread, faster-whisper1.2.1/ctranslate2 4.9.1",
+  "small_repository": "Systran/faster-whisper-small",
+  "small_revision": "536b0662742c02347bc0e980a01041f333bce120",
+  "production_changed": false,
+  "paid_api": false,
+  "cases": [
+    {
+      "id": "supplier",
+      "audio_sha256": "9560fbd28e94c5f009150e4cbca795126d43759491d63cd5304f271fbaf7f4ca",
+      "reference_sha256": "a2ab6d65440f09345e37aa4df3f41b4dd0d61019759835ac302d584caad32c5e",
+      "audio_seconds": 4.213875
+    },
+    {
+      "id": "negation",
+      "audio_sha256": "09c9c110a8ce12f0321b5dc113588fd78c60a18660e54075fb9e3ba21ab87196",
+      "reference_sha256": "d88e0f3e6f79c6c0b11e5cb7d89115fbd26b2c31ff4e4cdde06c50818521ba11",
+      "audio_seconds": 6.5985625
+    },
+    {
+      "id": "correction",
+      "audio_sha256": "69f802885b52cb00b429747e54e4aa76dd4d433bbf9aa304e282349f50da77bf",
+      "reference_sha256": "81cba7f711bb962ecb2d20aa0258d83ea6a389632d138e36f22889e3afb1f899",
+      "audio_seconds": 8.9384375
+    },
+    {
+      "id": "mixed",
+      "audio_sha256": "5e58b763ed6557ba478abc8cb9b546fbca33b8258a91e0bb219faa79d1440eb3",
+      "reference_sha256": "0cf85c458a2a5a3bb95d48caef91a7ee3db91ed1e1b32fa99fce3e7f8bcb6553",
+      "audio_seconds": 8.94325
+    }
+  ],
+  "variants": [
+    {
+      "name": "base-beam1",
+      "model_fingerprint": "368391b205205ddba0a1696f7e408130ad6432cf442588919dc80f7ad31225de",
+      "word_edits": 5,
+      "reference_words": 43,
+      "seconds": [
+        5.216,
+        5.141,
+        5.394,
+        5.5
+      ],
+      "peak_working_set_mib": 353.1,
+      "critical_review_flags": 1
+    },
+    {
+      "name": "base-beam5",
+      "model_fingerprint": "368391b205205ddba0a1696f7e408130ad6432cf442588919dc80f7ad31225de",
+      "word_edits": 5,
+      "reference_words": 43,
+      "seconds": [
+        5.497,
+        5.821,
+        6.364,
+        5.923
+      ],
+      "peak_working_set_mib": 353.0,
+      "critical_review_flags": 1
+    },
+    {
+      "name": "small-beam1",
+      "model_fingerprint": "40f0d23210624a91a050b5f38dc16e7957211c5f44439babd9cdcef5b1eff3bb",
+      "word_edits": 2,
+      "reference_words": 43,
+      "seconds": [
+        17.464,
+        19.47,
+        20.272,
+        23.676
+      ],
+      "peak_working_set_mib": 729.4,
+      "critical_review_flags": 0
+    },
+    {
+      "name": "small-beam5",
+      "model_fingerprint": "40f0d23210624a91a050b5f38dc16e7957211c5f44439babd9cdcef5b1eff3bb",
+      "word_edits": 0,
+      "reference_words": 43,
+      "seconds": [
+        19.76,
+        18.998,
+        21.757,
+        20.219
+      ],
+      "peak_working_set_mib": 729.5,
+      "critical_review_flags": 0
+    }
+  ]
+}

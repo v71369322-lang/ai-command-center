@@ -13,6 +13,11 @@ transcript09:24:11UTC → owner save09:27:45UTC; связанная запись
 task_created=false. Это сохранённый запрос, не выполненная задача/событие.
 Один короткий пример не подтверждает качество имён, дат и речи в дороге.
 [Требования к качеству голоса и безопасной записи](jarvis-2/VOICE_QUALITY.md).
+Локальное сравнение25 ноября:4 одинаковых синтетических audio,43 слова.
+Base beam1/5:5 лексических ошибок; Small beam1:2; Small beam5:0.
+Small около19–22s/730MiB против Base5–6s/353MiB на этом PC; не VPS SLA.
+Подготовлен offline evaluator,23 focused tests PASS; runtime/модель не менялись,
+новый CI не запускался. [Методика, результаты и ограничения](jarvis-2/VOICE_QUALITY.md).
 Платные AI/Calendar writes не разрешены. CI установленного3bcf8e4 SUCCESS.
 [Установка, замеры и ограничения](handoff/JARVIS_RESPONSE_LIVE_2026-11-25.md).
 
