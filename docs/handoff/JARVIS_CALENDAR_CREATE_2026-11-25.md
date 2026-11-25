@@ -44,7 +44,7 @@ to create again. Verified responses use existing SYNCED evidence and deduplicati
 `infra/google-calendar-create` is a NEW local script package. Existing read-only
 `infra/google-calendar/Bridge.gs` and its Google deployment are unchanged.
 The create/get bridge uses a distinct HMAC purpose, connection and key, signs
-the calendar ID and document hash, admits only create/get and one fixed calendar
+the explicit calendar ID (not the account-dependent primary alias) and document hash, admits only create/get and one fixed calendar
 from ScriptProperties, and calls only the fixed Google Calendar API origin.
 TLS checks remain enabled; bearer credentials stay inside Apps Script and are
 not returned to Telegram/VPS/AI. No update/delete/invite/attachments/guest writes.

@@ -230,7 +230,8 @@ def decide(bridge, iid, intent):
                            request_id=iid, request_fingerprint=row.fingerprint,
                            text=proposal['text'], text_hash=proposal['text_hash'], task_created=False)
         from .calendar_dialogue import handle_locked
-        if handle_locked(bridge, session, iid, proposal['text']):
+        source_received = session.get(TelegramInbox, proposal['voice_inbox_id']).created_at
+        if handle_locked(bridge, session, iid, proposal['text'], received_at=source_received):
             return
         from .telegram_project_picker import keyboard as picker_keyboard, issue
         number = iid.rsplit(':', 1)[1]

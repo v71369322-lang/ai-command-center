@@ -84,7 +84,8 @@ function doPost(e) {
     const key = props.getProperty('JARVIS_HMAC_KEY'), connection = props.getProperty('JARVIS_CONNECTION');
     const calendar = props.getProperty('JARVIS_CALENDAR_ID');
     if (props.getProperty('JARVIS_CREATE_ENABLED') !== '1' || !/^[a-f0-9]{64}$/.test(key || '') ||
-        !/^[a-f0-9]{64}$/.test(connection || '') || !/^[A-Za-z0-9_.@-]{1,256}$/.test(calendar || ''))
+        !/^[a-f0-9]{64}$/.test(connection || '') || !/^[A-Za-z0-9_.@-]{1,256}$/.test(calendar || '') ||
+        calendar === 'primary')
       throw new Error('configuration');
     const signed = JSON.parse(e.postData.contents);
     if (!jarvisKeys_(signed, ['payload','signature']) || typeof signed.payload !== 'string' ||

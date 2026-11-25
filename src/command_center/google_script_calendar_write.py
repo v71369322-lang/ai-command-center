@@ -32,7 +32,8 @@ class ScriptWriteProfile(ScriptCalendarProfile):
 class ScriptWriteHTTP:
     def __init__(self, profile, approved, key, *, transport=None, clock=time.time):
         self.profile = ScriptWriteProfile.model_validate(profile.model_dump())
-        if not self.profile.create_enabled or digest(self.profile.model_dump()) != approved:
+        if (not self.profile.create_enabled or digest(self.profile.model_dump()) != approved
+                or self.profile.calendar_id == 'primary'):
             raise Denied('calendar_write_exact_profile_required')
         read = ScriptCalendarProfile.model_validate({k: v for k, v in self.profile.model_dump().items()
             if k in ScriptCalendarProfile.model_fields})

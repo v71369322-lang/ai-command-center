@@ -76,7 +76,7 @@ def _latest(session, profile):
     return event
 
 
-def handle_locked(bridge, session, iid, value):
+def handle_locked(bridge, session, iid, value, *, received_at=None):
     """Called for text capture or an observed, owner-accepted voice transcript."""
     fields = extract(value, initial=True)
     initial = fields is not None
@@ -123,7 +123,7 @@ def handle_locked(bridge, session, iid, value):
         # Pin relative dates at the message's processing time; subsequent answers
         # never move an already-resolved date across midnight.
         days = {'сегодня': 0, 'завтра': 1, 'послезавтра': 2}[fields['date']]
-        received = session.get(TelegramInbox, iid).created_at
+        received = received_at or session.get(TelegramInbox, iid).created_at
         fields['date'] = (received.astimezone(zone).date() + timedelta(days=days)).isoformat()
     merged = fields if initial else {**previous['fields'], **fields}
     complete = all(k in merged for k in ('title', 'date', 'clock', 'duration_minutes'))
