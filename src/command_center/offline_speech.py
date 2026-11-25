@@ -17,13 +17,13 @@ MODEL_FILES = ('config.json', 'model.bin', 'tokenizer.json', 'vocabulary.txt')
 MAX_SAMPLES = MAX_SECONDS * 16000
 
 
-def verify_model(directory, manifest):
+def verify_model(directory, manifest, *, files=MODEL_FILES):
     """Check an exact local snapshot before importing the inference runtime."""
     path = Path(directory)
     if (not path.is_absolute() or path.is_symlink() or not path.is_dir()
-            or not isinstance(manifest, dict) or set(manifest) != set(MODEL_FILES)):
+            or not isinstance(manifest, dict) or set(manifest) != set(files)):
         raise Denied('speech_model_binding_invalid')
-    for name in MODEL_FILES:
+    for name in files:
         expected = manifest[name]
         file = path / name
         if (not isinstance(expected, str) or not re.fullmatch(r'[a-f0-9]{64}', expected)
@@ -36,7 +36,7 @@ def verify_model(directory, manifest):
         if value.hexdigest() != expected:
             raise Denied('speech_model_binding_changed')
     # Reject optional/unreviewed files (including a tokenizer fallback/config).
-    if set(item.name for item in path.iterdir()) != set(MODEL_FILES):
+    if set(item.name for item in path.iterdir()) != set(files):
         raise Denied('speech_model_snapshot_not_exact')
     return digest(manifest)
 

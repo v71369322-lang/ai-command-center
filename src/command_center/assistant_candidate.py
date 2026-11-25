@@ -11,9 +11,20 @@ from .planning_candidate import predecessor, raw_pin, read_json
 from .store import digest
 from .telegram_transport import TelegramConnection
 from .voice_profile import VoiceProfile
+from .speech_models import GIGAAM_MANIFEST, model_target
 
 PURPOSE = 'assistant-only-update.v1'
 FILES = {'previous.json', 'plain.json', 'bundle.json', 'compose.json', 'connection.candidate.json'}
+
+
+def check_voice_transition(before, after, revision, connection_digest):
+    expected = {**before.model_dump(), 'source_revision': revision, 'connection_digest': connection_digest}
+    if (after.model_manifest != before.model_manifest or after.model_directory != before.model_directory):
+        if after.model_manifest != GIGAAM_MANIFEST or after.model_directory != model_target(GIGAAM_MANIFEST):
+            raise ValueError('assistant_voice_permissions_changed')
+        expected.update(model_manifest=GIGAAM_MANIFEST, model_directory=model_target(GIGAAM_MANIFEST))
+    if after.model_dump() != expected:
+        raise ValueError('assistant_voice_permissions_changed')
 
 
 def assemble(previous, plain, active, voice, previous_pin, plain_pin, calendar=None, telegram_cpu=None):
@@ -36,8 +47,9 @@ def assemble(previous, plain, active, voice, previous_pin, plain_pin, calendar=N
             or digest(active.model_dump()) != old['telegram']['connection_digest']
             or any(getattr(active, k) != old['telegram'][k] for k in ('mode', 'owner_id', 'bot_id'))):
         raise ValueError('assistant_exact_owner_connection_required')
-    if (voice['model_directory'] != old['voice']['model_directory']
-            or voice['model_manifest'] != old['voice']['model_manifest']
+    changed_model = (voice['model_directory'] != old['voice']['model_directory']
+                     or voice['model_manifest'] != old['voice']['model_manifest'])
+    if (changed_model and voice['model_manifest'] != GIGAAM_MANIFEST
             or voice['profile_directory'] == old['voice']['profile_directory']):
         raise ValueError('assistant_existing_voice_model_required')
     staged = TelegramConnection.model_validate({**active.model_dump(), 'source_revision': new['revision']})
@@ -63,7 +75,8 @@ def private_output(path, uid):
     return path
 
 
-def prepare_profile(previous_directory, plain_directory, profile_directory, image):
+def prepare_profile(previous_directory, plain_directory, profile_directory, image,
+                    model_directory=None, model_manifest=None):
     previous, plain = load_bundle(previous_directory), load_bundle(plain_directory)
     old, new = previous['manifest'], plain['manifest']
     output = private_output(profile_directory, new['control_uid'])
@@ -71,10 +84,17 @@ def prepare_profile(previous_directory, plain_directory, profile_directory, imag
         raise ValueError('assistant_voice_profile_outside_state')
     original = predecessor(previous, previous_directory, checksum(previous))
     profile = check_binding(old)
+    replacement = {}
+    if model_directory is not None or model_manifest is not None:
+        if model_directory is None or model_manifest != GIGAAM_MANIFEST:
+            raise ValueError('assistant_exact_gigaam_snapshot_required')
+        replacement = {'model_directory': str(model_directory), 'model_manifest': model_manifest}
     staged = original[2].model_copy(update={'source_revision': new['revision']})
     updated = VoiceProfile.model_validate({**profile.model_dump(), 'source_revision': new['revision'],
-                                          'connection_digest': digest(staged.model_dump())})
-    voice = {**old['voice'], 'image': image, 'profile_directory': str(output),
+        'connection_digest': digest(staged.model_dump()),
+        **({'model_directory': model_target(model_manifest), 'model_manifest': model_manifest}
+           if replacement else {})})
+    voice = {**old['voice'], **replacement, 'image': image, 'profile_directory': str(output),
              'profile_digest': digest(updated.model_dump())}
     assemble(previous, plain, original[2], voice, checksum(previous), checksum(plain))
     source_check(new)
@@ -85,6 +105,8 @@ def prepare_profile(previous_directory, plain_directory, profile_directory, imag
         raise ValueError('assistant_predecessor_changed')
     output.mkdir(mode=0o700)
     atomic_json(output / 'profile.json', updated.model_dump())
+    check_binding({**new, 'telegram': {**old['telegram'], 'connection_digest': digest(staged.model_dump())},
+                   'voice': voice})
     return {'status': 'ASSISTANT_VOICE_PROFILE_PREPARED', 'voice': voice, 'paid_calls': 0}
 
 
@@ -100,9 +122,7 @@ def prepare(previous_directory, plain_directory, output, voice, previous_pin, pl
         check_calendar(target['manifest'])
     before = check_binding(previous['manifest'])
     after = check_binding(target['manifest'])
-    if after.model_dump() != {**before.model_dump(), 'source_revision': plain['manifest']['revision'],
-                             'connection_digest': digest(staged.model_dump())}:
-        raise ValueError('assistant_voice_permissions_changed')
+    check_voice_transition(before, after, plain['manifest']['revision'], digest(staged.model_dump()))
     engine = Engine(uid)
     engine.preflight()
     image_check(engine, {'api': target['manifest']['images']['api'], 'voice': voice['image']},
@@ -152,9 +172,7 @@ def inspect(directory, candidate_pin, preparation_pin):
         from .deployment_calendar import check_binding as check_calendar
         check_calendar(target['manifest'])
     before, after = check_binding(previous['manifest']), check_binding(target['manifest'])
-    if after.model_dump() != {**before.model_dump(), 'source_revision': plain['manifest']['revision'],
-                             'connection_digest': digest(staged.model_dump())}:
-        raise ValueError('assistant_voice_permissions_changed')
+    check_voice_transition(before, after, plain['manifest']['revision'], digest(staged.model_dump()))
     if (path / 'connection.previous.json').exists():
         old_connection = {**staged.model_dump(), 'source_revision': previous['manifest']['revision']}
         if read_json(path / 'connection.previous.json') != old_connection:

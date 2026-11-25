@@ -23,11 +23,11 @@ jobs:
           python -m pip install uv==0.12.23
           uv sync --frozen --group speech
           .venv/bin/python -m pip_audit --no-deps --disable-pip -r requirements.speech.lock
-          .venv/bin/python -m pytest -q tests/test_offline_speech.py tests/test_offline_speech_runtime.py tests/test_telegram_voice_files.py
+          .venv/bin/python -m pytest -q tests/test_offline_speech.py tests/test_offline_speech_runtime.py tests/test_gigaam_speech.py tests/test_speech_chunks.py tests/test_telegram_voice_files.py
       - name: Source-pinned optional speech image
         run: |
           docker build --target speech --build-arg F1_SOURCE_REVISION="$(git rev-parse HEAD)" -t acc-speech:ci .
-          docker run --rm --network none --entrypoint python acc-speech:ci -c 'import av, faster_whisper; import command_center.voice_worker'
+          docker run --rm --network none --entrypoint python acc-speech:ci -c 'import av, faster_whisper, onnx_asr; import command_center.voice_worker, command_center.gigaam_speech'
   synthetic:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

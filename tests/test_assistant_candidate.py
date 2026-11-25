@@ -10,6 +10,7 @@ from command_center.voice_profile import VoiceProfile
 from test_deployment import release as release
 from test_voice_release import voice_release as voice_release
 from test_voice_release import runtime_metadata
+from command_center.speech_models import GIGAAM_MANIFEST, model_target
 
 
 @pytest.fixture
@@ -62,6 +63,48 @@ def test_preserves_voice_and_owner_without_execution_daemon(assistant_release):
     assert not (args['output'] / 'activation.json').exists()
     assert all(c[1] == old['manifest']['control_uid'] for c in calls if c[0] == 'assistant_engine')
     assert all(set(c[1]) == {'api', 'voice'} for c in calls if c[0] == 'assistant_images')
+
+
+def test_exact_gigaam_model_change_keeps_every_other_profile_permission(assistant_release):
+    args, old, plain, active, _ = assistant_release
+    before = VoiceProfile.model_validate(candidate.read_json(Path(old['manifest']['voice']['profile_directory'])
+                                                            / 'profile.json'))
+    after = before.model_copy(update={'source_revision': plain['manifest']['revision'],
+        'connection_digest': digest(active.model_copy(update={'source_revision': plain['manifest']['revision']}).model_dump()),
+        'model_manifest': GIGAAM_MANIFEST, 'model_directory': model_target(GIGAAM_MANIFEST)})
+    candidate.check_voice_transition(before, after, after.source_revision, after.connection_digest)
+    with pytest.raises(ValueError, match='permissions_changed'):
+        candidate.check_voice_transition(before, after.model_copy(update={'since': '2030-01-01T00:00:00+00:00'}),
+                                         after.source_revision, after.connection_digest)
+
+
+def test_gigaam_prepare_inspect_pins_new_files_and_preserves_resource_limits(assistant_release, monkeypatch):
+    from hashlib import sha256
+    from command_center import speech_models
+    args, old, _, _, _ = assistant_release
+    root = Path(old['manifest']['data_root'])
+    model = root / 'voice/gigaam-synthetic-snapshot'
+    model.mkdir(mode=0o700)
+    manifest = {}
+    for name in GIGAAM_MANIFEST:
+        data = name.encode()
+        (model / name).write_bytes(data)
+        manifest[name] = sha256(data).hexdigest()
+    # Synthetic file integrity/interlock test, not real model inference.
+    monkeypatch.setattr(candidate, 'GIGAAM_MANIFEST', manifest)
+    monkeypatch.setattr(speech_models, 'GIGAAM_MANIFEST', manifest)
+    result = candidate.prepare_profile(args['previous_directory'], args['plain_directory'],
+        root / 'voice/gigaam-profile', args['voice']['image'], model_directory=model, model_manifest=manifest)
+    result = candidate.prepare(**{**args, 'voice': result['voice']})
+    candidate.inspect(args['output'], result['candidate_bundle'], result['preparation_digest'])
+    target = candidate.load_bundle(args['output'])
+    service = target['compose']['services']['voice']
+    assert service['mem_limit'] == '1g' and service['cpus'] == 1
+    assert service['volumes'][-1]['target'] == '/models/gigaam-v3'
+    assert service['volumes'][-1]['read_only'] is True
+    (model / 'v3_e2e_ctc.int8.onnx').write_bytes(b'tampered')
+    with pytest.raises(Denied, match='binding_changed'):
+        candidate.inspect(args['output'], result['candidate_bundle'], result['preparation_digest'])
 
 
 @pytest.mark.parametrize('attack', [None, 'image', 'socket', 'provider', 'writable', 'flag', 'host_pid'])

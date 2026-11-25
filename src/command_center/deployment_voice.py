@@ -5,7 +5,8 @@ from pathlib import Path
 import re
 import stat
 
-from .offline_speech import MODEL_FILES, verify_model
+from .offline_speech import verify_model
+from .speech_models import model_files, model_target
 from .store import digest
 from .telegram_transport import private_read
 from .voice_profile import VoiceProfile
@@ -22,9 +23,9 @@ def validate_binding(m):
             or not re.fullmatch(r'sha256:[a-f0-9]{64}', voice.get('image', ''))
             or not re.fullmatch(r'[a-f0-9]{64}', voice.get('profile_digest', ''))
             or not isinstance(voice.get('model_manifest'), dict)
-            or set(voice['model_manifest']) != set(MODEL_FILES)
             or any(not re.fullmatch(r'[a-f0-9]{64}', value) for value in voice['model_manifest'].values())):
         raise ValueError('voice_release_binding_invalid')
+    model_files(voice['model_manifest'])
     for key in ('profile_directory', 'model_directory'):
         path = Path(voice[key])
         if (not path.is_absolute() or '..' in path.parts
@@ -48,19 +49,20 @@ def check_binding(m):
             or profile.source_revision != m['revision']
             or profile.connection_digest != m['telegram']['connection_digest']
             or profile.connection_file != '/run/telegram/connection.json'
-            or profile.model_directory != MODEL or profile.model_manifest != voice['model_manifest']):
+            or profile.model_directory != model_target(voice['model_manifest'])
+            or profile.model_manifest != voice['model_manifest']):
         raise ValueError('voice_exact_profile_required')
     since = datetime.fromisoformat(profile.since)
     if since.tzinfo is None or since.utcoffset() is None:
         raise ValueError('voice_cutover_timezone_required')
     model = Path(voice['model_directory'])
-    for path in (model, *(model / name for name in MODEL_FILES)):
+    for path in (model, *(model / name for name in model_files(voice['model_manifest']))):
         info = path.lstat()
         if (path.is_symlink() or info.st_uid != os.getuid() or info.st_mode & 0o022
                 or not (stat.S_ISDIR(info.st_mode) if path == model else
                         stat.S_ISREG(info.st_mode) and info.st_nlink == 1)):
             raise ValueError('voice_model_custody_changed')
-    verify_model(model, voice['model_manifest'])
+    verify_model(model, voice['model_manifest'], files=model_files(voice['model_manifest']))
     return profile
 
 
@@ -80,7 +82,8 @@ def service(m):
             {'type': 'bind', 'source': str(Path(m['data_root']) / 'telegram'),
              'target': '/run/telegram', 'read_only': True},
             {'type': 'bind', 'source': voice['profile_directory'], 'target': '/run/voice', 'read_only': True},
-            {'type': 'bind', 'source': voice['model_directory'], 'target': MODEL, 'read_only': True}],
+            {'type': 'bind', 'source': voice['model_directory'],
+             'target': model_target(voice['model_manifest']), 'read_only': True}],
         'networks': {'control': None, 'telegram-access': None},
         'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
         'mem_limit': '1g', 'cpus': 1, 'pids_limit': 64,
