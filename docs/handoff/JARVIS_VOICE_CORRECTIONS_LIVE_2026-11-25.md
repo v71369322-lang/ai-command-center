@@ -48,16 +48,27 @@ Real /help reply visibly observed in Telegram: received11:17:56.269678UTC,
 SENT11:17:59.927714UTC, inbox→SENT3.658s. This is not UI→SENT or an SLA.
 Real natural-language Calendar query also produced the Google Calendar read reply
 visibly in Telegram after the upgrade. Events were not changed.
-No new phone voice had arrived at this checkpoint. Owner was asked once to send
-a short new test voice; existing previous voice had already been saved and cannot
-serve as the positive pending-correction acceptance case.
+Later that day the owner sent a new5s phone voice and clarified its actual wording
+in this chat. Intake12:44:49.175618UTC → actual ASR proposal12:44:59.194204UTC
+(10.018586s, not a speed SLA). ASR made an inflection error; this was not silently
+treated as a correct recognition or replaced with the operator's original test phrase.
 
-Still required: real new voice → actual ASR card → reply with full corrected text
-→ owner correction card → confirm latest → exactly one saved request. Verify raw
-ASR remains separate, stale card cannot save older text, and ledger/tasks unchanged.
-Use the authenticated Telegram UI; do not invent an incoming owner message or seed
-production proposal/audit rows to manufacture a pass. Do not claim live acceptance
-from CI, an initialized worker, or ordinary /help alone.
+Using the actual authenticated owner Telegram UI, replied to that specific ASR
+card with the full wording confirmed by the owner, adding punctuation only. A new
+owner-authored correction proposal appeared12:46:22.799075UTC. The initial ASR
+record remained distinct and both text hashes validated. Clicking the original
+card's Save returned the stale-card refusal; accepted_count was still0.
+
+Confirmed the latest corrected card: one ACCEPTED12:47:19.400368UTC, one saved
+NEEDS_PLANNING request, text exactly matching the owner correction, task_created=false.
+Repeated Save returned already-processed/no duplicate; read-only family-bound SQL
+still found exactly one ACCEPTED. Task count remained9 before/after, ledger actual4,
+reserved0, uncertain0 unchanged. The saved request view was opened and the corrected
+text visibly verified in Telegram. No fabricated incoming update or seeded audit rows.
+No Calendar event or paid AI call. This closes the live correction/save acceptance
+for this one real example; it does not validate noisy ASR, dates/addresses, idea-bank
+classification, scheduled tasks or the whole phase2 MVP. Raw voice/text and request
+identifiers are intentionally not copied into public Git evidence.
 
 ## Backup and recovery
 
@@ -83,6 +94,6 @@ Before this release backup directory238165074bytes of the configured256MiB quota
 no files removed and quota not bypassed. Future release preparation must recheck
 capacity and obtain approval before irreversible retention cleanup.
 
-Next product result remains voice correction acceptance, then reliable ASR for
-road use and separately approved Calendar writes, tasks/reminders and phase2
+Next product result is reliable ASR for road use and separately approved Calendar
+writes, tasks/reminders and phase2
 acceptance. Phases3–6 are not started by this installation.
