@@ -60,7 +60,9 @@ function jarvisExact_(event, request) {
   const p = event && event.extendedProperties && event.extendedProperties.private;
   if (!event || event.id !== id || event.status !== 'confirmed' || event.summary !== d.title ||
       (event.description || '') !== d.note || typeof event.etag !== 'string' ||
-      !event.start || !event.end || event.start.timeZone !== d.timezone || event.end.timeZone !== d.timezone ||
+      !event.start || !event.end ||
+      (event.start.timeZone && event.start.timeZone !== d.timezone) ||
+      (event.end.timeZone && event.end.timeZone !== d.timezone) ||
       +new Date(event.start.dateTime) !== +new Date(d.start) ||
       +new Date(event.end.dateTime) !== +new Date(d.end) ||
       !jarvisKeys_(p, ['commanderDraftId','commanderDocumentHash']) ||

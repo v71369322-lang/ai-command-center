@@ -4,6 +4,15 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const events = input.events || {};
 let reads = 0, writes = 0;
 const key = 'ab'.repeat(32), connection = 'c'.repeat(64);
+function normalized(event) {
+  if (!input.normalize_times || !event) return event;
+  const result = JSON.parse(JSON.stringify(event));
+  for(const field of ['start','end']) {
+    result[field].dateTime = new Date(result[field].dateTime).toISOString();
+    delete result[field].timeZone;
+  }
+  return result;
+}
 const sandbox = {
   Date: class extends Date { static now() { return 1000000; } },
   Utilities: {
@@ -26,7 +35,7 @@ const sandbox = {
       if (!Array.isArray(options.privateExtendedProperty) || options.privateExtendedProperty.length !== 1)
         throw Error('lookup binding');
       const draft = options.privateExtendedProperty[0].split('=')[1];
-      return {items:Object.values(events).filter(e => e.extendedProperties.private.commanderDraftId === draft)};
+      return {items:Object.values(events).filter(e => e.extendedProperties.private.commanderDraftId === draft).map(normalized)};
     },
     insert(d, calendar, options) {
       if (calendar !== 'synthetic@group.calendar.google.com' || options.sendUpdates !== 'none' ||
@@ -36,7 +45,7 @@ const sandbox = {
       if(input.provider_failure) throw Error('private provider failure');
       writes++; const event = {...d,status:'confirmed',etag:'"synthetic-etag"'};events[d.id]=event;
       if(input.lose_response) throw Error('timeout after commit');
-      return event;
+      return normalized(event);
     }
   }},
   ContentService:{MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})}

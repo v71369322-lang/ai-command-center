@@ -170,3 +170,32 @@ def test_create_package_uses_owned_events_service_without_external_fetch_scope()
     assert manifest['oauthScopes'] == ['https://www.googleapis.com/auth/calendar.events.owned']
     assert manifest['dependencies']['enabledAdvancedServices'] == [
         {'userSymbol': 'Calendar', 'version': 'v3', 'serviceId': 'calendar'}]
+
+
+def test_google_optional_timezone_and_utc_normalization_keep_exact_confirmed_instants():
+    iid = str(uuid4())
+    result = harness([envelope(request(iid), KEY, REQUEST)], normalize_times=True)
+    event = decoded(result['responses'][0])['event']
+    assert event['start'] == {'dateTime': document()['start'], 'timeZone': document()['timezone']}
+    assert result['writes'] == 1
+
+
+@pytest.mark.parametrize('attack', ['timezone', 'instant', 'reminder', 'private_hash', 'attendees', 'recurrence'])
+def test_provider_event_changes_are_not_reported_as_exact_confirmation(attack):
+    iid = str(uuid4())
+    events = harness([envelope(request(iid), KEY, REQUEST)])['events']
+    event = events[iid.replace('-', '')]
+    if attack == 'timezone':
+        event['start']['timeZone'] = 'Asia/Almaty'
+    elif attack == 'instant':
+        event['start']['dateTime'] = '2026-11-26T16:00:00+03:00'
+    elif attack == 'reminder':
+        event['reminders']['overrides'][0]['minutes'] = 10
+    elif attack == 'private_hash':
+        event['extendedProperties']['private']['commanderDocumentHash'] = '0' * 64
+    elif attack == 'attendees':
+        event['attendees'] = [{'email': 'synthetic@example.com'}]
+    else:
+        event['recurrence'] = ['RRULE:FREQ=DAILY']
+    result = harness([envelope(request(iid, 'get'), KEY, REQUEST)], events=events)
+    assert result['writes'] == 0 and result['responses'] == [{'error': 'unavailable'}]
