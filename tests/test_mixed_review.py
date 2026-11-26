@@ -13,12 +13,12 @@ from command_center.mixed_review import (items_for, keyboard, allowed_markup, pa
 from command_center.models import Audit, Control, TelegramInbox, TelegramDelivery
 from command_center.personal_inbox import records, collect_reminders
 from command_center.project_inbox import history, inbox
-from command_center.store import Denied
+from command_center.store import Denied, canonical
 from command_center.telegram_bridge import TelegramBridge
 from command_center.telegram_requests import captured_text
 from command_center.telegram_voice_requests import transcription_contract
 from command_center.telegram_voice_transcripts import propose, PROPOSED as VOICE_PROPOSED
-from command_center.telegram_voice_transcripts import preview
+from command_center.telegram_voice_transcripts import preview, keyboard as voice_keyboard
 from test_calendar_dialogue import setup as setup
 from test_telegram_bridge import OWNER, message
 from test_telegram_task_status import authority
@@ -33,9 +33,20 @@ TEXT = 'Задача: проверить коробку по кондитерс�
 def test_suspect_negation_is_warned_without_rewriting_owner_words(corrected):
     value = 'Встречу с Анной на переноси.'
     shown = preview(value, corrected=corrected)
-    assert value in shown and 'Возможно, распознавание потеряло отрицание' in shown
+    assert value in shown and 'возможно, потерялось «не»' in shown
     assert 'Встречу с Анной не переноси.' not in shown
-    assert 'Возможно, распознавание потеряло отрицание' not in preview('Встречу не переноси.')
+    assert 'возможно, потерялось «не»' not in preview('Встречу не переноси.')
+
+
+@pytest.mark.parametrize('corrected', [False, True])
+def test_long_voice_warning_keeps_full_source_within_transport_budget(monkeypatch, corrected):
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    value = 'Встречу на переноси. '
+    value += 'я' * ((2000 - len(value.encode())) // 2)
+    text = preview(value, corrected=corrected)
+    body = {'chat_id': 9999999999999999, 'text': text,
+            'reply_markup': voice_keyboard('00000000-0000-0000-0000-000000000000')}
+    assert value in text and len(canonical(body).encode()) <= 8192
 
 
 def test_literal_spans_cover_source_and_only_explicit_dates_are_resolved():

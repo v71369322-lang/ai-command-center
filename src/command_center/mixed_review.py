@@ -126,7 +126,7 @@ def issue_locked(bridge, session, source, value, *, operation_id=None):
         return False
     operation_id = operation_id or source.id
     proposal_id = str(uuid5(NAMESPACE_URL, 'acc:mixed-review:' + source.id + ':' + operation_id))
-    lines = ['Выделены пункты — проверьте каждый. Пока ничего отдельно не сохранено.',
+    lines = ['Выделены пункты — проверьте каждый. Сохранение — по кнопкам ниже.',
              'Кнопка сохранит только выбранный пункт; напоминание запланирует в Telegram.',
              'Встречи в Google здесь не создаются. Проверьте отрицания, имена, даты и время.']
     for i, item in enumerate(items, 1):
@@ -224,7 +224,7 @@ def decide(bridge, iid, intent):
             if issue_locked(bridge, session, source, value, operation_id=iid):
                 row.state = 'DONE'
             else:
-                bridge.finish(session, iid, 'Пункты требуют уточнения; исходный текст остаётся во входящих. Ничего отдельно не сохранено.')
+                bridge.finish(session, iid, 'Пункты требуют уточнения; исходный текст остаётся во входящих. Новые записи не созданы.')
             return
         if not 1 <= intent['item'] <= len(event['items']):
             raise Denied('mixed_review_item_invalid')
