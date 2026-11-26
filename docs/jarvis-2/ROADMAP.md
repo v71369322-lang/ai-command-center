@@ -76,3 +76,18 @@ task in confectionery with no deadline verified in UI and joined DB evidence.
 Proposal10.96s after intake; personal creation0.204s after acceptance. The next
 check is remaining Stage2 attachment/failure/speed acceptance, not repeating this
 successful path. Broader ASR quality and mixed-message understanding remain open.
+
+## 26 November attachment release live checkpoint
+
+PR123/source0259ce4 including PR122 installed after exact approval. Actual public
+Telegram document/photo -> reference + own copy -> project/status -> poller/voice
+restart -> trusted byte-integrity read PASS. No OCR/AI content interpretation or
+file-resend UI is delivered. Google agenda after restart18s, photo status12s.
+Both journals VERIFIED; paid calls0. Pre/post PC encrypted custody checked and
+post backup isolated restore audit VERIFIED. Initial/intermittent poller exits
+repaired; cause unestablished, uptime observation remains necessary. Authenticated
+owner web Inbox live200 not run, API scope checks passed in final CI.
+[Exact evidence and recovery](../handoff/JARVIS_ATTACHMENT_RELEASE_2026-11-26.md).
+Next useful bounded result is convenient owner retrieval of a stored file, then
+combined long phone voice / corrections / tasks / reminders / calendar acceptance.
+Do not declare Stage2 complete or start Stage3 from the attachment check alone.

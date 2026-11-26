@@ -139,6 +139,7 @@ class ConfiguredTelegramHTTP:
             from .telegram_coding_approval import allowed_markup as coding_markup
             from .telegram_voice_transcripts import allowed_markup as voice_markup
             from .telegram_calendar import allowed_markup as calendar_markup
+            from .telegram_attachment_retrieval import allowed_markup as attachment_markup
             valid = (not set(body) - {'chat_id', 'text', 'reply_markup'}
                 and type(body.get('chat_id')) is int and body['chat_id'] == self.owner
                 and isinstance(body.get('text'), str) and 1 <= len(body['text']) <= 4096)
@@ -149,7 +150,7 @@ class ConfiguredTelegramHTTP:
                     and not allowed_markup(markup) and not resume_markup(markup)
                     and not experiment_markup(markup) and not planning_markup(markup)
                     and not content_markup(markup) and not coding_markup(markup) and not generation_markup(markup)
-                    and not voice_markup(markup) and not calendar_markup(markup)):
+                    and not voice_markup(markup) and not calendar_markup(markup) and not attachment_markup(markup)):
                 valid = valid and (isinstance(markup, dict) and set(markup) == {'inline_keyboard'})
                 rows = markup.get('inline_keyboard') if isinstance(markup, dict) else None
                 valid = valid and isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], list) and len(rows[0]) == 1
@@ -203,6 +204,42 @@ class ConfiguredTelegramHTTP:
         except Exception:
             # A URL-bearing httpx exception must never escape to logs/tracebacks.
             raise TelegramHTTPError('telegram_network_or_response_uncertain', True) from None
+
+    def send_document(self, data, filename):
+        """One bounded owner-only multipart upload, never arbitrary URLs/file IDs."""
+        from .telegram_attachments import MAX_BYTES
+        from .telegram_voice_files import TelegramVoiceFiles
+        if (not isinstance(data, bytes) or not 0 < len(data) <= MAX_BYTES
+                or not isinstance(filename, str)
+                or not re.fullmatch(r'attachment-[0-9]{1,16}\.[a-z0-9]{1,10}', filename)):
+            raise Denied('telegram_document_upload_invalid')
+        redact_http_logs()
+        self.check_enabled()
+        if getattr(self, 'runtime_guard', None):
+            self.runtime_guard()
+        try:
+            with self.client.stream('POST', 'https://api.telegram.org/bot' + self._token + '/sendDocument',
+                    data={'chat_id': str(self.owner), 'disable_content_type_detection': 'true'},
+                    files={'document': (filename, data, 'application/octet-stream')}) as response:
+                value = json.loads(TelegramVoiceFiles._bounded(response, 65536))
+            result = value.get('result') if value.get('ok') is True else None
+            if (not isinstance(result, dict) or type(result.get('message_id')) is not int
+                    or result['message_id'] <= 0 or result.get('chat', {}).get('id') != self.owner
+                    or not isinstance(result.get('document'), dict)
+                    or type(result['document'].get('file_size')) is not int
+                    or result['document']['file_size'] != len(data)
+                    or result['document'].get('file_name') != filename):
+                raise TelegramHTTPError('telegram_document_receipt_invalid')
+            self.check_enabled()
+            if getattr(self, 'runtime_guard', None):
+                self.runtime_guard()
+            return result
+        except Denied:
+            raise
+        except TelegramHTTPError:
+            raise
+        except Exception:
+            raise TelegramHTTPError('telegram_document_delivery_uncertain') from None
 
     def verify_bot(self):
         me = self.call('getMe', {})

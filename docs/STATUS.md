@@ -4,13 +4,45 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November: local independent attachment copy slice, not installed. Reuses the
+26 November: local owner file retrieval slice, NOT INSTALLED. Button or plain
+"Пришли файл №N" queues only checked source/hash/epoch/revision metadata in the
+existing TelegramDelivery. Owner-only fixed-host bounded multipart upload reads
+own DB copy, no forwarding/download/OCR/AI. Stopped/stale/corrupt work suppressed;
+uncertain delivery never auto-retries. Local5 tests/static checks PASS; nine PG
+cases awaiting final CI. Production remains0259ce4.
+[Behavior, guards, verification and activation boundary](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+
+26 November10:50UTC: PR123/source0259ce4 INSTALLED after explicit exact approval.
+Both journals VERIFIED by stock reconciliation; apply executed once. Actual public
+Telegram document/photo references and independent binary copies PASS, one copy
+each, no F1 task; integrity/project/cards persist after poller+voice restart.
+Google read-only agenda PASS (18s); photo status12s. Five services/pinned model and
+Calendar custody verified; OPENepoch81, historicalactual4/reserved0/uncertain0.
+Startup/intermittent poller exits repaired using same container; root cause remains
+unestablished, last controlled restart10:46UTC, healthy10:50UTC. Full uptime not proven.
+36 exact server archive duplicates removed94349044bytes, all-PC copies retained.
+Pre/post encrypted PC backup and recovery delta independently verified. Final live
+owner web Inbox authenticated200 NOT RUN; covered in CI only. No paid AI/merge or
+Google event write. No new phone voice/punctuation acceptance in this release.
+[Installation evidence, recovery, limitations and historical exact proposal](handoff/JARVIS_ATTACHMENT_RELEASE_2026-11-26.md).
+
+Historical preparation record (superseded by installation evidence above):
+26 November: Draft PR123/source0259ce4549aab013ffb6a55574ae7365015bd843
+independent attachment copies ready for review, NOT INSTALLED. Final CI45792659928
+SUCCESS:2894PASS/1skipped/2warnings; infrastructure1014PASS; speech44PASS;
+encrypted networkless restore of binary fixture PASS. Head/base/merge pins checked. Reuses the
 existing background voice process and persistent Inbox data records; no new
 service/table/mount/credential/migration. Voice priority, exact source/epoch guard,
 bounded16MiB raw/32 files, PG encrypted backup inclusion; binary contents are not
 AI instructions. Local15 tests/static checks PASS; eight PG cases and binary
-networkless restore acceptance awaiting CI. Production75776b0.
+networkless restore acceptance PASS in final CI. Production75776b0.
 [Storage, privacy, quotas and scope](handoff/JARVIS_ATTACHMENT_COPIES_2026-11-26.md).
+Later authorized read-only09:38UTC VPS reconciliation: deployed75776b0, journals
+VERIFIED, five services/voiceIDLE/TG live, ledger unchanged.37 old encrypted archives
+independently decrypted/checksummed on PC. Exact36SERVER-copy retention proposal
+94349044bytes leaves90.7MiB quota free; all-PC copies, five newer server canonical
+archives and stage1 recovery packages retained. No cleanup/staging/install/paid call.
+[Exact release proposal — subsequently approved and installed](handoff/JARVIS_ATTACHMENT_RELEASE_2026-11-26.md).
 
 26 November: Draft PR122/source03b4aab attachment reference Inbox ready for review,
 not installed. Final CI45785579447 SUCCESS: main2871PASS/1skipped/2warnings,
