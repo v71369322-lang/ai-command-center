@@ -2,7 +2,8 @@
 
 Owner requested the next Stage2 step after reference Inbox PR122. Base is
 78706150bd668e6c58e04f184c1e33fbd3205aa1 on codex/attachment-inbox-review,
-which retains unmerged PR122/121/120 dependencies. No server work in this stage.
+which retains unmerged PR122/121/120 dependencies. Implementation initially
+used local/mock/CI checks only; later read-only release reconciliation is below.
 
 ## Reused architecture
 
@@ -56,7 +57,7 @@ future backup inclusion; no claim that a fresh production backup already ran.
 ## Verification
 
 15 local codec/download/bounds/token-safety checks PASS. Ruff whole tree, contract
-export, scoped Bandit and diff check PASS. Eight PostgreSQL cases await final CI:
+export, scoped Bandit and diff check PASS. Eight PostgreSQL cases PASS in final CI:
 persisted read from fresh DB client without Telegram, unchanged authority/one copy,
 corruption and scope refusal, stop/revoked epoch, quota before download, voice
 priority, lost COMMIT response, stale source no backfill and shared leadership.
@@ -64,9 +65,33 @@ Existing isolated-restore CI drill now seeds one public inert binary DATA record
 and metadata audit anchor, encrypts full PG dump, restores into another networkless
 PostgreSQL instance and verifies byte equality/fingerprint. It is NOT a real phone
 file, independent offsite recovery proof, or activation of a new capability.
-No local Docker engine assumed; final CI/head/merge pin review still required.
+Local Docker unavailable; final CI/head/base/merge pins checked. No cloud
+rootful/mock result is presented as actual VPS/phone acceptance.
 
 Production remains75776b0; PR122 references are not installed either. New source
-would consolidate both slices. No VPS access/deployment/merge/retention/paid AI or
-new integration performed. Stage2 still needs actual phone attachment and recovery/
+would consolidate both slices. No server mutation/deployment/merge/retention/paid AI or new integration
+performed. Later read-only09:38UTC reconciliation and encrypted custody download
+used the standing owner diagnostic authorization; old write windows not extended. Stage2 still needs actual phone attachment and recovery/
 resource acceptance; general document understanding and punctuation are separate.
+
+## Exact source checkpoint
+
+Final application source0259ce4549aab013ffb6a55574ae7365015bd843 / Draft PR123.
+Base78706150bd668e6c58e04f184c1e33fbd3205aa1. Merge-ref
+43a6e4f43008b0776b274ae3881c3a1d10dbc95e; head and merge tree
+b3471a963e9239f646a0b4839a4bbe2563c065de. Source bundle SHA256
+4802D63089581FCFC0091080E496ED22D3A0E87E55AF9BBCFBF33D536B4EEECC.
+Final CI45792659928 SUCCESS: main2894passed/1skipped/2warnings (532.17s),
+infrastructure1014passed, speech44passed; superseded/overlapping runs not summed.
+Final cloud verification passed for pinned merge-ref. Encrypted PG dump -> another
+networkless PostgreSQL -> inert binary byte/fingerprint match and audit interlock
+PASS. Additional standalone HTTP mock photo-rendition probe PASS; no real network. Existing owner web
+Inbox now uses the checked source reader for attachment and accepted voice
+metadata; DATA blobs are excluded from this owner-only view.
+[Operator custody/recovery and rollback limits](../jarvis-2/ATTACHMENT_RECOVERY.md).
+
+[Consolidated exact release/36 archive retention proposal](JARVIS_ATTACHMENT_RELEASE_2026-11-26.md)
+was prepared after read-only runtime/quota/dependency checks.36 proposed SERVER
+copies/94349044bytes are duplicates of protected, independently decrypted and
+checksum-verified PC originals; current/recent canonical archives and stage1
+recovery packages retained. This proposal has NOT been approved or applied.

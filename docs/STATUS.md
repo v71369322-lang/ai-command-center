@@ -4,13 +4,22 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November: local independent attachment copy slice, not installed. Reuses the
+26 November: Draft PR123/source0259ce4549aab013ffb6a55574ae7365015bd843
+independent attachment copies ready for review, NOT INSTALLED. Final CI45792659928
+SUCCESS:2894PASS/1skipped/2warnings; infrastructure1014PASS; speech44PASS;
+encrypted networkless restore of binary fixture PASS. Head/base/merge pins checked. Reuses the
 existing background voice process and persistent Inbox data records; no new
 service/table/mount/credential/migration. Voice priority, exact source/epoch guard,
 bounded16MiB raw/32 files, PG encrypted backup inclusion; binary contents are not
 AI instructions. Local15 tests/static checks PASS; eight PG cases and binary
-networkless restore acceptance awaiting CI. Production75776b0.
+networkless restore acceptance PASS in final CI. Production75776b0.
 [Storage, privacy, quotas and scope](handoff/JARVIS_ATTACHMENT_COPIES_2026-11-26.md).
+Later authorized read-only09:38UTC VPS reconciliation: deployed75776b0, journals
+VERIFIED, five services/voiceIDLE/TG live, ledger unchanged.37 old encrypted archives
+independently decrypted/checksummed on PC. Exact36SERVER-copy retention proposal
+94349044bytes leaves90.7MiB quota free; all-PC copies, five newer server canonical
+archives and stage1 recovery packages retained. No cleanup/staging/install/paid call.
+[Exact consolidated release and recovery proposal — NOT approved](handoff/JARVIS_ATTACHMENT_RELEASE_2026-11-26.md).
 
 26 November: Draft PR122/source03b4aab attachment reference Inbox ready for review,
 not installed. Final CI45785579447 SUCCESS: main2871PASS/1skipped/2warnings,

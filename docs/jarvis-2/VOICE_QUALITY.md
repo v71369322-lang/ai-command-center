@@ -188,3 +188,26 @@ Evaluator получил opt-in `--review-output`: создаёт новый о�
 Новый CI не запускался; production source остаётся3bcf8e4, оба его CI SUCCESS.
 Итоговые локальные проверки после приватного readback:25 PASS (включая
 CLI overwrite/privacy guards), Ruff PASS, Bandit medium/high PASS.
+
+## 26 November native punctuation investigation (no runtime changes)
+
+Local exact configuration uses GigaAM v3 E2E CTC int8 via onnx-asr0.12.0,
+pinned snapshot322c3b29492673eb7d0b434bfa9dfb8653e34d02. Authors explicitly
+advertise punctuation/normalization for v3_e2e_ctc and v3_e2e_rnnt:
+https://github.com/salute-developers/GigaAM . This family capability is not proof
+of perfect output for the deployed quantized snapshot or the owner's speech.
+Pinned decoder implementation maps vocabulary tokens and normalizes spaces:
+https://raw.githubusercontent.com/istupakov/onnx-asr/v0.12.0/src/onnx_asr/asr.py .
+Local GigaamSpeech strips outer whitespace and joins bounded windows; transcript
+preview does not remove punctuation. Existing tests preserve comma/period output,
+but use mock inference and therefore do not measure real punctuation accuracy.
+
+Inference: do not add a new punctuator or larger model merely assuming the current
+variant has no punctuation. First compare actual raw model output and UI on the
+same longer owner-confirmed sample, then evaluate whether window boundaries,
+quantization or recognition quality explain the missing signs. Current limits
+remain120s audio/15s inference windows and2000UTF8 bytes of transcript; oversized
+text rejects instead of silent truncation. These are not unlimited dictation.
+Verify words, negations, names and dates alongside punctuation positions and
+memory/latency before any model/window/contract change. No model download, extra
+process, audio transfer, paid call or production change was made in this inquiry.
