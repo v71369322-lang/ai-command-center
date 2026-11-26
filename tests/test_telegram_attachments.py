@@ -111,6 +111,7 @@ def test_sensitive_or_foreign_attachment_is_rejected_before_intake(attachments, 
 def test_configured_polling_reloads_attachment_and_never_calls_file_api(configured, store, monkeypatch):
     from test_telegram_service import FakeBot, client_for, update
     from command_center.telegram_service import TelegramService
+    from test_telegram_project_picker import callback
     monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
     fake = FakeBot()
     fake.updates = [attachment(caption='Напомни завтра в 11 проверить файл')]
@@ -118,11 +119,13 @@ def test_configured_polling_reloads_attachment_and_never_calls_file_api(configur
     before = authority(store)
     try:
         TelegramService(store, client, poll_seconds=0).run(max_cycles=1)
-        fake.updates = [update(2, '/request 1')]
+        bridge = TelegramBridge(store, client, OWNER)
+        fake.updates = [callback(bridge, fake, uid=2, pid='vanilla-sugar'), update(3, '/request 1')]
         TelegramService(store, client, poll_seconds=0).run(max_cycles=1)
         assert any('Документ: notes.pdf' in b['text'] for b in fake.sent)
+        assert any('Ваниль и Сахар' in b['text'] for b in fake.sent)
         assert set(method for method, _ in fake.calls) <= {
-            'getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage'}
+            'getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage', 'answerCallbackQuery'}
         assert authority(store) == before
         with store.transaction() as session:
             assert not list(session.scalars(select(Audit).where(Audit.event['kind'].as_string().in_(
