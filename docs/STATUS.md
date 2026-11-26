@@ -4,13 +4,39 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November: local owner file retrieval slice, NOT INSTALLED. Button or plain
-"Пришли файл №N" queues only checked source/hash/epoch/revision metadata in the
-existing TelegramDelivery. Owner-only fixed-host bounded multipart upload reads
-own DB copy, no forwarding/download/OCR/AI. Stopped/stale/corrupt work suppressed;
-uncertain delivery never auto-retries. Local5 tests/static checks PASS; nine PG
-cases awaiting final CI. Production remains0259ce4.
-[Behavior, guards, verification and activation boundary](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+26 November: combined long-voice check found two real gaps; Stage2 NOT passed.
+Exact deployed decoder transcribed public63.88s synthetic speech in3.803s,
+RSS558.79MiB/noOOM, but "не переноси" -> "на переноси" critical negation error.
+Existing mixed task/idea/reminder becomes one task title. No paid call/model change
+or mixed production task accepted. Local shared ingress guard prepared: keep
+mixed source intact in Inbox before domain routing; no guessed batch/actions.
+15 local cases/static checks PASS, two PG journey cases awaiting final CI.
+[Evidence, scope, repair and limits](handoff/JARVIS_MVP_VOICE_CHECK_2026-11-26.md).
+
+26 November12:36UTC: PR124/sourcec25e2d3 INSTALLED with fresh exact owner approval.
+ONE stock apply exited0, both journals VERIFIED directly. Real Telegram button
+(document) and plain numbered request(photo) each produced one SENT file; exact
+returned bytes independently read back from Telegram and matched retained75/310
+byte copies. Same poller/container/image restart30.09s, no auto resend or new F1
+task/copy. Existing cross-release copies remain readable. Calendar agenda16s,
+unchanged event; five service/model/Calendar boundaries PASS, OPENepoch85,
+historicalactual4/reserved0/uncertain0. No paid AI, merge, deletion or quota increase.
+Protected PC pre/post encrypted backup/recovery custody independently verified.
+IAB direct TXT export/native phone download not proven; actual full-file Bot API
+readback supplies byte evidence, not a preview. Stage2 remains in progress.
+[Exact installation, acceptance, recovery and limits](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+
+Historical preparation record (superseded by installation above):
+26 November: Draft PR124/sourcec25e2d30ec49bad7347cf3274714bbb520cffd3d
+owner attachment retrieval READY FOR REVIEW, NOT INSTALLED. Button or plain
+"Пришли файл №N" returns verified DB bytes through the existing delivery queue.
+Only private owner, bounded fixed-host multipart upload, safe name, exact document
+receipt; stop/epoch/revision/copy checks, no automatic retry after uncertainty.
+Final CI45815091382 SUCCESS:2909PASS/1skipped/1warning, infra1014PASS,
+speech44PASS. Head/merge4c804097 tree pins match.15 new cases (6 protocol,9 PG),
+encrypted networkless restore and container persistence/smokes PASS. No real
+Telegram file send or VPS operation performed in this slice. Production last
+verified0259ce4. [Scope, CI evidence and concrete exact release proposal](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
 
 26 November10:50UTC: PR123/source0259ce4 INSTALLED after explicit exact approval.
 Both journals VERIFIED by stock reconciliation; apply executed once. Actual public

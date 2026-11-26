@@ -866,6 +866,9 @@ class TelegramBridge:
                     if not intent['text'].strip():
                         raise Denied('telegram_empty_request')
                     self.guard()
+                    from .mixed_inbox import hold_locked
+                    if hold_locked(self, session, iid, intent['text']):
+                        return {'inbox_id': iid, 'state': row.state, 'task_id': None}
                     from .calendar_dialogue import handle_locked
                     if handle_locked(self, session, iid, intent['text']):
                         return {'inbox_id': iid, 'state': 'DONE', 'task_id': None}
