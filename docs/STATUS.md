@@ -4,6 +4,13 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November local ASR stage: current long negation error reproduced with exact
+local model. Longest-pause prototype rejected; Small/beam1 improves clean long
+text but drops a clause on noisy holdout, so no model switch. Corrected evaluation
+of repeated critical phrases and punctuation word boundaries; CLI schema2,
+19 local tests PASS. Production73647d0 unchanged; no VPS/paid/model activation.
+[Evidence and pending verification](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+
 26 November15:26UTC: PR126/source73647d0 INSTALLED after fresh exact owner approval.
 ONE stock apply exited0; both journals VERIFIED directly. Owner resume OPENepoch93,
 no old task restart/paid calls. Actual Telegram three-item card -> separate task,
