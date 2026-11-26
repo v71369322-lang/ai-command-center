@@ -57,7 +57,8 @@ def heartbeat(worker, guard, fingerprint, state):
 
 
 class VoiceWorker:
-    def __init__(self, bridge, downloader, decoder, *, since, model_fingerprint, runtime_guard=None):
+    def __init__(self, bridge, downloader, decoder, *, since, model_fingerprint, runtime_guard=None,
+                 attachment_copier=None):
         if (not isinstance(since, datetime) or since.tzinfo is None or since.utcoffset() is None
                 or not callable(getattr(downloader, 'download', None))
                 or not callable(getattr(decoder, 'transcribe', None))
@@ -67,7 +68,10 @@ class VoiceWorker:
             raise Denied('voice_worker_binding_invalid')
         if runtime_guard is not None and not callable(runtime_guard):
             raise Denied('voice_worker_binding_invalid')
+        if attachment_copier is not None and not callable(getattr(attachment_copier, 'process_one', None)):
+            raise Denied('voice_worker_binding_invalid')
         self.runtime_guard = runtime_guard
+        self.attachment_copier = attachment_copier
         self.bridge, self.downloader, self.decoder = bridge, downloader, decoder
         self.since, self.model_fingerprint = since, model_fingerprint
         self.key = int(digest({'voice_worker': bridge.profile})[:15], 16)
@@ -130,7 +134,10 @@ class VoiceWorker:
                 return {'state': 'BUSY'}
             self.leader = leader
             try:
-                return self._process()
+                result = self._process()
+                if result['state'] == 'IDLE' and self.attachment_copier is not None:
+                    return self.attachment_copier.process_one(self)
+                return result
             finally:
                 self.leader = None
                 try:
@@ -239,8 +246,15 @@ def main():
             if current != profile or stop.is_set():
                 raise Denied('voice_profile_revoked_or_changed')
 
+        from .assistant_policy import assistant_only
+        copier = None
+        if assistant_only():
+            from .attachment_files import AttachmentFiles
+            from .attachment_copies import AttachmentCopier
+            copier = AttachmentCopier(AttachmentFiles(client, approved_connection=profile.connection_digest))
         worker = VoiceWorker(bridge, files, decoder, since=since,
-                             model_fingerprint=decoder.model_fingerprint, runtime_guard=guard)
+                             model_fingerprint=decoder.model_fingerprint, runtime_guard=guard,
+                             attachment_copier=copier)
         for signum in (signal.SIGINT, signal.SIGTERM):
             signal.signal(signum, lambda *_: stop.set())
         if not hasattr(signal, 'SIGALRM'):

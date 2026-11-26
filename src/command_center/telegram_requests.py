@@ -178,6 +178,9 @@ def request_reply(bridge, session, intent, *, suffix=''):
     for width in widths:
         parts = []
         for row, value, pid, version in selected:
+            if row.intent.get('kind') == 'attachment':
+                from .attachment_copies import status
+                value += '\n' + status(session, row)
             number = row.id.removeprefix(bridge.profile + ':')
             project_label = dict(PROJECTS).get(pid, 'Не распределён')
             if width is not None:

@@ -2,17 +2,20 @@
 This proves cloud isolation of the drill, NOT offsite custody or disaster RPO/RTO.
 """
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import time
 from uuid import uuid4
+from types import SimpleNamespace
 
 from psycopg import sql
 
 from command_center.recovery import dump_database, seal, unseal
 from command_center.store import ZERO, canonical, digest
 from command_center.worker import docker
+from command_center.attachment_copies import encode, decode, identity
 
 IMAGE = 'postgres:16-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0'
 
@@ -26,6 +29,29 @@ def run(*args, data=None):
 
 def main():
     started = time.monotonic()
+    # Public inert binary fixture only. Same persistent DATA record format as
+    # the attachment worker; no network/Telegram file or user data in this drill.
+    data = bytes(range(256)) * 4
+    source = SimpleNamespace(profile=digest({'restore_fixture': uuid4().hex}),
+                             fingerprint=digest({'inert': 'binary fixture'}),
+                             intent={'file_size': len(data)})
+    source.id = source.profile + ':1'
+    profile, copy_id = identity(source)
+    document = encode(source, data, sha256(data).hexdigest())
+    parent = run('exec', 'acc-f1-db-1', 'psql', '-XAt', '-U', 'f1_admin', '-d', 'f1', '-c',
+                 'SELECT digest FROM audit ORDER BY sequence DESC LIMIT 1').decode().strip()
+    fixture = {'kind': 'attachment_restore_fixture', 'actor': 'fixture', 'task_id': None,
+               'time': datetime.now(timezone.utc).isoformat(), 'revision': os.environ['F1_SOURCE_REVISION'],
+               'copy_id': copy_id, 'copy_fingerprint': digest(document)}
+    statement = sql.SQL('BEGIN; INSERT INTO telegram_inbox(id,profile,fingerprint,intent,state,created_at) '
+                       'VALUES ({},{},{},{}::jsonb,{},clock_timestamp())').format(
+        sql.Literal(copy_id), sql.Literal(profile), sql.Literal(digest(document)),
+        sql.Literal(canonical(document)), sql.Literal('STORED_ATTACHMENT')).as_string()
+    statement += sql.SQL('; INSERT INTO audit(event,previous,digest) VALUES ({}::jsonb,{},{}); COMMIT;').format(
+        sql.Literal(canonical(fixture)), sql.Literal(parent),
+        sql.Literal(digest({'previous': parent, 'event': fixture}))).as_string()
+    run('exec', 'acc-f1-db-1', 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'f1_admin', '-d', 'f1',
+        '-c', statement)
     key = bytes.fromhex(Path('.runtime/secrets/backup_key').read_text().strip())
     archive = seal(dump_database('acc-f1-db-1'), key)
     Path('.runtime/isolated-backup.enc').write_bytes(archive)
@@ -60,6 +86,11 @@ def main():
             return run('exec', name, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U',
                        'f1_admin', '-d', 'restore_drill', '-Atc', statement).decode().strip()
 
+        restored = json.loads(query(sql.SQL('SELECT intent FROM telegram_inbox WHERE id={}').format(
+            sql.Literal(copy_id)).as_string()))
+        if decode(restored, source) != data or digest(restored) != fixture['copy_fingerprint']:
+            raise RuntimeError('isolated_restore_attachment_bytes_changed')
+
         parent = query('SELECT digest FROM audit ORDER BY sequence DESC LIMIT 1')
         event = {'kind': 'isolated_restore_interlock', 'actor': 'recovery', 'task_id': None,
                  'time': datetime.now(timezone.utc).isoformat(), 'revision': os.environ['F1_SOURCE_REVISION']}
@@ -90,6 +121,7 @@ def main():
                   'duration_seconds': round(time.monotonic() - started, 3),
                   'different_container': True, 'network': 'none', 'recovery_interlock': True,
                   'audit_rows_verified': len(rows), 'offsite_custody_verified': False,
+                  'inert_attachment_bytes_verified': len(data),
                   'rpo_rto_proven': False}
         Path('.runtime/isolated-restore.json').write_text(json.dumps(result, indent=2) + '\n')
         print('Encrypted backup → different networkless PostgreSQL container → interlock/audit: PASS')
