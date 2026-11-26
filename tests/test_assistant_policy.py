@@ -85,7 +85,8 @@ def test_personal_replies_do_not_send_owner_back_to_developer_setup(store, monke
         while bridge.deliver_one():
             pass
         responses = '\n'.join(item['text'] for item in fake.sent)
-        assert 'Сохранено во входящих' in responses
+        assert 'Идея сохранена' in responses
+        assert 'Срок не назначен' in responses
         assert 'Идея: новый десерт' in responses
         assert not any(token in responses for token in ['/develop', '/setup', '/connection',
                                                        'Ожидает планирования', 'GitHub App', 'Baseline:'])
