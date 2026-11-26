@@ -1,5 +1,11 @@
 # Reviewed mixed-message spans — development checkpoint
 
+Later26November: fresh separate owner approval installed source73647d0.
+[Exact installation and live acceptance](JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+NOT INSTALLED and future-release text below records the preparation checkpoint;
+installation evidence above supersedes its deployment status. ASR/full noisy-voice
+limitations remain open.
+
 Owner approved the next development stage after installed PR125. This slice is
 local edits/tests/commit/Draft PR only; no VPS access, deployment, merge, paid AI,
 model download/change or new Google write. Production remains bb944ff.

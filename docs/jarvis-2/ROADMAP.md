@@ -125,3 +125,11 @@ from real callback Update IDs, plus refresh/dedup and suspect-negation readback.
 Final CI45840200281 PASS; not installed. Full unconstrained multi-item NLP and real
 long/noisy owner ASR acceptance remain open. Stage2 NOT complete; no model/provider
 or deployment approval inferred. [Final evidence](../handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).
+
+## 26 November PR126 installed checkpoint
+
+Fresh exact approval installed73647d0. Real text/button source -> three distinct
+personal records, stale/duplicate refusal, same-container restart, parent archive
+and exactly-one Telegram reminder verified. Google read preserved; no paid AI or
+new event. Stage2 remains incomplete: fresh long/noisy owner voice and general
+free-form mixed understanding are not proven. [Evidence](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).

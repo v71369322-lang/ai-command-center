@@ -1,5 +1,11 @@
 # Качество голосового ввода — этап2/6
 
+26November current production source73647d0 after exact PR126 installation.
+Actual text/button three-item acceptance passed, no new owner phone recording or
+ASR decode in that release. Model/accuracy/punctuation unchanged; prior long-probe
+negation error and real long/noisy acceptance gap remain. Preparation statements
+below retain their dated NOT INSTALLED meaning. [Installation](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+
 ## 26 November — reviewed mixed-message candidate (not installed)
 
 PR126/source73647d0 passed final CI45840200281. Explicit multi-item text or

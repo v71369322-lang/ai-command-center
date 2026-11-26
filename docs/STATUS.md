@@ -4,6 +4,17 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November15:26UTC: PR126/source73647d0 INSTALLED after fresh exact owner approval.
+ONE stock apply exited0; both journals VERIFIED directly. Owner resume OPENepoch93,
+no old task restart/paid calls. Actual Telegram three-item card -> separate task,
+idea and exact reminder via real callbacks; old card refused, duplicate blocked
+before/after same-container3.93s restart. Sources/records persist; parent archive
+preserves children. Reminder once, SENT6.67s after due; test records completed/
+archived. Existing Google read PASS, no event write. Protected pre/post backup and
+PC recovery custody verified; one metadata-owner repair reused existing backup.
+[Installation, recovery evidence and voice limits](handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+
+Historical preparation checkpoint (installation above supersedes NOT INSTALLED):
 26 November14:53UTC: Draft PR126/source73647d0 READY FOR REVIEW, NOT INSTALLED.
 Final CI45840200281 SUCCESS:2966passed/1skipped/1warning, infra1014passed,
 speech44passed, head/merge tree identical.40 new cases cover selected literal
