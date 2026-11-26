@@ -269,4 +269,4 @@ def test_owner_web_inbox_reads_attachment_metadata_and_never_binary(copies, clie
     rows = result.json()['requests']
     assert len(rows) == 1 and 'notes.pdf' in rows[0]['text']
     assert 'data64' not in result.text and 'aW5lcnQ' not in result.text
-    assert client.get('/api/telegram/requests', headers=headers['agent']).status_code == 403
+    assert client.get('/api/telegram/requests', headers=headers['agent']).status_code == 409
