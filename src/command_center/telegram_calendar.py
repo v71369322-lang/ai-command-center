@@ -70,6 +70,16 @@ def keyboard(draft_id, version):
     ]]}
 
 
+def allowed_markup(value):
+    try:
+        intent = parse_callback(value['inline_keyboard'][0][0]['callback_data'])
+        from .calendar_drafts import _uuid
+        _uuid(intent['draft_id'])
+        return canonical(value) == canonical(keyboard(intent['draft_id'], intent['version']))
+    except (Denied, KeyError, IndexError, TypeError):
+        return False
+
+
 def _operation(iid, suffix):
     return str(uuid5(NAMESPACE_URL, f'acc:calendar:{iid}:{suffix}'))
 
