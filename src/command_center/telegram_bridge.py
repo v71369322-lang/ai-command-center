@@ -461,9 +461,11 @@ class TelegramBridge:
         if assistant_only() and intent['kind'] == 'help':
             with self.store.transaction() as session:
                 return self.finish(session, iid, 'Jarvis: отправьте текстовое или голосовое поручение. '
-                                   'Сохранённые запросы: /requests; проекты: /projects; '
-                                   'напоминания: /reminders. После подключения Google спросите: '
-                                   '«что у меня завтра?». Разработка и платные AI-вызовы не включены.')
+                                   'Например: «Купить упаковку», «Идея: новая коробка», '
+                                   '«Напомни завтра в 11 позвонить поставщику». '
+                                   'Спросите «мои задачи», «мои идеи», «мои напоминания» или «что у меня сегодня?». '
+                                   'Сохранённые запросы: /requests; проекты: /projects. '
+                                   'Разработка и платные AI-вызовы не включены.')
         self.guard()
         kind = intent['kind']
         scope = RecoveryBridge(self) if 'recovery' in kind else self
@@ -745,8 +747,12 @@ class TelegramBridge:
                         from .attention import telegram_reply
                         reply = telegram_reply(self.store, session)
                 elif kind == 'reminders':
-                    from .attention_schedule import telegram_reply
-                    reply = telegram_reply(session)
+                    if assistant_only():
+                        from .personal_inbox import render as personal_render
+                        reply = personal_render(self, session, 'reminder')
+                    else:
+                        from .attention_schedule import telegram_reply
+                        reply = telegram_reply(session)
                 elif kind == 'calendar_list':
                     from .telegram_calendar import list_reply
                     reply = list_reply(session, self.profile, self.calendar_writer)

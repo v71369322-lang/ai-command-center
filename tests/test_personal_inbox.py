@@ -110,6 +110,7 @@ def test_reminder_uses_durable_delivery_once_with_stop_guard_and_restart(persona
     title_time = (now + timedelta(minutes=5)).astimezone(timezone(timedelta(hours=3)))
     value = f'Напомни {title_time:%Y-%m-%d} в {title_time:%H:%M} позвонить поставщику'
     assert 'В Google событие не создавалось' in response(bridge, message(1, value))
+    assert 'позвонить поставщику' in response(bridge, message(2, '/reminders'))
     with store.transaction() as session:
         assert collect_reminders(bridge, session) == []
     monkeypatch.setattr(store, 'now', lambda session: now + timedelta(minutes=6))
@@ -254,6 +255,7 @@ def test_configured_transport_polling_saves_task_and_lists_it_without_external_a
     try:
         TelegramService(store, client, poll_seconds=0).run(max_cycles=1)
         assert any('Задача сохранена' in b['text'] for b in fake.sent)
+        assert 'reply_markup' not in fake.sent[0]
         assert any('Личные задачи' in b['text'] and 'Купить упаковку' in b['text'] for b in fake.sent)
         assert authority(store) == before
     finally:
