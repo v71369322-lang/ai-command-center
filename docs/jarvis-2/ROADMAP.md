@@ -91,3 +91,11 @@ owner web Inbox live200 not run, API scope checks passed in final CI.
 Next useful bounded result is convenient owner retrieval of a stored file, then
 combined long phone voice / corrections / tasks / reminders / calendar acceptance.
 Do not declare Stage2 complete or start Stage3 from the attachment check alone.
+
+26 November: next attachment retrieval slice implemented in Draft PR124/sourcec25e2d3.
+Final CI45815091382 PASS: main2909/1skip/1warning, infra1014, speech44.
+Get-file button/plain numbered request uses existing owner delivery, checked DB
+copy, exact connection and no-retry uncertainty; no new service or paid AI.
+Not installed. Next step is separately approved exact release with actual two
+public fixture retrievals and restart/no-duplicate checks, followed by combined
+Stage2 voice/correction/task/reminder/calendar acceptance. Stage3 not started.

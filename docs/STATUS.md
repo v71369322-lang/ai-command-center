@@ -4,13 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November: local owner file retrieval slice, NOT INSTALLED. Button or plain
-"Пришли файл №N" queues only checked source/hash/epoch/revision metadata in the
-existing TelegramDelivery. Owner-only fixed-host bounded multipart upload reads
-own DB copy, no forwarding/download/OCR/AI. Stopped/stale/corrupt work suppressed;
-uncertain delivery never auto-retries. Local5 tests/static checks PASS; nine PG
-cases awaiting final CI. Production remains0259ce4.
-[Behavior, guards, verification and activation boundary](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+26 November: Draft PR124/sourcec25e2d30ec49bad7347cf3274714bbb520cffd3d
+owner attachment retrieval READY FOR REVIEW, NOT INSTALLED. Button or plain
+"Пришли файл №N" returns verified DB bytes through the existing delivery queue.
+Only private owner, bounded fixed-host multipart upload, safe name, exact document
+receipt; stop/epoch/revision/copy checks, no automatic retry after uncertainty.
+Final CI45815091382 SUCCESS:2909PASS/1skipped/1warning, infra1014PASS,
+speech44PASS. Head/merge4c804097 tree pins match.15 new cases (6 protocol,9 PG),
+encrypted networkless restore and container persistence/smokes PASS. No real
+Telegram file send or VPS operation performed in this slice. Production last
+verified0259ce4. [Scope, CI evidence and concrete exact release proposal](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
 
 26 November10:50UTC: PR123/source0259ce4 INSTALLED after explicit exact approval.
 Both journals VERIFIED by stock reconciliation; apply executed once. Actual public
