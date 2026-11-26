@@ -4,6 +4,17 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 ноября live: PR119/exactb808144 УСТАНОВЛЕН, deployment/activation VERIFIED.
+Настоящая Telegram-кнопка создала одну встречу в основном Google Calendar:
+27.11.2026 15:00–15:10 Europe/Moscow, «Тест Jarvis — проверка календаря»,
+без приглашённых, popup за20мин. Signed readback, Google UI (ровно1event),
+agenda, повторная кнопка до/после exact Telegram restart PASS, один create claim.
+OPENepoch71, voice IDLE, ledger unchanged/no paid calls. До/после backup и
+recovery custody независимо проверены на PC; удалены только3 явно согласованных
+серверных архива, PC originals сохранены. Backup quota снова почти заполнена:
+1042342bytes free; следующая копия/выпуск требует нового точного retention плана.
+[Точная установка, реальная приёмка и оставшиеся границы](handoff/JARVIS_CALENDAR_CARD_FIX_LIVE_2026-11-26.md).
+
 26 ноября, корректирующий выпуск: PR119/exactb808144, final CI45754615840 SUCCESS:
 2809PASS/1skipped/1warning, infrastructure1014PASS, speech44PASS; merge-ref tree
 сверен с HEAD. Exact Linux card validation PASS. Исправлены только пропущенные
