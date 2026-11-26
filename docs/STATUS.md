@@ -4,6 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November08:20UTC: PR121/source75776b039b732698e83cc77c2da051e75123ec9a
+INSTALLED with fresh explicit owner approval. Both journals VERIFIED; five services,
+Telegram heartbeat and voiceIDLE verified. Live task/idea/project recall, completion,
+restart persistence, combined Google agenda and exactly one11:18Moscow reminder
+PASS. Paid ledger unchanged. Protected PC pre/post backup and recovery custody
+independently decrypted/verified. Exact three approved old server archives removed;
+PC originals retained. Initial poller exit repaired with same container after20-cycle
+live diagnostic; root cause not established. Fresh phone voice acceptance still open.
+[Exact installation, acceptance, recovery and limits](handoff/JARVIS_PERSONAL_PLANNER_LIVE_2026-11-26.md).
+
 26 ноября: Draft PR121/source75776b0, final CI45776306557 SUCCESS:
 2857PASS/1skipped/1warning; infra1014PASS; speech44PASS. Не установлено.
 [Единый точный план выпуска и retention](handoff/JARVIS_UNDATED_RELEASE_2026-11-26.md).

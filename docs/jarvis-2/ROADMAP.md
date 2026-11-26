@@ -59,3 +59,14 @@
 разрешение; merge не следует автоматически из разработки. Google write scope,
 необратимая очистка и внешние бизнес-доступы — отдельные действия. Исторические
 разрешения на другие версии не считать бессрочными.
+
+## 26 November personal planner live checkpoint
+
+PR121 including PR120 installed with exact owner approval. Task/idea separation,
+undated deferred plans, explicit project correction/recall, completion, persistence
+after the same poller restart, combined existing Google agenda and one actual
+11:18Moscow Telegram reminder all verified. Pre/post encrypted backups independently
+verified on PC. [Evidence and limits](../handoff/JARVIS_PERSONAL_PLANNER_LIVE_2026-11-26.md).
+Next acceptance is a real fresh owner phone voice -> reviewed personal task;
+then close the remaining Stage2 attachment/failure/speed checks before Stage3.
+No paid AI, recurring reports, new calendar scopes, merge or other projects.
