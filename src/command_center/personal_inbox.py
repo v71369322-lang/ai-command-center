@@ -87,7 +87,7 @@ def parse(value):
         return {'action': 'create', 'category': 'reminder', 'title': match[3],
                 'date': match[1].lower(),
                 'clock': match[2].zfill(5) if ':' in match[2] else match[2].zfill(2) + ':00'}
-    match = re.fullmatch(r'(?:(?:запиши|сохрани)(?: мне)? )?'
+    match = re.fullmatch(r'(?:(?:запиши|сохрани)(?: мне)? |отдельн(?:ая|ую) )?'
                         r'(идею|идея|заметку|заметка|задачу|задача)[: ,]+(.+)', text, re.I)
     if match:
         category = {'идею': 'idea', 'идея': 'idea', 'заметку': 'note', 'заметка': 'note',

@@ -4,6 +4,14 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November development: reviewed mixed-message spans prepared after PR125.
+Owner can save individual supported points through observed buttons, preserving
+literal original/accepted voice and actual callback provenance. Ambiguous text
+stays pending; no synthetic owner updates or Calendar batch actions. Refresh and
+cross-card dedup reuse the existing audit/admission lock. Bounded suspect-negation
+warning added; ASR model/accuracy unchanged. Production remains bb944ff; no server
+access or release in this stage. [Scope and pending CI](handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).
+
 26 November13:47UTC: PR125/sourcebb944ff INSTALLED with fresh exact owner approval.
 One stock apply exited0; both journals VERIFIED directly, owner Telegram resume
 confirmed OPENepoch89, no old-task restart or paid call. Actual mixed task/idea/

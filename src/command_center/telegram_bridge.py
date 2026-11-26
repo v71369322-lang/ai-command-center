@@ -144,6 +144,9 @@ class TelegramBridge:
             elif token.startswith('cl:'):
                 from .telegram_calendar import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
+            elif token.startswith('mi:'):
+                from .mixed_review import parse_callback
+                intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('vr:'):
                 from .telegram_voice_transcripts import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
@@ -726,6 +729,9 @@ class TelegramBridge:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 capture(self, session, iid, intent)
+        elif kind in {'mixed_confirm', 'mixed_refresh'}:
+            from .mixed_review import decide
+            decide(self, iid, intent)
         elif kind == 'voice_confirm':
             from .telegram_voice_transcripts import decide
             decide(self, iid, intent)

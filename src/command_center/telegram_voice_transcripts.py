@@ -35,12 +35,15 @@ def parse_edit(message):
 
 def preview(value, *, corrected=False):
     from .assistant_policy import assistant_only
+    suspect = bool(re.search(r'\bна\s+(?:переноси|создавай|отправляй|меняй|удаляй|записывай)\b', value, re.I))
+    warning = ('\n\nВозможно, распознавание потеряло отрицание: проверьте «на» перед действием. '
+               'Слова автоматически не исправлены. Если текст неверный, ответьте полной правкой.' if suspect else '')
     effect = ('\nПроверьте имена, дату, время и место. Кнопка сохранит личную запись; '
               'напоминание с датой и временем будет запланировано в Telegram. '
               'Запись встречи в Google потребует отдельного подтверждения. Платный AI и выполнение поручений не запускаются.'
               if assistant_only() else '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
               ' событие календаря, AI и выполнение не запускаются.')
-    return ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value
+    return ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning
             + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
             + effect)
 

@@ -6,15 +6,23 @@ from .store import Denied
 from .telegram_requests import captured_text
 
 
-def multiple_requests(value):
+def request_markers(value):
     # Quoted examples are data. Missing/ambiguous structure is not a batch plan.
-    text = re.sub(r'«[^»]*»|"[^"\n]*"', ' ', value)
+    text = re.sub(r'«[^»]*»|"[^"\n]*"', lambda m: ' ' * len(m[0]), value)
     imperative = r'(?<!\w)(?:(?:запиши|сохрани)(?: мне)?\s+(?:задачу|идею|заметку)|напомни(?: мне)?|(?:создай|добавь|запиши)(?: мне)?\s+(?:встречу|событие)|отдельн(?:ая|ую)\s+(?:идея|идею|задача|задачу|заметка|заметку))\b'
-    positions = {match.start() for match in re.finditer(imperative, text, re.I)
-                 if not re.search(r'\bне\s*$', text[:match.start()], re.I)}
+    all_matches = list(re.finditer(imperative, text, re.I))
+    matches = [m for m in all_matches
+               if not re.search(r'\bне\s*$', text[:m.start()], re.I)]
+    positions = {m.start() for m in matches}
     for match in re.finditer(r'(?<!\w)(?:идея|задача|заметка)\s*:', text, re.I):
-        positions.add(match.start())
-    return len(positions) > 1
+        if (not any(m.start() <= match.start() < m.end() for m in all_matches)
+                and not re.search(r'\bне(?:\s+(?:запиши|сохрани)(?:\s+мне)?)?\s*$', text[:match.start()], re.I)):
+            positions.add(match.start())
+    return sorted(positions)
+
+
+def multiple_requests(value):
+    return len(request_markers(value)) > 1
 
 
 def hold_locked(bridge, session, iid, value):
@@ -31,6 +39,9 @@ def hold_locked(bridge, session, iid, value):
     row.state = 'NEEDS_PLANNING'
     bridge.store.audit(session, 'personal_mixed_request_held', 'owner', profile=bridge.profile,
                        request_id=iid, request_fingerprint=row.fingerprint)
+    from .mixed_review import issue_locked
+    if issue_locked(bridge, session, row, value):
+        return True
     number = iid.rsplit(':', 1)[1]
     bridge.enqueue(session, iid + ':reply',
         f'Похоже, в сообщении несколько поручений. Весь текст сохранён во входящих: №{number}.\n'
