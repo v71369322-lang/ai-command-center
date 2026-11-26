@@ -23,7 +23,8 @@ def test_multipart_upload_is_fixed_host_owner_and_exact_bytes():
         assert request.url.host == 'api.telegram.org' and request.url.path.endswith('/sendDocument')
         assert DATA in request.content and str(OWNER).encode() in request.content
         assert b'attachment-1.pdf' in request.content
-        return httpx.Response(200, json={'ok': True, 'result': {'message_id': 51, 'chat': {'id': OWNER}}})
+        return httpx.Response(200, json={'ok': True, 'result': {'message_id': 51, 'chat': {'id': OWNER},
+            'document': {'file_size': len(DATA), 'file_name': 'attachment-1.pdf'}}})
     configured = client(handler)
     configured.owner = OWNER
     try:
@@ -40,6 +41,8 @@ def test_multipart_upload_is_fixed_host_owner_and_exact_bytes():
     httpx.Response(302, headers={'location': 'https://outside.test'}),
     httpx.Response(200, content=b'x' * 65537),
     httpx.Response(200, json={'ok': True, 'result': {'message_id': 1, 'chat': {'id': OWNER + 1}}}),
+    httpx.Response(200, json={'ok': True, 'result': {'message_id': 1, 'chat': {'id': OWNER},
+        'document': {'file_size': len(DATA) + 1, 'file_name': 'attachment-1.bin'}}}),
 ])
 def test_upload_rejects_redirect_oversize_and_wrong_recipient(response):
     configured = client(lambda _: response)

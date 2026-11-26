@@ -224,7 +224,11 @@ class ConfiguredTelegramHTTP:
                 value = json.loads(TelegramVoiceFiles._bounded(response, 65536))
             result = value.get('result') if value.get('ok') is True else None
             if (not isinstance(result, dict) or type(result.get('message_id')) is not int
-                    or result['message_id'] <= 0 or result.get('chat', {}).get('id') != self.owner):
+                    or result['message_id'] <= 0 or result.get('chat', {}).get('id') != self.owner
+                    or not isinstance(result.get('document'), dict)
+                    or type(result['document'].get('file_size')) is not int
+                    or result['document']['file_size'] != len(data)
+                    or result['document'].get('file_name') != filename):
                 raise TelegramHTTPError('telegram_document_receipt_invalid')
             self.check_enabled()
             if getattr(self, 'runtime_guard', None):
