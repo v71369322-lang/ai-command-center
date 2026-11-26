@@ -4,6 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 ноября: владелец разрешил PR118/main Calendar/точные четыре архивных backups/
+одну тестовую встречу, без paid AI; окно02:53:01–04:53:01UTC. Exactb104b78 и
+CI SUCCESS сверены; rootless app/speech образы и base release подготовлены.
+Согласованные4 серверных backup удалены после повторной PC decrypt/checksum и
+совпадения remote hashes; PC originals сохранены,17468885bytes освобождено.
+Новый Google create-проект/точный код/manifest/отдельный защищённый ключ готовы.
+Google остановил публикацию на owner passkey; подтверждённых consent/deployment
+ID пока нет. PR118 НЕ установлен, production1e5dd99/read-only Calendar сохранён.
+[Состояние, реальные действия, окно и продолжение](handoff/JARVIS_CALENDAR_CREATE_STAGING_2026-11-26.md).
+
 25 ноября, следующий локальный срез: диалог уточнения встречи и подтверждённое
 создание через отдельный opt-in Google bridge. Существующие draft/sync/owner
 interlocks переиспользованы; UNKNOWN до внешнего вызова, затем только readback,
