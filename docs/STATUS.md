@@ -7,8 +7,13 @@
 25 ноября, следующий локальный срез: диалог уточнения встречи и подтверждённое
 создание через отдельный opt-in Google bridge. Существующие draft/sync/owner
 interlocks переиспользованы; UNKNOWN до внешнего вызова, затем только readback,
-фиксированный event ID защищает от дублей.55 локальных проверок PASS;
-PG/Linux CI ещё требуется. На VPS остаётся1e5dd99, Google read-only не менялся.
+фиксированный event ID защищает от дублей.63 локальных проверок PASS;
+PR118/exactb104b78 CI45688706551 SUCCESS:2799 PASS/1 skipped/1 warning,
+infrastructure1014 PASS, speech44 PASS (пересекающиеся наборы не суммировать).
+Владелец выбрал основной Google Calendar. Новые права/публикация/deployment
+и удаление четырёх архивных серверных backups ещё НЕ разрешены.
+[Точный пакет и план активации/retention](handoff/JARVIS_CALENDAR_CREATE_RELEASE_2026-11-25.md).
+На VPS остаётся1e5dd99, Google read-only не менялся.
 [Реализация, ограничения и необходимые gates](handoff/JARVIS_CALENDAR_CREATE_2026-11-25.md).
 
 25 ноября: PR117/exact1e5dd99 с фиксированным GigaAM установлен по отдельному

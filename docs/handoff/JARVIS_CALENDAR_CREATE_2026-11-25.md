@@ -68,11 +68,15 @@ interlocks cover the exact expanded bundle; do not replace them with compose up.
 
 ## Validation
 
-Local cross-language transport/parser + existing read bridge:55 passed.
+Local cross-language transport/parser + existing read bridge:63 passed.
 Ruff, contract export checks and changed-source Bandit medium/high passed.
-New PostgreSQL dialogue/publisher/callback and Linux custody tests are included;
-local Docker daemon is unavailable and Windows cannot import fcntl. Final Linux
-CI is required, not assumed. Node harness simulates Google entirely in memory;
+Final application source b104b78a21377df062f55244d1a7bc76fadae62a / PR118:
+CI45688706551 SUCCESS. Merge-ref0d89dca063018a51eda871c22f613652a50a8d12
+has identical tree db5dcdba544c82929e8c76372070d6251bba08b6. Main2799 passed,
+1 skipped,1 dependency warning; infrastructure1014 passed and speech44 passed.
+New PostgreSQL dialogue/publisher/callback and Linux custody tests passed in CI.
+Local Docker remains unavailable; Windows cannot import fcntl.
+[Exact activation and retention proposal](JARVIS_CALENDAR_CREATE_RELEASE_2026-11-25.md). Node harness simulates Google entirely in memory;
 it is not a real Google acceptance or permission grant.
 
 ## Remaining activation gates
