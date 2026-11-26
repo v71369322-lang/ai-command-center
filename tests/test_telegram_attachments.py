@@ -96,11 +96,13 @@ def test_sensitive_or_foreign_attachment_is_rejected_before_intake(attachments, 
     with pytest.raises(Denied):
         bridge.receive(update)
     update = attachment(caption='PRIVATE KEY')
-    with pytest.raises(Denied):
-        bridge.receive(update)
+    result = bridge.receive(update)
+    assert result['state'] == 'DONE'
     with store.transaction() as session:
-        assert not list(session.scalars(select(TelegramInbox)))
-    update = attachment()
+        saved = list(session.scalars(select(TelegramInbox)))
+        assert len(saved) == 1 and saved[0].intent == {'kind': 'attachment_rejected'}
+        assert 'PRIVATE KEY' not in str(list(session.scalars(select(TelegramDelivery)))[0].body)
+    update = attachment(uid=2)
     bridge.receive(update)
     altered = deepcopy(update)
     altered['message']['document']['file_id'] = 'changed-fixture'
@@ -120,10 +122,15 @@ def test_configured_polling_reloads_attachment_and_never_calls_file_api(configur
     try:
         TelegramService(store, client, poll_seconds=0).run(max_cycles=1)
         bridge = TelegramBridge(store, client, OWNER)
-        fake.updates = [callback(bridge, fake, uid=2, pid='vanilla-sugar'), update(3, '/request 1')]
+        oversized = attachment(uid=4)
+        oversized['message']['document']['file_size'] = MAX_BYTES + 1
+        fake.updates = [callback(bridge, fake, uid=2, pid='vanilla-sugar'), update(3, '/request 1'),
+                        oversized, update(5, '/help')]
         TelegramService(store, client, poll_seconds=0).run(max_cycles=1)
         assert any('Документ: notes.pdf' in b['text'] for b in fake.sent)
         assert any('Ваниль и Сахар' in b['text'] for b in fake.sent)
+        assert any('Вложение не сохранено' in b['text'] for b in fake.sent)
+        assert any('Jarvis:' in b['text'] for b in fake.sent)
         assert set(method for method, _ in fake.calls) <= {
             'getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage', 'answerCallbackQuery'}
         assert authority(store) == before

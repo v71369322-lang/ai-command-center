@@ -160,8 +160,12 @@ class TelegramBridge:
         if value is None and ('photo' in message or 'document' in message):
             from .telegram_attachments import parse_message, summary
             sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
-            attachment = parse_message(message, sensitive)
-            self.check_text(summary(attachment))
+            try:
+                attachment = parse_message(message, sensitive)
+                self.check_text(summary(attachment))
+            except (Denied, UnicodeError):
+                # Fixed receipt only: rejected captions/file references never reach the database or reply.
+                return str(uid), {'kind': 'attachment_rejected'}
             return str(uid), attachment
         if value is None and 'voice' in message:
             sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
@@ -697,6 +701,14 @@ class TelegramBridge:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 capture(self, session, iid, intent)
+        elif kind == 'attachment_rejected':
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                row = session.get(TelegramInbox, iid)
+                if row.state != 'DONE':
+                    self.finish(session, iid, 'Вложение не сохранено: не подходят размер, формат или подпись. '
+                        'Принимаю фото и документы до 10 МБ с короткой подписью. '
+                        'Попробуйте отправить файл меньшего размера или сократить подпись.')
         elif kind == 'attachment':
             from .telegram_attachments import capture
             with self.store.transaction() as session:

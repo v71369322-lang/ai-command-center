@@ -16,7 +16,7 @@ def require_developer():
 
 
 PERSONAL_INTENTS = frozenset({
-    'capture', 'attachment', 'voice_request', 'voice_confirm', 'voice_edit', 'voice',
+    'capture', 'attachment', 'attachment_rejected', 'voice_request', 'voice_confirm', 'voice_edit', 'voice',
     'help', 'projects', 'project', 'requests', 'request', 'assign',
     'archive_request', 'restore_request', 'attention', 'reminders',
     'attention_schedule', 'attention_schedule_change',

@@ -13,7 +13,9 @@ Only owner private messages, same authorization and audit/outbox/idempotency.
 Photos retain largest supplied size reference, not duplicate resolution records.
 Documents retain original display filename (never used as filesystem path),
 caption, Telegram message ID, file ID/unique ID and reported size. Limit10MiB;
-strict bounded field validation, known-secret checks before durable intake.
+strict bounded field validation, known-secret checks before durable content intake.
+Invalid owner attachments receive a fixed explanation without retaining or echoing
+filename/caption/file IDs; foreign messages still reject before admission.
 Repeated update creates one saved item and one acknowledgement; changed payload
 with same update ID is rejected. Existing project picker, queue, assignment and
 archive/restore readers use the same checked immutable source. Captions are data:
@@ -28,8 +30,9 @@ reference/metadata, not the file bytes; Telegram availability/deletion still
 matters. Search by contents and independent encrypted binary custody require a
 separate bounded follow-up with retention/limits/recovery acceptance. Albums are
 independent message records; no inferred grouping or summary. No admin expansion.
-Unsupported/malformed media still follows existing checked reject behavior;
-owner-friendly rejection feedback remains a later gap, not silently claimed done.
+Invalid photo/document metadata returns fixed owner feedback and the next valid
+message still processes in the same poll. Other unsupported media keeps existing
+rejection behavior; support is not claimed.
 
 ## Checks
 
