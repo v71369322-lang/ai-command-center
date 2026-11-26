@@ -4,6 +4,17 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 ноября, корректирующий выпуск: PR119/exactb808144, final CI45754615840 SUCCESS:
+2809PASS/1skipped/1warning, infrastructure1014PASS, speech44PASS; merge-ref tree
+сверен с HEAD. Exact Linux card validation PASS. Исправлены только пропущенные
+календарные кнопки в configured transport allowlist. Candidate собран/inspected,
+НЕ установлен. Telegram/голос и чтение main Calendar на b104 продолжают работать;
+живое уточнение даты/времени и отмена прошли. Записи встречи в Google пока нет.
+Нужны отдельное разрешение новой exact версии и трёх архивных SERVER backup
+deletions (независимые PC copies проверены и сохраняются), свежая backup/restore
+и завершение единственной тестовой встречи через настоящую Telegram-кнопку.
+[Точный подготовленный пакет, CI, retention и восстановление](handoff/JARVIS_CALENDAR_CARD_FIX_RELEASE_2026-11-26.md).
+
 26 ноября live: PR118/exactb104b78 установлен; оба журнала VERIFIED после штатного
 reconcile (один apply, bounded exact Telegram restart, без OOM). Google create
 Version1 опубликован владельцем, signed lookup PASS; main binding настроен,
