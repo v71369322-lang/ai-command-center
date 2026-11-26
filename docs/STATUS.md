@@ -4,6 +4,15 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 ноября live: PR118/exactb104b78 установлен; оба журнала VERIFIED после штатного
+reconcile (один apply, bounded exact Telegram restart, без OOM). Google create
+Version1 опубликован владельцем, signed lookup PASS; main binding настроен,
+Europe/Moscow сохранён без включения сводок. Telegram OPEN epoch68, voice IDLE.
+До/после backup и recovery custody независимо проверены на PC. Встреча НЕ создана:
+live-проверка нашла пропущенный calendar keyboard в allowlist исходящего транспорта.
+Исправление локальное,72 transport tests PASS; PG integration ждёт CI.
+[Установка, доказательства, дефект и продолжение](handoff/JARVIS_CALENDAR_CREATE_LIVE_2026-11-26.md).
+
 26 ноября: владелец разрешил PR118/main Calendar/точные четыре архивных backups/
 одну тестовую встречу, без paid AI; окно02:53:01–04:53:01UTC. Exactb104b78 и
 CI SUCCESS сверены; rootless app/speech образы и base release подготовлены.
