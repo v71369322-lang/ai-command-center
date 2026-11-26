@@ -117,3 +117,11 @@ creating individual actions. Single task, Calendar read and cross-release record
 persistence passed. This is a boundary repair, not automatic multi-item capture or
 an ASR improvement. Long/noisy real-owner voice acceptance remains open and Stage2
 is NOT complete. [Installation evidence](../handoff/JARVIS_MIXED_INBOX_INSTALL_2026-11-26.md).
+
+## 26 November reviewed mixed-message candidate
+
+PR126/source73647d0 adds owner-reviewed literal spans and existing personal records
+from real callback Update IDs, plus refresh/dedup and suspect-negation readback.
+Final CI45840200281 PASS; not installed. Full unconstrained multi-item NLP and real
+long/noisy owner ASR acceptance remain open. Stage2 NOT complete; no model/provider
+or deployment approval inferred. [Final evidence](../handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).

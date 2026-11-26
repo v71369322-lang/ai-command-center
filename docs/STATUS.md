@@ -4,6 +4,17 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November14:53UTC: Draft PR126/source73647d0 READY FOR REVIEW, NOT INSTALLED.
+Final CI45840200281 SUCCESS:2966passed/1skipped/1warning, infra1014passed,
+speech44passed, head/merge tree identical.40 new cases cover selected literal
+span records, actual callback source IDs, duplicates/concurrent clicks, refresh,
+stop/epoch/revision/expiry/timezone, parent archive and exactly-once reminders.
+Long transcript readback budget protected; raw suspect negation warning preserves
+words. ASR model/accuracy unchanged, no live phone/VPS/Google write or paid AI.
+Production remains last verifiedbb944ff; Stage2 incomplete.
+[Final pins, scope, limits and concrete release plan](handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).
+
+Historical development checkpoint (final verification above supersedes pending CI):
 26 November development: reviewed mixed-message spans prepared after PR125.
 Owner can save individual supported points through observed buttons, preserving
 literal original/accepted voice and actual callback provenance. Ambiguous text
