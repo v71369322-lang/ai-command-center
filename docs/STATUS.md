@@ -4,6 +4,12 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November: local attachment reference Inbox slice in progress, not installed.
+Owner photo/document references and captions, existing Inbox/queue/picker, explicit
+no-content-read receipt; no download/OCR/AI. Local10 tests/static checks PASS;
+four PostgreSQL/configured-polling cases awaiting final CI. Production75776b0.
+[Scope and file-retention limitation](handoff/JARVIS_ATTACHMENT_INBOX_2026-11-26.md).
+
 26 November08:20UTC: PR121/source75776b039b732698e83cc77c2da051e75123ec9a
 INSTALLED with fresh explicit owner approval. Both journals VERIFIED; five services,
 Telegram heartbeat and voiceIDLE verified. Live task/idea/project recall, completion,

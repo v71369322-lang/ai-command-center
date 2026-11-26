@@ -17,6 +17,9 @@ def _captured_text(row, anchor, session=None, *, states=frozenset({'NEEDS_PLANNI
         raise Denied('telegram_saved_request_integrity')
     if set(row.intent) == {'kind', 'text'} and row.intent.get('kind') == 'capture':
         value = row.intent.get('text')
+    elif row.intent.get('kind') == 'attachment':
+        from .telegram_attachments import summary
+        value = summary(row.intent)
     elif (session is not None and row.intent.get('kind') == 'voice_confirm'
           and row.intent.get('confirm') is True):
         accepted = session.execute(select(Audit).where(
@@ -69,6 +72,7 @@ def project_queue(bridge, session, project='all'):
     rows = session.execute(select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
         TelegramInbox.state == 'NEEDS_PLANNING', or_(
             TelegramInbox.intent['kind'].as_string() == 'capture',
+            TelegramInbox.intent['kind'].as_string() == 'attachment',
             TelegramInbox.intent['kind'].as_string() == 'voice_confirm'))
         .order_by(TelegramInbox.created_at.desc(), TelegramInbox.id.desc()).limit(1001)).scalars().all()
     if len(rows) > 1000:
@@ -135,6 +139,7 @@ def request_reply(bridge, session, intent, *, suffix=''):
     query = select(TelegramInbox).where(TelegramInbox.profile == bridge.profile,
         TelegramInbox.state == 'NEEDS_PLANNING', or_(
             TelegramInbox.intent['kind'].as_string() == 'capture',
+            TelegramInbox.intent['kind'].as_string() == 'attachment',
             TelegramInbox.intent['kind'].as_string() == 'voice_confirm'))
     if intent['kind'] == 'request':
         query = query.where(TelegramInbox.id == bridge.profile + ':' + intent['number'])
