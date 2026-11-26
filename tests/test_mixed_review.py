@@ -83,6 +83,8 @@ def test_bounds_and_quote_offsets():
     value = 'Заметка: «Задача: пример». Идея: коробка.'
     assert [value[i:i+5] for i in request_markers(value)] == ['Замет', 'Идея:']
     assert items_for(TEXT, NOW, {'configured': False, 'timezone': 'Europe/Moscow'}, NOW)[-1]['document'] is None
+    value = '  ' + TEXT
+    assert ''.join(value[x['start']:x['end']] for x in items_for(value, NOW, SCHEDULE, NOW)) == value
 
 
 @pytest.mark.parametrize('token', [None, '', 'mi:bad:1', 'mi:00000000-0000-0000-0000-000000000000:9'])
@@ -254,6 +256,20 @@ def test_integration_unsupported_meeting_tail_cannot_be_saved_via_forged_slot(se
     with store.transaction() as tx:
         assert not records(service, tx)
     assert provider['writes'] == 0 and provider['calls'] == []
+
+
+def test_integration_large_review_falls_back_before_transport_limit(setup, store, monkeypatch):
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    service, fake, _ = setup
+    value = ' '.join(['Задача: ' + 'я' * 100 + '.'] * 8)
+    source = service.receive(message(1, value))
+    while service.deliver_one():
+        pass
+    assert len(fake.sent) == 1 and 'reply_markup' not in fake.sent[0]
+    with store.transaction() as tx:
+        assert captured_text(tx, tx.get(TelegramInbox, source['inbox_id'])) == value
+        assert not records(service, tx)
+        assert not tx.scalar(select(Audit).where(Audit.event['kind'].as_string() == PROPOSED))
 
 
 def test_integration_reviewed_voice_keeps_raw_and_saves_only_selected_literal_span(setup, store, monkeypatch):

@@ -84,6 +84,8 @@ def items_for(value, received, schedule, now):
         return []
     if value[:positions[0]].strip():
         positions.insert(0, 0)
+    else:
+        positions[0] = 0
     if len(positions) > 8:
         return []
     items = []
@@ -137,9 +139,11 @@ def issue_locked(bridge, session, source, value, *, operation_id=None):
               'Карточка действует 10 минут; затем нажмите «Обновить разбор». '
               'Если пункт неверный, не сохраняйте его — пришлите исправленный пункт отдельным сообщением.']
     text = '\n'.join(lines)
-    if len(text) > 3800:
+    markup = keyboard(proposal_id, items)
+    body = {'chat_id': bridge.owner, 'text': text, 'reply_markup': markup}
+    if len(text) > 3800 or len(canonical(body).encode()) > 8192:
         return False
-    delivery = bridge.enqueue(session, operation_id + ':reply', text, keyboard(proposal_id, items))
+    delivery = bridge.enqueue(session, operation_id + ':reply', text, markup)
     bridge.store.audit(session, PROPOSED, 'owner', profile=bridge.profile, proposal_id=proposal_id,
         source_id=source.id, source_fingerprint=source.fingerprint, source_hash=digest(value),
         received_at=received.isoformat(), schedule=schedule, items=items, items_hash=digest(items),
