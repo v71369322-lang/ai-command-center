@@ -47,6 +47,14 @@ def test_long_voice_warning_keeps_full_source_within_transport_budget(monkeypatc
     body = {'chat_id': 9999999999999999, 'text': text,
             'reply_markup': voice_keyboard('00000000-0000-0000-0000-000000000000')}
     assert value in text and len(canonical(body).encode()) <= 8192
+    echoed = {'update_id': 3, 'callback_query': {'id': 'public-query',
+        'from': {'id': OWNER, 'is_bot': False, 'first_name': 'Владимир'},
+        'data': body['reply_markup']['inline_keyboard'][0][0]['callback_data'],
+        'message': {'message_id': 55, 'date': 1795700000, 'chat': {'id': OWNER, 'type': 'private', 'first_name': 'Владимир'},
+                    'from': {'id': 67890, 'is_bot': True, 'first_name': 'Jarvis'},
+                    'text': text, 'reply_markup': body['reply_markup']}}}
+    dummy = type('Owner', (), {'owner': OWNER, 'client': None})()
+    assert TelegramBridge.normalize(dummy, echoed)[1]['kind'] == 'voice_confirm'
 
 
 def test_literal_spans_cover_source_and_only_explicit_dates_are_resolved():

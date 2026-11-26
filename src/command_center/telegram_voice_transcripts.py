@@ -45,10 +45,10 @@ def preview(value, *, corrected=False):
     result = ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning
             + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
             + effect)
-    if len(canonical({'text': result}).encode()) > 7400:
+    if len(canonical({'text': result}).encode()) > 6700:
         # Keep every source character. Shorten instructions, never the dictation.
-        tail = ('Проверьте текст, даты и отрицания. Правка — ответом полным текстом. '
-                'Кнопка сохранит запись; напоминание запланирует. Google — отдельно.' if assistant_only()
+        warning = '\n\nПроверьте «на»: могло потеряться «не».' if suspect else ''
+        tail = ('Правка — ответом. Кнопка сохранит запись/напоминание; Google — отдельно.' if assistant_only()
                 else 'Проверьте текст. Правка — ответом полным текстом. Кнопка сохранит запрос, без выполнения.')
         result = (EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning + '\n\n' + tail
     return result

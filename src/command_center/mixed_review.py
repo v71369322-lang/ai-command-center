@@ -141,7 +141,8 @@ def issue_locked(bridge, session, source, value, *, operation_id=None):
     text = '\n'.join(lines)
     markup = keyboard(proposal_id, items)
     body = {'chat_id': bridge.owner, 'text': text, 'reply_markup': markup}
-    if len(text) > 3800 or len(canonical(body).encode()) > 8192:
+    # The callback echoes this card plus Telegram sender/chat/query metadata.
+    if len(text) > 3800 or len(canonical(body).encode()) > 7000:
         return False
     delivery = bridge.enqueue(session, operation_id + ':reply', text, markup)
     bridge.store.audit(session, PROPOSED, 'owner', profile=bridge.profile, proposal_id=proposal_id,
