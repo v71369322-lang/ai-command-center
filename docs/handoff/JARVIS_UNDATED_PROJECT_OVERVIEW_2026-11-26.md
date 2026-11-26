@@ -56,3 +56,9 @@ prepare final verified source, get exact deployment/backup retention approval,
 then test real owner voice/text, project recall, completion and one timed reminder.
 Backup quota and retention are governed by the last live handoff and fresh VPS
 reconciliation, not an implied authorization from this development request.
+
+Final source75776b039b732698e83cc77c2da051e75123ec9a / Draft PR121:
+CI45776306557 SUCCESS, main2857passed/1skipped/1warning, infra1014passed,
+speech44passed. Merge-ref7796efed54e61de1651cc6e6b6bc59479634e260 verified.
+[Consolidated exact release and retention proposal](JARVIS_UNDATED_RELEASE_2026-11-26.md).
+Still not installed; no VPS access in this development stage.
