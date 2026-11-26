@@ -11,7 +11,9 @@ restart persistence, combined Google agenda and exactly one11:18Moscow reminder
 PASS. Paid ledger unchanged. Protected PC pre/post backup and recovery custody
 independently decrypted/verified. Exact three approved old server archives removed;
 PC originals retained. Initial poller exit repaired with same container after20-cycle
-live diagnostic; root cause not established. Fresh phone voice acceptance still open.
+live diagnostic; root cause not established. Fresh8s phone voice accepted08:30UTC -> personal task131179275, confectionery,
+no deadline: PASS; proposal10.96s after intake, personal creation0.204s after
+owner acceptance. Exact spoken reference/quality beyond this sample not established.
 [Exact installation, acceptance, recovery and limits](handoff/JARVIS_PERSONAL_PLANNER_LIVE_2026-11-26.md).
 
 26 ноября: Draft PR121/source75776b0, final CI45776306557 SUCCESS:

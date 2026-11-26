@@ -92,3 +92,21 @@ backup and exact deployment mechanisms remain unchanged.
 Phone voice-to-personal-task acceptance remains a separate actual owner recording;
 no synthetic phone evidence was generated. Long mixed-message AI understanding,
 regular proactive resurfacing and Decision Log are not part of this release.
+
+## Fresh phone voice acceptance — 08:30UTC
+
+Owner sent a real8second phone voice and personally accepted the proposed
+transcript in Telegram. Actual UI showed saved personal task131179275 in
+Vanilla & Sugar, no deadline. Read-only DB join bound the latest voice inbox
+through proposal904b0fc7-9890-561b-97f5-2a1e084e3c32 to exactly this request.
+Received08:29:52.027305UTC; ASR started08:29:55.565005;
+proposal08:30:02.986802 (10.96s after intake); owner accepted08:30:17.079377;
+personal task created08:30:17.282986 (0.204s after acceptance), project assignment
+08:30:18.492755. One personal creation, active, due_atNULL, no reminder queued,
+source task_idNULL (no autonomous coding/execution task). Ledgeractual4/reserved0/
+uncertain0 unchanged. No paid AI calls or calendar event from this voice test.
+Original transcript was accepted by the owner, but exact spoken reference was
+not independently confirmed; one number/form difference and sparse punctuation
+must not be represented as perfect ASR quality. No transcript/audio/file IDs are
+copied to this public handoff. Phone -> confirmed personal task path PASS;
+no claim of general long/noisy/mixed speech quality or full Stage2 completion.

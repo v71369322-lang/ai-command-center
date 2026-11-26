@@ -70,3 +70,9 @@ verified on PC. [Evidence and limits](../handoff/JARVIS_PERSONAL_PLANNER_LIVE_20
 Next acceptance is a real fresh owner phone voice -> reviewed personal task;
 then close the remaining Stage2 attachment/failure/speed checks before Stage3.
 No paid AI, recurring reports, new calendar scopes, merge or other projects.
+
+26 November08:30UTC: fresh actual8s owner phone voice -> owner-confirmed personal
+task in confectionery with no deadline verified in UI and joined DB evidence.
+Proposal10.96s after intake; personal creation0.204s after acceptance. The next
+check is remaining Stage2 attachment/failure/speed acceptance, not repeating this
+successful path. Broader ASR quality and mixed-message understanding remain open.
