@@ -83,7 +83,8 @@ def test_exact_bound_file_uses_only_fixed_telegram_host():
 
 
 @pytest.mark.parametrize('change', [{'file_path': '../private'}, {'file_path': 'https://outside.test/file'},
-    {'file_path': 'documents/file.pdf?redirect=x'}, {'file_unique_id': 'changed'}, {'file_size': 999}])
+    {'file_path': 'documents/file.pdf?redirect=x'}, {'file_unique_id': 'changed'}, {'file_size': 999},
+    {'file_size': float(len(DATA))}])
 def test_changed_reference_or_path_never_downloads(change):
     calls = []
     def handler(request):

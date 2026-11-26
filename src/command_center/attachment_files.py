@@ -26,7 +26,8 @@ class AttachmentFiles:
                     json={'file_id': intent['file_id']}, headers={'Accept-Encoding': 'identity'}) as response:
                 envelope = json.loads(TelegramVoiceFiles._bounded(response, 4096))
             info = envelope.get('result') if envelope.get('ok') is True else None
-            if (not isinstance(info, dict) or any(info.get(k) != intent[k] for k in
+            if (not isinstance(info, dict) or type(info.get('file_size')) is not int
+                    or any(info.get(k) != intent[k] for k in
                     ('file_id', 'file_unique_id', 'file_size'))):
                 raise Denied('attachment_file_binding_changed')
             path = info.get('file_path')

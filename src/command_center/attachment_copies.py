@@ -58,7 +58,8 @@ def copied_event(session, source):
 
 
 def read_copy(store, session, source, *, profile):
-    if source.profile != profile or source.intent.get('kind') != 'attachment':
+    if (source is None or source.profile != profile or not isinstance(source.intent, dict)
+            or source.intent.get('kind') != 'attachment'):
         raise Denied('attachment_copy_owner_scope')
     store.check_audit(session)
     captured_text(session, source, states=frozenset({'NEEDS_PLANNING', 'ARCHIVED'}))
