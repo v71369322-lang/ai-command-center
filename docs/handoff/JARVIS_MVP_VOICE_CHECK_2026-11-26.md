@@ -1,5 +1,11 @@
 # Combined voice/MVP acceptance — incomplete, bounded repair prepared
 
+Later26November: separate fresh exact owner approval installed PR125/bb944ff.
+[Installation, live checks, backups and limits](JARVIS_MIXED_INBOX_INSTALL_2026-11-26.md).
+The verification-only scope and NOT INSTALLED statements below describe the
+preparation checkpoint, not current production. Full mixed-voice acceptance is
+still incomplete; the installed guard does not split messages or improve ASR.
+
 Owner requested combined long voice, correction, task/idea/reminder and Calendar
 verification after installed PR124. Verified application/sourcec25e2d3; final
 CI45815091382 SUCCESS rechecked. Base remains unmerged PR124; no merge, new

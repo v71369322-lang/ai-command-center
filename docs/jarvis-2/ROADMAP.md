@@ -108,3 +108,12 @@ agenda16s unchanged, paid calls0, encrypted pre/post PC custody verified. No fur
 cleanup or quota change. Next remaining Stage2 result: combined real long voice,
 correction, personal task/idea/reminder and Calendar acceptance with explicit
 failure handling. No ASR quality/native phone download claim from attachment tests.
+
+## 26 November PR125 installation checkpoint
+
+Explicit mixed-request guard installed atbb944ff after separate exact approval.
+Actual text task/idea/reminder and meeting/idea mixtures retained intact without
+creating individual actions. Single task, Calendar read and cross-release record
+persistence passed. This is a boundary repair, not automatic multi-item capture or
+an ASR improvement. Long/noisy real-owner voice acceptance remains open and Stage2
+is NOT complete. [Installation evidence](../handoff/JARVIS_MIXED_INBOX_INSTALL_2026-11-26.md).

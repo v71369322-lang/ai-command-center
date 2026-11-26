@@ -4,6 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November13:47UTC: PR125/sourcebb944ff INSTALLED with fresh exact owner approval.
+One stock apply exited0; both journals VERIFIED directly, owner Telegram resume
+confirmed OPENepoch89, no old-task restart or paid call. Actual mixed task/idea/
+reminder and meeting/idea inputs retained intact, no personal/F1/Calendar actions;
+separate task saved/completed in confectionery, existing Google agenda reads.
+Test sources reversibly archived. Cross-release prior task/idea/reminder retained,
+no repeat reminder. Protected pre/post PC backups and isolated audit restore verified.
+[Exact installation and remaining voice limits](handoff/JARVIS_MIXED_INBOX_INSTALL_2026-11-26.md).
+
+Historical preparation checkpoint (installation above supersedes NOT INSTALLED):
 26 November: combined voice acceptance remains incomplete. Draft PR125/source
 bb944ff passed final CI45826953730 (2926passed/1skipped; infra1014passed;
 speech job SUCCESS), NOT INSTALLED. Guard retains explicit mixed requests intact

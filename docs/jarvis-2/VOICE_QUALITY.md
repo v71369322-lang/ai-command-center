@@ -2,7 +2,8 @@
 
 ## 26 November — latest long public probe (no model change)
 
-Current production c25e2d30 uses pinned GigaAM. Public63.876s synthetic voice:
+Current production bb944ff uses the unchanged pinned GigaAM model after PR125.
+The probe below ran on predecessor c25e2d30. Public63.876s synthetic voice:
 3.803s offline decode/inference,558.79MiB peak, noOOM.4/91 word edits, but
 critical "не переноси" -> "на переноси"; quality acceptance FAILED. Existing
 local Whisper Small/int8/beam5 preserved all six labelled critical phrases,
