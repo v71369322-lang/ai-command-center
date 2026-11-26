@@ -1,5 +1,11 @@
 # Reviewed mixed-message spans — development checkpoint
 
+Later26November: fresh separate owner approval installed source73647d0.
+[Exact installation and live acceptance](JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+NOT INSTALLED and future-release text below records the preparation checkpoint;
+installation evidence above supersedes its deployment status. ASR/full noisy-voice
+limitations remain open.
+
 Owner approved the next development stage after installed PR125. This slice is
 local edits/tests/commit/Draft PR only; no VPS access, deployment, merge, paid AI,
 model download/change or new Google write. Production remains bb944ff.
@@ -36,7 +42,69 @@ punctuation and real long/noisy owner accuracy remain open. Unusual phrasing can
 still fall back to original Inbox; correcting a rejected item is an ordinary
 separate owner message, not an implicit edit of the original source.
 
-Local detector/protocol checks and scope static checks recorded in final checkpoint.
-Linux Docker unavailable on this PC; PostgreSQL, concurrency, voice correction/
-span provenance and reminder behavior require final CI. No mocks are live proof.
-Final application HEAD/PR merge-ref and CI pending. Stage2 NOT complete.
+## Final verification and release boundary
+
+Draft PR126 https://github.com/v71369322-lang/ai-command-center/pull/126, application
+source73647d0b66d6031ca566152b7be8eeb994ae1330. Base remains
+codex/mvp-voice-acceptance atbb944ff863b7af39c8dbca29182280140780cb3f (PR125).
+Merge-reffdf9a3986a3f631ae82fbdba716de2bf2de42027; head/merge tree
+1a023cc742c7f88f4b7da62594b94392aa91d04d identical. Final CI45840200281 SUCCESS:
+2966passed/1skipped/1warning in665.07s; infrastructure1014passed in76.64s;
+speech44passed. Reviewed static security rules PASS, no medium/high or dependency
+advisories. Full cloud verification explicitly passed for the final merge-ref.
+Superseded/cancelled runs are not counted as final evidence or added to totals.
+
+40 new cases:22 local detector/protocol and18 PostgreSQL cases. Existing mixed-
+source regressions included in local37PASS overlap the final suite and are not
+summed;22 additional existing parser/voice transport checks also passed separately.
+Ruff, changed-module Bandit, generated contract/requirements, diff and current
+runtime secret scan PASS. Initial unfiltered Bandit also listed existing LOW
+findings; final stock security policy preserved and reviewed them, no checks
+were disabled. Linux Docker unavailable on this PC; PostgreSQL/container evidence
+comes from CI, not a local or VPS test.
+
+PostgreSQL tests exercise literal span/source anchoring, real callback update IDs,
+original text preserved before review, no save without observed owner click,
+completion/project views after fresh bridge and parent archive, exactly-once
+reminder collection, simultaneous clicks, cross-card duplicates, refresh/stale
+cards, expiry/epoch/stop/recovery/revision/timezone refusal, forged owner/message/
+markup, changed/archived source and unsavable meeting slot. Mock voice proposal
+uses the retained actual public ASR transcript; no audio decode or owner phone
+recording was performed here. Existing raw/correction/stale-card tests pass in
+full CI. Provider/client mocks are not actual Telegram or Google acceptance.
+
+Large review payloads fall back to the original Inbox before exceeding7000bytes
+canonical outbound JSON, leaving room for echoed callback metadata under the
+existing8192byte inbound limit. Local actual-render/fixed transport probes of both
+public long texts PASS (6207/6113bytes); a wider bounded local probe exposed the
+callback-echo limit and motivated the reservation. Long raw/corrected ASR readback
+keeps every source character and shortens instructions only, with callback budget
+regressions. This does not guarantee arbitrary maximum-size Telegram profile
+metadata; ingress remains bounded and rejects oversized Updates.
+
+Generic encrypted backup to a separate networkless PostgreSQL restore/audit and
+container recreate/persistence/boundary smokes PASS in final CI. New mixed-source
+records were NOT independently extracted from a restored VPS backup. No new
+schema/table/service/credential or new ASR model/provider; no live VPS, Telegram
+send, Google write or paid call in this slice. PR remains Draft, unmerged and NOT
+INSTALLED; production last verifiedbb944ff at13:47UTC in its dated installation
+handoff, not a fresh server claim. Stage2 NOT complete.
+
+## Concrete next release, only after separate owner approval
+
+Install PR126 source73647d0 through fresh read-only predecessor/health/backup-quota
+reconciliation, exact source images, stock prepare/inspect, protected fresh backup
+and isolated restore, exact candidate/preparation/time-bound activation and
+postchecks. Do not repeat apply on an error without reconciliation. If verified,
+restore normal admission through actual owner Telegram flow; no old task restart.
+Live public text -> review -> select task/idea/reminder, duplicate refusal, existing
+Google read and cross-release persistence are required acceptance checks. No new
+Google event is needed. Capture independent protected postbackup/recovery custody.
+Unchanged schema alone does not authorize rollback over new callback-source data;
+check exact reader compatibility and preserve source/audit/queue backups.
+
+Fresh real long/noisy owner voice and transcription accuracy remain open. The
+negation warning covers a bounded symptom; it is not confidence scoring, a silent
+correction or improved ASR. No paid model experiment, model change, deployment,
+merge or next-stage expansion follows automatically from this development task.
+Subsequent documentation checkpoint does not change tested application HEAD.

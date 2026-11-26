@@ -50,6 +50,33 @@ def test_relative_date_pinned_at_original_intake_and_no_past_invention():
         due_at(intent, received, 'Europe/Moscow', now + timedelta(days=2))
 
 
+@pytest.mark.parametrize('clock,expected', [
+    ('9 часов 15 минут', '09:15'), ('9 часов 5 минут', '09:05'),
+    ('0 часов 1 минуту', '00:01'), ('23 часа 59 минут', '23:59'),
+    ('11 часов', '11:00'), ('1 час', '01:00'), ('09:15', '09:15'),
+])
+def test_explicit_spoken_numeric_minutes_are_not_silently_discarded(clock, expected):
+    result = parse(f'Напомни послезавтра в {clock} позвонить Анне')
+    assert result['clock'] == expected and result['title'] == 'позвонить Анне'
+    assert result['date'] == 'послезавтра'
+
+
+@pytest.mark.parametrize('clock', [
+    '9 часов 75 минут', '9 часов пятнадцать минут', '9 часов 15 секунд',
+    '9 часов 15', '9 часов 15 минут 1 секунду', '9 15 минут',
+    '9 вечера', '9 часов вечера', '9:15 вечера', '9:15:30',
+    '9 минут', '25 часов 15 минут', '9 часов -15 минут',
+    '9 ч 15 мин', '9 часов пятнадцать', '9 часов сорок пять', '9 часов с половиной',
+])
+def test_unsupported_clock_suffix_never_becomes_a_wrong_whole_hour(clock):
+    assert parse(f'Напомни завтра в {clock} позвонить') == {'action': 'invalid_reminder'}
+
+
+def test_explicit_colon_clock_can_have_a_numeric_task_title():
+    assert parse('Напомни завтра в 09:15 3 коробки заказать')['title'] == '3 коробки заказать'
+    assert parse('Напомни завтра в 09:15 частично проверить склад')['title'] == 'частично проверить склад'
+
+
 def test_only_one_explicit_project_hint_is_assigned():
     assert project_hint('Купить упаковку для кондитерской') == 'vanilla-sugar'
     assert project_hint('Проверить автосервис и кондитерскую') is None

@@ -1,5 +1,22 @@
 # Качество голосового ввода — этап2/6
 
+26November current production source73647d0 after exact PR126 installation.
+Actual text/button three-item acceptance passed, no new owner phone recording or
+ASR decode in that release. Model/accuracy/punctuation unchanged; prior long-probe
+negation error and real long/noisy acceptance gap remain. Preparation statements
+below retain their dated NOT INSTALLED meaning. [Installation](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+
+## 26 November — reviewed mixed-message candidate (not installed)
+
+PR126/source73647d0 passed final CI45840200281. Explicit multi-item text or
+owner-approved/corrected voice proposes literal spans; supported points are saved
+only by actual observed owner clicks. Uncertain meeting/reminder fragments remain
+pending. Known "на переноси" symptom gets a warning; raw words are preserved.
+Long readback shortens instructions, never source text, to fit the guarded reply/
+callback path. No new model, audio decode, paid call or real phone acceptance.
+Recognition accuracy and punctuation are unchanged. Production remainsbb944ff.
+[Evidence and boundaries](../handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).
+
 ## 26 November — latest long public probe (no model change)
 
 Current production bb944ff uses the unchanged pinned GigaAM model after PR125.

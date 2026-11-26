@@ -80,13 +80,29 @@ def parse(value):
         if (re.search(r'\b(?:или|либо|если)\b', low)
                 or len(re.findall(r'\bв [0-2]?\d(?::[0-5]\d)?\b', low)) > 1):
             return {'action': 'invalid_reminder'}
-        match = re.fullmatch(r'напомни(?: мне)? (сегодня|завтра|послезавтра|\d{4}-\d{2}-\d{2}) '
-                             r'в ([0-2]?\d(?::[0-5]\d)?)[,:]? (.+)', text, re.I)
-        if not match or int(match[2].split(':')[0]) > 23:
+        match = re.fullmatch(r'напомни(?: мне)? (?P<date>сегодня|завтра|послезавтра|\d{4}-\d{2}-\d{2}) '
+            r'в (?P<hour>[0-2]?\d)(?::(?P<colon>[0-5]\d)| (?P<unit>час|часа|часов)'
+            r'(?: (?P<minutes>[0-5]?\d) минут(?:а|у|ы)?)?)?[,:]? (?P<title>.+)', text, re.I)
+        if not match or int(match['hour']) > 23:
             return {'action': 'invalid_reminder'}
-        return {'action': 'create', 'category': 'reminder', 'title': match[3],
-                'date': match[1].lower(),
-                'clock': match[2].zfill(5) if ':' in match[2] else match[2].zfill(2) + ':00'}
+        title = match['title']
+        # An unconsumed time suffix is not the reminder title. Never turn
+        # "9 часов 75 минут" or "9 вечера" into an invented 09:00 reminder.
+        units = r'(?:час(?:а|ов|ы|у)?|минут(?:а|у|ы)?|секунд(?:а|у|ы)?)'
+        word_number = r'(?:ноль|нуль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|'
+        word_number += r'одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|'
+        word_number += r'восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят)\b'
+        if (re.match(r'^(?:' + units + r'|утра|утром|дня|днём|днем|вечера|вечером|ночи|ночью)\b', title, re.I)
+                or re.match(r'^(?:ч|мин|сек)\.?(?=\s|\d|$)', title, re.I)
+                or re.match(r'^[+-]?\d+\s*(?::|\s+' + units + r'\b)', title, re.I)
+                or (match['unit'] and (re.match(r'^[+-]?\d', title)
+                    or re.match(word_number, title, re.I)
+                    or re.match(r'^(?:половин\w*|четверт\w*|с половиной)\b', title, re.I)
+                    or re.match(r'^\w+(?: \w+)? минут(?:а|у|ы)?\b', title, re.I)))):
+            return {'action': 'invalid_reminder'}
+        minute = match['colon'] or match['minutes'] or '0'
+        return {'action': 'create', 'category': 'reminder', 'title': title,
+                'date': match['date'].lower(), 'clock': f"{int(match['hour']):02}:{int(minute):02}"}
     match = re.fullmatch(r'(?:(?:запиши|сохрани)(?: мне)? |отдельн(?:ая|ую) )?'
                         r'(идею|идея|заметку|заметка|задачу|задача)[: ,]+(.+)', text, re.I)
     if match:

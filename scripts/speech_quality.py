@@ -95,7 +95,7 @@ def main():
             **assess(case['reference'], transcript, case.get('critical_phrases', []))})
         if args.review_output:
             review.append({'id': case['id'], 'reference': case['reference'], 'transcript': transcript})
-    report = {'model_fingerprint': fingerprint, 'mode': args.mode,
+    report = {'assessment_schema': 2, 'model_fingerprint': fingerprint, 'mode': args.mode,
               'beam': args.beam if args.mode == 'whisper-experiment' else None, 'threads': 1,
               'compute_type': 'int8', 'load_seconds': round(load_seconds, 3),
               'peak_working_set_mib': round(peak_memory(), 1), 'platform': sys.platform,
