@@ -4,6 +4,14 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November: local independent attachment copy slice, not installed. Reuses the
+existing background voice process and persistent Inbox data records; no new
+service/table/mount/credential/migration. Voice priority, exact source/epoch guard,
+bounded16MiB raw/32 files, PG encrypted backup inclusion; binary contents are not
+AI instructions. Local15 tests/static checks PASS; eight PG cases and binary
+networkless restore acceptance awaiting CI. Production75776b0.
+[Storage, privacy, quotas and scope](handoff/JARVIS_ATTACHMENT_COPIES_2026-11-26.md).
+
 26 November: Draft PR122/source03b4aab attachment reference Inbox ready for review,
 not installed. Final CI45785579447 SUCCESS: main2871PASS/1skipped/2warnings,
 infrastructure1014PASS, speech44PASS. Source and merge tree pins checked.

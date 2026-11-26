@@ -630,7 +630,8 @@ def create_app(settings=None, gateway_factory=None):
             store.check_audit(session)
             rows = session.execute(select(TelegramInbox).where(TelegramInbox.state == 'NEEDS_PLANNING')
                                    .order_by(TelegramInbox.created_at.desc()).limit(50)).scalars()
-            return {'requests': [{'id': r.id, 'state': r.state, 'text': r.intent['text']} for r in rows],
+            from .project_inbox import checked_text
+            return {'requests': [{'id': r.id, 'state': r.state, 'text': checked_text(store, session, r)} for r in rows],
                     'ai_planning_connected': False}
 
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
