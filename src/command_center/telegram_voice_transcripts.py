@@ -234,6 +234,9 @@ def decide(bridge, iid, intent):
         bridge.store.audit(session, ACCEPTED, 'owner', profile=bridge.profile, proposal_id=intent['proposal_id'],
                            request_id=iid, request_fingerprint=row.fingerprint,
                            text=proposal['text'], text_hash=proposal['text_hash'], task_created=False)
+        from .mixed_inbox import hold_locked
+        if hold_locked(bridge, session, iid, proposal['text']):
+            return
         from .calendar_dialogue import handle_locked
         source_received = session.get(TelegramInbox, proposal['voice_inbox_id']).created_at
         if handle_locked(bridge, session, iid, proposal['text'], received_at=source_received):

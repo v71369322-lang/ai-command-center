@@ -4,6 +4,15 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November: combined long-voice check found two real gaps; Stage2 NOT passed.
+Exact deployed decoder transcribed public63.88s synthetic speech in3.803s,
+RSS558.79MiB/noOOM, but "не переноси" -> "на переноси" critical negation error.
+Existing mixed task/idea/reminder becomes one task title. No paid call/model change
+or mixed production task accepted. Local shared ingress guard prepared: keep
+mixed source intact in Inbox before domain routing; no guessed batch/actions.
+15 local cases/static checks PASS, two PG journey cases awaiting final CI.
+[Evidence, scope, repair and limits](handoff/JARVIS_MVP_VOICE_CHECK_2026-11-26.md).
+
 26 November12:36UTC: PR124/sourcec25e2d3 INSTALLED with fresh exact owner approval.
 ONE stock apply exited0, both journals VERIFIED directly. Real Telegram button
 (document) and plain numbered request(photo) each produced one SENT file; exact
