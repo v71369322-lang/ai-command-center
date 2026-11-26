@@ -8,7 +8,7 @@
 existing background voice process and persistent Inbox data records; no new
 service/table/mount/credential/migration. Voice priority, exact source/epoch guard,
 bounded16MiB raw/32 files, PG encrypted backup inclusion; binary contents are not
-AI instructions. Local15 tests/static checks PASS; seven PG cases and binary
+AI instructions. Local15 tests/static checks PASS; eight PG cases and binary
 networkless restore acceptance awaiting CI. Production75776b0.
 [Storage, privacy, quotas and scope](handoff/JARVIS_ATTACHMENT_COPIES_2026-11-26.md).
 

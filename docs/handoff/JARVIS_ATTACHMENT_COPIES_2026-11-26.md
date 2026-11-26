@@ -56,7 +56,7 @@ future backup inclusion; no claim that a fresh production backup already ran.
 ## Verification
 
 15 local codec/download/bounds/token-safety checks PASS. Ruff whole tree, contract
-export, scoped Bandit and diff check PASS. Seven PostgreSQL cases await final CI:
+export, scoped Bandit and diff check PASS. Eight PostgreSQL cases await final CI:
 persisted read from fresh DB client without Telegram, unchanged authority/one copy,
 corruption and scope refusal, stop/revoked epoch, quota before download, voice
 priority, lost COMMIT response, stale source no backfill and shared leadership.
