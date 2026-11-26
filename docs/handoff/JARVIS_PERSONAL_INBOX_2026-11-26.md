@@ -71,6 +71,19 @@ due delivery once across bridge restart, pending-notification suppression,
 foreign profiles, changed source, missing dates/timezone and offline agenda.
 Synthetic HTTP is NOT live Telegram/voice acceptance.
 
+Final checked source e238589a1585dd8fb3dd3c2b7a1dc15294454213, PR120 Draft,
+CI45768463214 SUCCESS:2842PASS/1skipped/1warning, infrastructure1014PASS,
+speech44PASS plus pinned image/import smoke, full security/container gates.
+The33 new tests (including12 PostgreSQL/integration tests) passed in the main
+suite. Head and merge-ref2ace45a203784bfad490bd03f16cbd7469bfbd28 have identical
+tree2a82504ee6758493718b1f08f8e8fe868a50e8e1; metadata rechecked after CI.
+Existing assistant-policy test now expects an explicit classified idea receipt
+while retaining every developer route/permission prohibition. Receipt is plain
+text; project picker remains optional in the original request view. Natural
+project correction uses existing owner assignment checks. Help and reminders
+menu reflect the new personal scenario. No production/server operation in this
+development step. [Exact release review](JARVIS_PERSONAL_INBOX_RELEASE_2026-11-26.md).
+
 This is a bounded deterministic first slice, not general natural-language AI.
 No splitting of long mixed messages; no guessed project/deadline. Reminder
 grammar: today/tomorrow/day-after/ISOdate + numeric hour or HH:MM + text, up to
