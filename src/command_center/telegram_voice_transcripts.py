@@ -34,10 +34,15 @@ def parse_edit(message):
 
 
 def preview(value, *, corrected=False):
+    from .assistant_policy import assistant_only
+    effect = ('\nПроверьте имена, дату, время и место. Кнопка сохранит личную запись; '
+              'напоминание с датой и временем будет запланировано в Telegram. '
+              'Запись встречи в Google потребует отдельного подтверждения. Платный AI и выполнение поручений не запускаются.'
+              if assistant_only() else '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
+              ' событие календаря, AI и выполнение не запускаются.')
     return ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value
             + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
-            '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
-            ' событие календаря, AI и выполнение не запускаются.')
+            + effect)
 
 
 def keyboard(proposal_id):
@@ -232,6 +237,9 @@ def decide(bridge, iid, intent):
         from .calendar_dialogue import handle_locked
         source_received = session.get(TelegramInbox, proposal['voice_inbox_id']).created_at
         if handle_locked(bridge, session, iid, proposal['text'], received_at=source_received):
+            return
+        from .personal_inbox import handle_locked as personal_handle
+        if personal_handle(bridge, session, iid, proposal['text'], received_at=source_received):
             return
         from .telegram_project_picker import keyboard as picker_keyboard, issue
         number = iid.rsplit(':', 1)[1]

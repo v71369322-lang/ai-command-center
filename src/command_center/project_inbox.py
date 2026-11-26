@@ -93,39 +93,44 @@ def inbox(store, role, project='all'):
 
 
 def classify(store, role, request_id, project_id, expected_version, operation_id, *, _scope_installer=None):
+    with store.transaction() as session:
+        return classify_locked(store, session, role, request_id, project_id, expected_version, operation_id,
+                               _scope_installer=_scope_installer)
+
+
+def classify_locked(store, session, role, request_id, project_id, expected_version, operation_id, *, _scope_installer=None):
     owner(role)
     if project_id is not None and (not isinstance(project_id, str) or project_id not in IDS):
         raise Denied('unknown_project')
     if type(expected_version) is not int or not 0 <= expected_version <= 1000:
         raise Denied('invalid_assignment_version')
-    with store.transaction() as session:
-        store.check_audit(session)
-        row = session.get(TelegramInbox, request_id)
-        if row is None:
-            raise Denied('saved_request_not_found')
-        checked_text(store, session, row)
-        latest, operations = history(session)
-        fingerprint = digest({'request_id': request_id, 'project_id': project_id, 'expected_version': expected_version})
-        previous = operations.get(operation_id)
-        if previous:
-            if previous['input_hash'] != fingerprint or previous['request_fingerprint'] != row.fingerprint:
-                raise Denied('project_assignment_idempotency_conflict')
-            if _scope_installer:
-                _scope_installer(session, previous)
-            return receipt(previous)
-        current = latest.get(row.id)
-        if current and current['request_fingerprint'] != row.fingerprint:
-            raise Denied('project_request_binding_changed')
-        if expected_version != (current['version'] if current else 0):
-            raise Denied('project_assignment_stale_version')
-        if len(operations) >= MAX_CHANGES:
-            raise Denied('project_assignment_history_limit')
-        event = {'request_id': row.id, 'request_fingerprint': row.fingerprint, 'project_id': project_id,
-                 'version': expected_version + 1, 'operation_id': operation_id, 'input_hash': fingerprint}
-        store.audit(session, EVENT, 'owner', **event)
+    store.check_audit(session)
+    row = session.get(TelegramInbox, request_id)
+    if row is None:
+        raise Denied('saved_request_not_found')
+    checked_text(store, session, row)
+    latest, operations = history(session)
+    fingerprint = digest({'request_id': request_id, 'project_id': project_id, 'expected_version': expected_version})
+    previous = operations.get(operation_id)
+    if previous:
+        if previous['input_hash'] != fingerprint or previous['request_fingerprint'] != row.fingerprint:
+            raise Denied('project_assignment_idempotency_conflict')
         if _scope_installer:
-            _scope_installer(session, event)
-        return receipt(event)
+            _scope_installer(session, previous)
+        return receipt(previous)
+    current = latest.get(row.id)
+    if current and current['request_fingerprint'] != row.fingerprint:
+        raise Denied('project_request_binding_changed')
+    if expected_version != (current['version'] if current else 0):
+        raise Denied('project_assignment_stale_version')
+    if len(operations) >= MAX_CHANGES:
+        raise Denied('project_assignment_history_limit')
+    event = {'request_id': row.id, 'request_fingerprint': row.fingerprint, 'project_id': project_id,
+             'version': expected_version + 1, 'operation_id': operation_id, 'input_hash': fingerprint}
+    store.audit(session, EVENT, 'owner', **event)
+    if _scope_installer:
+        _scope_installer(session, event)
+    return receipt(event)
 
 
 def receipt(event):
