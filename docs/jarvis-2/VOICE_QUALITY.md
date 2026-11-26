@@ -244,3 +244,18 @@ text rejects instead of silent truncation. These are not unlimited dictation.
 Verify words, negations, names and dates alongside punctuation positions and
 memory/latency before any model/window/contract change. No model download, extra
 process, audio transfer, paid call or production change was made in this inquiry.
+
+## 26 November follow-up: critical words and spoken reminder minutes
+
+Local public synthetic comparison reproduced GigaAM negation loss. Small/beam1
+omitted a meeting/name clause in the noisy held-out clip. Small/beam5 retained
+labelled critical occurrences but the120s stress took107.172s on this Windows PC,
+above the current90s budget. No model change is justified by these measurements;
+this is not VPS or real-road/owner acceptance. Punctuation remains imperfect.
+
+Evaluation now counts repeated critical phrases and checks punctuation word
+boundaries (schema2); human review remains mandatory. Separately, the reminder
+parser no longer drops numeric spoken minutes:9 часов15 минут ->09:15. Unsupported
+recognized clock tails refuse instead of silently becoming a whole hour. Raw voice
+and existing owner confirmation remain. Calendar parser unchanged.
+[Exact scope and verification](../handoff/JARVIS_ASR_LOCAL_2026-11-26.md).

@@ -4,15 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November local voice stage: confirmed reminder parser discarded spoken minutes
-("9 часов 15 минут" ->09:00). Limited fix preserves09:15, refuses recognized
-ambiguous suffixes and leaves ASR/raw source unchanged. Evaluation also now counts
-repeated critical phrases and punctuation boundaries; schema2. Local58 selected
-tests PASS,3 PostgreSQL cases/final CI pending. Small/beam5 preserves critical
-labels on fresh noisy/stress synthetic clips but120s takes107s on Windows, over
-current90s budget; no model switch justified. Exact external probe prepared but
-NOT authorized/run. Production73647d0 unchanged; no VPS/paid/model activation.
-[Scope, measurements and pending verification](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+26 November final local stage: Draft PR127/source4f51e270a0513f2c01ab1301e7796929ef8c5098
+READY FOR REVIEW, NOT INSTALLED. Final CI45854503391 SUCCESS:3001passed/1skipped/
+1warning, infra1014passed and speech44passed (overlapping suites, not summed).
+Merge25c5c4ee776e211d34f426e1fdf3ab1db876e6b3 has identical head/merge tree.
+Spoken numeric reminder minutes now preserve09:15 instead of silently09:00;
+unsupported recognized clock tails refuse. Three PostgreSQL regressions PASS.
+ASR evaluation counts repeated critical phrases and punctuation boundaries.
+No model switch: Small experiments have noisy omission or latency limitations.
+Production last verified73647d0 unchanged; no VPS/paid/model activation in this stage.
+[Final pins, measurements and remaining acceptance](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
 
 26 November15:26UTC: PR126/source73647d0 INSTALLED after fresh exact owner approval.
 ONE stock apply exited0; both journals VERIFIED directly. Owner resume OPENepoch93,
