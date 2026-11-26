@@ -157,6 +157,12 @@ class TelegramBridge:
                 intent['callback_query_id'] = query_id
             return str(uid), intent
         value = message.get('text')
+        if value is None and ('photo' in message or 'document' in message):
+            from .telegram_attachments import parse_message, summary
+            sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
+            attachment = parse_message(message, sensitive)
+            self.check_text(summary(attachment))
+            return str(uid), attachment
         if value is None and 'voice' in message:
             sensitive = self.client.sensitive if isinstance(self.client, ConfiguredTelegramHTTP) else lambda _: False
             if message.get('caption') == '/calendar':
@@ -686,6 +692,11 @@ class TelegramBridge:
             apply_decision(self, iid, intent)
         elif kind == 'calendar_voice':
             from .telegram_calendar_voice import capture
+            with self.store.transaction() as session:
+                self.store.check_audit(session)
+                capture(self, session, iid, intent)
+        elif kind == 'attachment':
+            from .telegram_attachments import capture
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 capture(self, session, iid, intent)
