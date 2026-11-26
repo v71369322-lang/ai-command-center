@@ -1,4 +1,4 @@
-# Consolidated attachment release — exact proposal, NOT authorized or installed
+# Consolidated attachment release — installed 26 November 2026
 
 Source0259ce4549aab013ffb6a55574ae7365015bd843, Draft PR123 including PR122.
 Base78706150bd668e6c58e04f184c1e33fbd3205aa1; merge-ref
@@ -9,9 +9,76 @@ Final CI45792659928 SUCCESS: main2894passed/1skipped/2warnings (532.17s),
 infrastructure1014passed, speech44passed. Full encrypted networkless PostgreSQL
 restore with inert binary byte/fingerprint verification PASS. Final cloud
 verification passed for the pinned merge-ref. Overlaps/superseded runs not summed.
-Code is ready for review; no server install or cleanup has occurred.
+The proposal below was subsequently explicitly approved by the owner. Source0259ce4 is installed; see the dated live evidence above the historical proposal.
 
-## Current read-only evidence and authority boundary
+
+## Approved installation and live evidence (26 November10:27–10:50UTC)
+
+Owner approved the exact proposal. Recorded operation scope10:27:01–11:21:01UTC;
+no extension. Runtime source0259ce4549aab013ffb6a55574ae7365015bd843,
+candidatefef264da8a588188f2597af7704725fd29fea381ba57375201047ec8be0f769b,
+preparation627ed008ea9cf6927500f54f48a53605c9a1939522dddacb26ebdf1507bc9c9e.
+App image2910af8b9f9ae8afdd59cbbc440a4b24f850102c8e3c3ad39d49e660bb0dcc0b;
+speech286741e7b8beb2e68f7c4f61295cb5fe4fbe7e886ddfcfc8f6817f23bb8cba5b.
+Both deployment and activation VERIFIED through stock reconciliation. Apply ran
+ONCE; its failure was not retried. Exact runtime/preflight/postcheck gates were
+preserved; no manual journal edits. Telegram stopped during startup and again
+while resuming; same-container bounded repair and a20-cycle live diagnostic were
+used. Second diagnostic exceeded its150s operator timeout; actual state checked
+before proceeding, no duplicate poller left. Underlying intermittent failure is
+not established. Last controlled poller/voice restart10:46UTC; both healthy at
+10:50UTC, voiceIDLE. This is an observation window, not an uptime guarantee.
+
+Actual owner Telegram /resume+current confirmation opened admission, epoch81.
+No old tasks resumed. Historical actual4/reserved0/uncertain0 unchanged; paid
+calls0. Exact five services, unchanged pinned voice model and Google read/write
+custody verified; developer worker/broker/watchdog remain absent.
+
+Two public disposable fixtures were actually uploaded through Telegram Web:
+- Document131179278:75bytes, SHA256
+  0147a2323ef60b88c0f18f502ea6e5f6888c69354a486f1dd7491ad9abd9cbe0,
+  exactly matches the original PC fixture. ProjectAI Commander selected and seen
+  again in the card after poller AND voice same-container restarts.
+- Photo131179279: Telegram rendition310bytes, SHA256
+  0167ff2aaa2bf983959d0ebff773ef29895878bb6e9c823362efd24d62e2f3c3.
+  Telegram transformed the original179byte PNG; this is not claimed to preserve
+  the pre-upload PNG bytes. Own stored rendition integrity verified.
+
+Both independent copies read through trusted read_copy without Telegram; source
+NEEDS_PLANNING/task_idNone, one stored event each before and after restart.
+Reference and independent-copy status observed in real Telegram cards. Photo
+card after restart replied13:48:48Moscow to13:48:36 request (12s). Google agenda
+read replied13:47:39 to13:47:21 (18s), preserved27November15:00 event and current
+personal task; no event written. Voice recognition was not independently retested
+on a new phone recording. No claim of improved punctuation or long-dictation
+acceptance. Owner web Inbox authenticated live200 was NOT RUN: no existing owner
+web session used; final CI covers API metadata/auth boundaries, not live login.
+
+Exactly36 listed historical SERVER archive duplicates removed,94349044bytes;
+all37 independently checked PC historical copies retained. No additional cleanup.
+Five prior canonical server archives and stage1 recovery packages untouched.
+After pre/apply/post backups:189873214/268435456bytes used,78562242bytes free.
+No quota increase. Before-write backupc0fa8d95f800453dac0792806b66e874 independently
+PC-decrypted/checksummed, full isolated restore audit VERIFIED. Post backup
+89cd52f6d367421882ce63ff0833cd62 and2448691byte encrypted recovery delta separately
+PC-decrypted/checksummed; both journals, calendar key fingerprints/source profiles
+and pinned model manifest verified inside the encrypted delta. Protected PC custody:
+C:/Users/Zver/.codex/private-backups/jarvis-2/attachments-install-20261126-1026.
+Post backup also passed a full fresh isolated networkless PostgreSQL restore with audit anchor verification; primary unchanged. Binary byte equality in that restored instance was not separately re-read (live read_copy and CI restore fixture are separate evidence). No plaintext dumps or raw keys exported. Offsite/RPO/RTO are not proven.
+
+Bounded offline source-pinned probe:1GiB/1CPU/64PID, no network, read-only model,
+15s synthetic inference plus10MiB inert binary roundtrip; peakRSS614.98MiB,
+2.65seconds, noOOM. Not a real long-phone-audio or maximum-size Telegram test.
+
+Rollback to75776b0 is not approved/established compatible after attachment data
+admission. Keep original/copy/audit records and repair forward; use verified backup
+and exact compatibility review before any restoration. No paid AI, merge, Google
+write/new scopes, other projects or infrastructure access expansions performed.
+Stage2/6 remains incomplete. Next bounded development: owner file retrieval UI,
+then combined real long-voice/task/reminder/calendar acceptance; no automatic
+permission for another deployment, paid OCR or AI analysis.
+
+## Historical read-only evidence and authority boundary
 
 26 November09:38UTC VPS176.12.75.135: exact predecessor75776b0, bundle
 071acdc27f39cccd8511d73adb941974a883a2b766bce02ac081d991050a3686,
