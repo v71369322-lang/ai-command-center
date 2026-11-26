@@ -4,12 +4,15 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November local ASR stage: current long negation error reproduced with exact
-local model. Longest-pause prototype rejected; Small/beam1 improves clean long
-text but drops a clause on noisy holdout, so no model switch. Corrected evaluation
-of repeated critical phrases and punctuation word boundaries; CLI schema2,
-19 local tests PASS. Production73647d0 unchanged; no VPS/paid/model activation.
-[Evidence and pending verification](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+26 November local voice stage: confirmed reminder parser discarded spoken minutes
+("9 часов 15 минут" ->09:00). Limited fix preserves09:15, refuses recognized
+ambiguous suffixes and leaves ASR/raw source unchanged. Evaluation also now counts
+repeated critical phrases and punctuation boundaries; schema2. Local58 selected
+tests PASS,3 PostgreSQL cases/final CI pending. Small/beam5 preserves critical
+labels on fresh noisy/stress synthetic clips but120s takes107s on Windows, over
+current90s budget; no model switch justified. Exact external probe prepared but
+NOT authorized/run. Production73647d0 unchanged; no VPS/paid/model activation.
+[Scope, measurements and pending verification](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
 
 26 November15:26UTC: PR126/source73647d0 INSTALLED after fresh exact owner approval.
 ONE stock apply exited0; both journals VERIFIED directly. Owner resume OPENepoch93,
