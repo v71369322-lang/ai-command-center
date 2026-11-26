@@ -21,6 +21,8 @@ or new Calendar writes performed for this development step.
 - «Готово №N», «Отложи задачу №N», «Возобнови задачу №N» and bounded delegated,
   waiting/blocked transitions update personal status. «Это идея №N», «Это задача
   №N», «Это заметка №N» correct classification without rewriting the source.
+  «Раздел №N: автосервис» corrects existing project classification. Saved records
+  get a short plain-text receipt instead of forcing project-picker interaction.
   Ideas/notes cannot be completed as tasks without explicit reclassification.
 - «Что у меня сегодня?» / existing agenda today/tomorrow/week combine existing
   Google read result with bounded local task/reminder lists. Missing/unavailable
@@ -43,7 +45,8 @@ commit atomically under existing global lock/audit chain.
 Only Jarvis assistant mode interprets personal phrases. Developer-mode intake
 is preserved. Original source/fingerprint, owner/profile and history versions
 are checked; archived intake cannot keep producing reminders. Existing project
-picker can correct assignment, with its observed-card/version protections.
+picker remains available through existing request view with its observed-card
+protections; the natural explicit project edit uses the same owner classifier.
 One unambiguous explicit project hint selects an EXISTING category; multiple
 project hints stay unassigned. No access to project code/CRM or executor granted.
 

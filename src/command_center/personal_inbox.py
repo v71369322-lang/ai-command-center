@@ -38,6 +38,13 @@ def parse(value):
     if match:
         return {'action': 'category', 'number': match[2],
                 'category': {'задача': 'task', 'идея': 'idea', 'заметка': 'note'}[match[1]]}
+    match = re.fullmatch(r'(?:раздел|проект) №?([0-9]{1,16}):\s*(.+)', low)
+    if match:
+        projects = {'кондитерская': 'vanilla-sugar', 'ваниль и сахар': 'vanilla-sugar',
+                    'автосервис': 'lnauto', 'capital lab': 'capital-lab', 'jarvis': 'command-center',
+                    'джарвис': 'command-center', 'без проекта': None}
+        return ({'action': 'project', 'number': match[1], 'project_id': projects[match[2]]}
+                if match[2] in projects else {'action': 'invalid_project'})
     if re.match(r'^напомни\b', low):
         if (re.search(r'\b(?:или|либо|если)\b', low)
                 or len(re.findall(r'\bв [0-2]?\d(?::[0-5]\d)?\b', low)) > 1):
@@ -177,13 +184,25 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
         bridge.finish(session, iid, 'Напоминание не создано: нужны точная дата, время и текст. '
                       'Например: «Напомни завтра в 11:00 позвонить поставщику».')
         return True
+    if intent['action'] == 'invalid_project':
+        bridge.finish(session, iid, 'Раздел не изменён. Доступны: кондитерская, автосервис, Capital Lab, Jarvis, без проекта.')
+        return True
     row = session.get(TelegramInbox, iid)
     all_records = records(bridge, session)
-    if intent['action'] in {'status', 'category'}:
+    if intent['action'] in {'status', 'category', 'project'}:
         rid = bridge.profile + ':' + intent['number']
         item = all_records.get(rid)
         if not item:
             bridge.finish(session, iid, 'Личная запись с таким номером не найдена. Покажите «мои задачи» или «мои идеи».')
+            return True
+        if intent['action'] == 'project':
+            from .project_inbox import classify_locked, history, PROJECTS
+            current, _ = history(session)
+            version = current.get(rid, {}).get('version', 0)
+            classify_locked(bridge.store, session, 'owner', rid, intent['project_id'], version,
+                            str(uuid5(NAMESPACE_URL, 'personal-project-change:' + iid)))
+            label = dict(PROJECTS).get(intent['project_id'], 'Не распределён')
+            bridge.finish(session, iid, f'Раздел записи №{intent["number"]}: {label}.')
             return True
         if intent['action'] == 'status' and item['category'] not in {'task', 'reminder'}:
             bridge.finish(session, iid, 'Это идея или заметка. Для превращения в задачу напишите '
@@ -233,7 +252,6 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
         classify_locked(bridge.store, session, 'owner', iid, project, 0,
                         str(uuid5(NAMESPACE_URL, 'personal-project:' + iid)))
     number = iid.rsplit(':', 1)[1]
-    from .telegram_project_picker import keyboard, issue
     when = '\nНапомню: ' + due + ' в Telegram. В Google событие не создавалось.' if due else '\nСрок не назначен.'
     saved = 'сохранено' if intent['category'] == 'reminder' else 'сохранена'
     label = dict(PROJECTS).get(project, 'Не распределён')
@@ -242,8 +260,8 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
         text += f'\nЗавершить: «Готово №{number}». Само поручение ещё не выполнено.'
     else:
         text += f'\nИсправить тип: «Это задача №{number}» или «Это идея №{number}».'
-    delivery = bridge.enqueue(session, iid + ':reply', text, keyboard(number, 1 if project else 0))
-    issue(bridge, session, delivery, number, 1 if project else 0)
+    text += f'\nИзменить раздел: «Раздел №{number}: автосервис».'
+    bridge.enqueue(session, iid + ':reply', text)
     return True
 
 

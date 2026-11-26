@@ -97,6 +97,8 @@ def test_tasks_ideas_assignment_completion_reclassification_and_replay(personal,
     assert 'Ничего не изменено' in response(bridge, message(7, 'Готово №1'))
     response(bridge, message(8, 'Это задача №3'))
     assert snapshot(bridge)[bridge.profile + ':3']['category'] == 'task'
+    response(bridge, message(9, 'Раздел №1: автосервис'))
+    assert next(r for r in inbox(store, 'owner')['requests'] if r['id'].endswith(':1'))['project_id'] == 'lnauto'
     assert authority(store) == before
 
 
