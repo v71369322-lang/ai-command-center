@@ -147,6 +147,9 @@ def test_uncertain_http_is_never_automatically_retried(copies, store):
     assert calls == [True] and file_rows(store)[0].state == 'UNCERTAIN'
     with store.transaction() as tx:
         assert not list(tx.scalars(select(Audit).where(Audit.event['kind'].as_string() == 'task_created')))
+        notices = [r for r in tx.scalars(select(TelegramDelivery))
+                   if 'Отправка файла не подтверждена' in r.body.get('text', '')]
+        assert len(notices) == 1 and notices[0].state == 'SENT'
 
 
 def test_missing_copy_keeps_original_and_cannot_upload(copies, store):

@@ -80,3 +80,16 @@ def payload(bridge, session, body):
             suffix = '.' + extension
     # Fixed safe name: original untrusted names are displayed in the source card.
     return data, 'attachment-' + number(source.id.rsplit(':', 1)[1]) + suffix
+
+
+def notice(bridge, session, delivery):
+    """One safe failure notice; queue saturation never rolls back uncertainty."""
+    if ('attachment' not in delivery.body or delivery.state not in {'UNCERTAIN', 'CANCELLED'}
+            or session.scalar(select(func.count()).select_from(TelegramDelivery)) >= 1000):
+        return
+    text = ('Отправка файла не подтверждена. Автоматически не повторяю. '
+            'Если файл не пришёл, запросите его ещё раз кнопкой «Получить файл».')
+    if delivery.state == 'CANCELLED':
+        text = ('Отправка файла отменена: остановка, изменение условий или проверка копии. '
+                'Откройте исходную карточку вложения для повторного запроса.')
+    bridge.enqueue(session, delivery.id + ':file-status:' + delivery.state, text)

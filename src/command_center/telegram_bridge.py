@@ -1055,6 +1055,8 @@ class TelegramBridge:
                 except Denied:
                     row.state = 'CANCELLED'
                     self.store.audit(session, 'telegram_attachment_delivery_suppressed', 'system', delivery_id=oid)
+                    from .telegram_attachment_retrieval import notice
+                    notice(self, session, row)
                     return {'id': oid, 'state': row.state}
             else:
                 if (not isinstance(body.get('text'), str) or not 1 <= len(body['text']) <= 4096
@@ -1074,6 +1076,9 @@ class TelegramBridge:
                 row = session.get(TelegramDelivery, oid)
                 row.state = 'UNCERTAIN'
                 self.store.audit(session, 'telegram_delivery_uncertain', 'system', delivery_id=oid)
+                if attachment is not None:
+                    from .telegram_attachment_retrieval import notice
+                    notice(self, session, row)
             return {'id': oid, 'state': 'UNCERTAIN'}
         with self.store.transaction() as session:
             row = session.get(TelegramDelivery, oid)
@@ -1083,6 +1088,9 @@ class TelegramBridge:
                 row.state, row.message_id = 'SENT', result['message_id']
             self.store.audit(session, 'telegram_delivery_observed', 'system', delivery_id=oid,
                              state=row.state, message_id=row.message_id)
+            if attachment is not None:
+                from .telegram_attachment_retrieval import notice
+                notice(self, session, row)
             return {'id': oid, 'state': row.state}
 
     def recover(self):
@@ -1095,6 +1103,8 @@ class TelegramBridge:
             for row in rows:
                 row.state = 'UNCERTAIN'
                 self.store.audit(session, 'telegram_delivery_recovery_uncertain', 'system', delivery_id=row.id)
+                from .telegram_attachment_retrieval import notice
+                notice(self, session, row)
 
     def resume_pending(self):
         with self.store.transaction() as session:
