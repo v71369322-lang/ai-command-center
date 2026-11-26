@@ -1,10 +1,24 @@
 # Качество голосового ввода — этап2/6
 
-26November current production source73647d0 after exact PR126 installation.
-Actual text/button three-item acceptance passed, no new owner phone recording or
-ASR decode in that release. Model/accuracy/punctuation unchanged; prior long-probe
-negation error and real long/noisy acceptance gap remain. Preparation statements
-below retain their dated NOT INSTALLED meaning. [Installation](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+26 November17:51UTC: actual production4f51e270a0513f2c01ab1301e7796929ef8c5098,
+both release journals VERIFIED. Voice heartbeat fresh/IDLE; final application CI
+45854503391 remains SUCCESS. Read-only metadata:4 real voice requests total,
+maximum8seconds; none>=30seconds and no new voice decode on installed4f51e27.
+No raw audio, file IDs, transcript or owner content exported in this check.
+
+Long-owner-voice acceptance is WAITING FOR INPUT, not PASS. Ask owner to send one
+30–60second non-sensitive voice with2–3 points, a negation, name and explicit time.
+Do not infer spoken ground truth from ASR. Compare with owner-confirmed wording;
+check intake→start→proposal→SENT timing, literal preview/raw source, punctuation
+positions, names/negations/date/time and item completeness. Keep any wrong readback
+unaccepted, use existing Reply correction and verify raw/corrected separation.
+Only after readback is confirmed, use observed review buttons for disposable test
+records; no guessed Calendar write, fabricated owner Update or paid call.
+Quality/latency, operational save and phone notification evidence stay distinct.
+No model download/change, service/config change or release authorized by this check.
+[Installed release and limits](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
+
+Historical checkpoints below retain their dated source/installation meanings.
 
 ## 26 November — reviewed mixed-message candidate (not installed)
 

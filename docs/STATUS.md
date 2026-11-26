@@ -4,6 +4,13 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November17:51UTC: long voice acceptance preparation/read-only check.
+Production4f51e27 and both journals VERIFIED, voice fresh/IDLE. Actual Telegram
+history has4 voice requests,max8s,none>=30s; no new voice on current release.
+WAITING FOR OWNER30–60s SAMPLE; long/noisy quality is not accepted. No raw audio/
+transcript export, paid call, model/service/config change or new deployment.
+[Exact acceptance procedure and evidence limits](jarvis-2/VOICE_QUALITY.md).
+
 26 November17:16UTC: PR127/source4f51e27 INSTALLED after exact owner approval.
 One stock apply failed at initial Telegram startup (exit1/noOOM); no apply retry.
 Independent exact startup diagnostic passed, SAME target poller started once;
