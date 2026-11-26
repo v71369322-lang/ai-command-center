@@ -11,7 +11,7 @@ from command_center.telegram_attachments import MAX_BYTES, parse_message, summar
 from command_center.telegram_bridge import MockTelegramHTTP, TelegramBridge
 from command_center.telegram_requests import captured_text
 from test_telegram_bridge import BotHTTP, OWNER, message
-from test_telegram_task_status import authority, response
+from test_telegram_task_status import authority, response, service_reply_id
 from test_telegram_service import configured as configured
 
 
@@ -80,7 +80,7 @@ def test_owner_attachment_survives_reopen_without_commands_downloads_or_authorit
         row = session.get(TelegramInbox, saved['inbox_id'])
         assert '/stop' in captured_text(session, row)
         assert len(list(session.scalars(select(TelegramDelivery).where(
-            TelegramDelivery.id == saved['inbox_id'] + ':reply')))) == 1
+            TelegramDelivery.id == service_reply_id(bridge, saved['inbox_id']))))) == 1
         assert not list(session.scalars(select(Audit).where(
             Audit.event['kind'].as_string() == 'personal_inbox_record_created')))
     while bridge.deliver_one():
