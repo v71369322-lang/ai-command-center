@@ -38,11 +38,24 @@ rejection behavior; support is not claimed.
 
 Local10 metadata/summary/secret/oversize/ambiguous-media tests PASS; Ruff whole
 source/tests/scripts/infra, contract export, scoped Bandit and diff check PASS.
-Four PostgreSQL/configured-polling cases require CI: durable reopen, duplicate,
-authority unchanged, foreign/secret rejection before intake, caption not command,
+Four PostgreSQL/configured-polling cases PASS in final CI: durable reopen, duplicate,
+authority unchanged, foreign rejection before intake, fixed secret-content rejection
+without content retention/echo, caption not command,
 no getFile/download calls. No local DB/container runtime assumed available.
 Mock transport and PG acceptance do not prove live phone attachments/VPS.
-Final CI status will be reconciled at the final PR head/merge-ref.
+Final source03b4aab1d2968f469679571365f191985b92821a / Draft PR122.
+Source bundle.runtime/attachment-inbox-release/source.bundle SHA256
+EAABAFC9EFBB6E99A85EFE02380B089FB43F30833008C9EB08CB52227B193737.
+Final CI45785579447 SUCCESS: main2871passed/1skipped/2warnings (542.35s),
+infrastructure1014passed, speech44passed; overlapping sets not summed. Earlier
+superseded runs not counted. Final cloud verification passed for merge-ref
+4ad9a449f896da7e888776d81976111071371d3f. Head/base/merge freshly checked;
+head and merge share tree301604219ccb5c4e6bf58e5d52d3cd495c426146.
+Five additional normalization probes passed without DB/network/model: valid owner,
+secret caption fixed rejection, invalid boolean size, malformed Unicode caption,
+foreign sender denial. Local Docker engine checked unavailable; PG cases use CI.
+Final CI reconciled against the final PR head/merge-ref. No live VPS acceptance
+or deployment is implied by configured HTTP/PG or cloud container tests.
 
 ## Voice quality request
 

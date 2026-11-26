@@ -1,5 +1,23 @@
 # Качество голосового ввода — этап2/6
 
+26 November2026 current checkpoint: production75776b0 uses the previously pinned
+GigaAM profile. Whisper/Base/Small results below are historical experiments, not
+current production settings. Google confirmed-meeting write was separately
+connected and accepted; earlier read-only limitations below describe their date.
+Fresh real8s phone voice -> owner-confirmed personal task was accepted at08:30UTC
+(10.96s intake-to-proposal,0.204s acceptance-to-personal-record); no deadline and
+correct confectionery assignment. This proves the bounded save path, not perfect
+ASR wording/punctuation or quality on long/noisy/mixed speech.
+
+Owner subsequently requested better punctuation and longer dictation quality.
+Keep this requirement open. Do not change model or fabricate sentence boundaries
+from one short sample. Next evaluation should preserve original ASR and owner
+correction separately, compare word/negation/date/name integrity and punctuation
+positions on the same longer confirmed recordings, and measure CPU/RAM/latency.
+No new ASR model, paid provider, audio transfer or runtime change was authorized
+or made by the attachment Inbox development slice.
+
+
 ## Проверенный результат25 ноября2026
 
 Production source3bcf8e42e4ce5cd22769b64dac120b577a3363f5. Реальное5s
