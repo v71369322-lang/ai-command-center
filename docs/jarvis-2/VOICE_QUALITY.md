@@ -259,3 +259,10 @@ parser no longer drops numeric spoken minutes:9 часов15 минут ->09:15.
 recognized clock tails refuse instead of silently becoming a whole hour. Raw voice
 and existing owner confirmation remain. Calendar parser unchanged.
 [Exact scope and verification](../handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+
+
+26 November: PR127/4f51e27 installed with exact approval. Live TEXT/buttons preserve
+numeric spoken-unit09:15, refuse75minutes, reject duplicate save and deliver one
+20:14 Telegram reminder. This validates deployed parsing/saving/delivery, NOT a
+new actual voice decode or improved acoustic/punctuation accuracy. Model unchanged.
+[Exact release and startup recovery](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).

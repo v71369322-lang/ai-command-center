@@ -143,3 +143,16 @@ variants still have omission/latency limitations. Stage2 remains incomplete;
 real long/noisy owner voice and overall minimal-version acceptance stay open.
 Production last verified73647d0; no deployment in this local development stage.
 [Verification and limits](../handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+
+
+## 26 November PR127 installed checkpoint
+
+Exact approved4f51e27 installed; one failed first Telegram start repaired by
+starting the same exact container, then full checks and stock reconcile VERIFIED.
+Real Telegram supported spoken numeric09:15 preserved,75minutes refused, duplicate
+blocked and20:14 reminder delivered once2.815s after due; test records done.
+Existing Calendar read, prior records and protected backups/recovery verified.
+No ASR model/punctuation improvement or new real phone voice acceptance claimed.
+Stage2 remains incomplete: long/noisy owner speech and complete daily-flow acceptance.
+Before next release review backup headroom; cleanup/quota changes need exact approval.
+[Installation evidence](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).

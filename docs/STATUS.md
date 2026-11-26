@@ -4,6 +4,18 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November17:16UTC: PR127/source4f51e27 INSTALLED after exact owner approval.
+One stock apply failed at initial Telegram startup (exit1/noOOM); no apply retry.
+Independent exact startup diagnostic passed, SAME target poller started once;
+full pre/postchecks PASS, stock exact reconcile exit0, both journals VERIFIED.
+Owner web resume OPENepoch97. Real mixed card saves09:15 with clean title,75minute
+suffix refused, duplicate blocked, due20:14 reminder sent once2.815s after due.
+Both public test reminders done; original source, prior records and Google read
+preserved. Protected pre/post PC backup custody and isolated restore PASS.
+No model change/paid API/Google write/merge. Stage2 remains incomplete.
+[Installation, startup repair and remaining limits](handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
+
+Historical preparation checkpoint (installation above supersedes NOT INSTALLED):
 26 November final local stage: Draft PR127/source4f51e270a0513f2c01ab1301e7796929ef8c5098
 READY FOR REVIEW, NOT INSTALLED. Final CI45854503391 SUCCESS:3001passed/1skipped/
 1warning, infra1014passed and speech44passed (overlapping suites, not summed).
