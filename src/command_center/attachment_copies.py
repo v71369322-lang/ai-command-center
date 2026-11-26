@@ -156,8 +156,9 @@ class AttachmentCopier:
                 store.audit(session, STORED, 'attachment_worker', profile=bridge.profile, request_id=iid,
                     source_fingerprint=fingerprint, copy_id=copy_id, copy_fingerprint=copy_fingerprint,
                     size=len(data), sha256=checksum)
+                from .telegram_attachment_retrieval import keyboard
                 bridge.enqueue(session, iid + ':copy', f'Независимая копия вложения №{iid.rsplit(":", 1)[1]} сохранена. '
-                    'Содержимое не читалось.')
+                    'Содержимое не читалось.', keyboard(iid.rsplit(':', 1)[1]))
             return {'state': 'ATTACHMENT_COPIED'}
         except Exception as error:
             from .voice_worker import admission_busy

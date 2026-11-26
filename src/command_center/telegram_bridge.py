@@ -117,7 +117,10 @@ class TelegramBridge:
             if (not isinstance(token, str) or type(message.get('message_id')) is not int
                     or message['message_id'] <= 0):
                 raise Denied('telegram_callback_invalid')
-            if token.startswith('pj:'):
+            if token.startswith('af:'):
+                from .telegram_attachment_retrieval import number
+                intent = {'kind': 'attachment_get', 'number': number(token[3:])}
+            elif token.startswith('pj:'):
                 from .telegram_project_picker import parse_callback
                 intent = parse_callback(token) | {'message_id': message['message_id']}
             elif token.startswith('rs:'):
@@ -351,6 +354,10 @@ class TelegramBridge:
                 raise Denied('telegram_project_assignment_invalid')
             return str(uid), {'kind': 'assign', 'number': parts[1],
                              'project_id': None if parts[2] == 'none' else parts[2], 'version': int(parts[3])}
+        file_match = re.fullmatch(r'(?:/file |[Пп]ришли файл\s*№?\s*)([0-9]+)', value)
+        if file_match:
+            from .telegram_attachment_retrieval import number
+            return str(uid), {'kind': 'attachment_get', 'number': number(file_match[1])}
         if value.startswith('/request '):
             number = value[9:]
             if not re.fullmatch(r'0|[1-9][0-9]{0,15}', number) or int(number) >= 2**53:
@@ -837,12 +844,18 @@ class TelegramBridge:
                     delivery = scope.finish(session, iid, reply + suffix, markup)
                 if markup:
                     issue(self, session, delivery, intent['number'], version)
+                if kind == 'request':
+                    from .telegram_attachment_retrieval import offer
+                    offer(self, session, iid, intent['number'])
         else:
             with self.store.transaction() as session:
                 self.store.check_audit(session)
                 if kind in {'archive_request', 'restore_request'}:
                     from .request_lifecycle import apply
                     apply(self, session, iid, intent)
+                elif kind == 'attachment_get':
+                    from .telegram_attachment_retrieval import queue
+                    queue(self, session, iid, intent['number'])
                 elif kind == 'capture':
                     row = session.get(TelegramInbox, iid)
                     if row.state == 'NEEDS_PLANNING':
@@ -1032,15 +1045,27 @@ class TelegramBridge:
             anchored = session.execute(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_delivery_queued',
                 Audit.event['delivery_id'].as_string() == oid,
                 Audit.event['request_hash'].as_string() == digest(body))).first()
-            if (not anchored or body.get('chat_id') != self.owner
-                    or not isinstance(body.get('text'), str) or not 1 <= len(body['text']) <= 4096
-                    or set(body) - {'chat_id', 'text', 'reply_markup'}):
+            if not anchored or body.get('chat_id') != self.owner:
                 raise Denied('telegram_delivery_scope_or_integrity_invalid')
-            from .project_inbox import check_content
-            check_content(self.store, body['text'])
+            attachment = None
+            if 'attachment' in body:
+                from .telegram_attachment_retrieval import payload
+                try:
+                    attachment = payload(self, session, body)
+                except Denied:
+                    row.state = 'CANCELLED'
+                    self.store.audit(session, 'telegram_attachment_delivery_suppressed', 'system', delivery_id=oid)
+                    return {'id': oid, 'state': row.state}
+            else:
+                if (not isinstance(body.get('text'), str) or not 1 <= len(body['text']) <= 4096
+                        or set(body) - {'chat_id', 'text', 'reply_markup'}):
+                    raise Denied('telegram_delivery_scope_or_integrity_invalid')
+                from .project_inbox import check_content
+                check_content(self.store, body['text'])
             self.store.audit(session, 'telegram_delivery_intent', 'system', delivery_id=oid)
         try:
-            result = self.client.call('sendMessage', body)
+            result = (self.client.send_document(*attachment) if attachment is not None
+                      else self.client.call('sendMessage', body))
             if (not isinstance(result, dict) or type(result.get('message_id')) is not int
                     or result['message_id'] <= 0 or result.get('chat', {}).get('id') != self.owner):
                 raise ValueError('telegram_message_receipt_invalid')

@@ -4,6 +4,14 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November: local owner file retrieval slice, NOT INSTALLED. Button or plain
+"Пришли файл №N" queues only checked source/hash/epoch/revision metadata in the
+existing TelegramDelivery. Owner-only fixed-host bounded multipart upload reads
+own DB copy, no forwarding/download/OCR/AI. Stopped/stale/corrupt work suppressed;
+uncertain delivery never auto-retries. Local5 tests/static checks PASS; nine PG
+cases awaiting final CI. Production remains0259ce4.
+[Behavior, guards, verification and activation boundary](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+
 26 November10:50UTC: PR123/source0259ce4 INSTALLED after explicit exact approval.
 Both journals VERIFIED by stock reconciliation; apply executed once. Actual public
 Telegram document/photo references and independent binary copies PASS, one copy
