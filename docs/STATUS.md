@@ -4,6 +4,14 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 ноября, следующий локальный шаг: личные задачи/идеи/заметки и разовые Telegram
+напоминания обычными фразами, версии/статусы, явные проекты через существующий
+classifier, общий обзор с Calendar. Новый personal_inbox переиспользует
+TelegramInbox/Audit/Delivery; новых сервисов/таблиц/AI нет.21 parser/date checks
+PASS; PostgreSQL/outbox/voice/configured-transport tests подготовлены для CI.
+На VPS остаётся установленныйb808144; этот шаг ещё не deployment/live acceptance.
+[Поведение, защита доставки, границы и проверки](handoff/JARVIS_PERSONAL_INBOX_2026-11-26.md).
+
 26 ноября live: PR119/exactb808144 УСТАНОВЛЕН, deployment/activation VERIFIED.
 Настоящая Telegram-кнопка создала одну встречу в основном Google Calendar:
 27.11.2026 15:00–15:10 Europe/Moscow, «Тест Jarvis — проверка календаря»,

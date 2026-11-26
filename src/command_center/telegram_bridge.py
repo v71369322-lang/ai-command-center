@@ -825,6 +825,9 @@ class TelegramBridge:
                     from .calendar_dialogue import handle_locked
                     if handle_locked(self, session, iid, intent['text']):
                         return {'inbox_id': iid, 'state': 'DONE', 'task_id': None}
+                    from .personal_inbox import handle_locked as personal_handle
+                    if personal_handle(self, session, iid, intent['text']):
+                        return {'inbox_id': iid, 'state': row.state, 'task_id': None}
                     row.state = 'NEEDS_PLANNING'
                     from .telegram_project_picker import keyboard as picker_keyboard, issue
                     number = iid.rsplit(':', 1)[1]
@@ -951,6 +954,8 @@ class TelegramBridge:
                 from .telegram_calendar import collect_reminders
                 collect(self, session)
                 collect_reminders(self, session)
+                from .personal_inbox import collect_reminders as collect_personal
+                collect_personal(self, session)
             return
         with self.store.transaction() as session:
             self.store.check_audit(session)
@@ -986,6 +991,11 @@ class TelegramBridge:
             if not row:
                 return None
             self.store.check_audit(session)
+            from .assistant_policy import assistant_only
+            if assistant_only():
+                from .personal_inbox import delivery_allowed
+                if not delivery_allowed(self, session, row):
+                    return {'id': row.id, 'state': row.state}
             row.state, row.deadline = 'SENDING', self.store.now(session) + timedelta(seconds=30)
             oid, body = row.id, dict(row.body)
             anchored = session.execute(select(Audit).where(Audit.event['kind'].as_string() == 'telegram_delivery_queued',

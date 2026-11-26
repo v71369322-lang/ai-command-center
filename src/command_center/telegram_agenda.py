@@ -75,7 +75,13 @@ def reply(bridge, iid, intent):
             raise Denied('telegram_agenda_not_pending')
         control = session.get(Control, 1)
         if bridge.calendar is None:
-            bridge.finish(session, iid, 'Google Calendar ещё не подключён. События не изменены.')
+            text = 'Google Calendar ещё не подключён. События не изменены.'
+            from .assistant_policy import assistant_only
+            if assistant_only():
+                from .personal_inbox import render as personal_render
+                text += '\n\n' + personal_render(bridge, session, period=intent['period'], limit=4)
+                text += '\n\n' + personal_render(bridge, session, 'reminder', period=intent['period'], limit=4)
+            bridge.finish(session, iid, text[:4000])
             return
         if control.halted or control.recovery:
             bridge.finish(session, iid, 'Внешнее чтение календаря на паузе. События не изменены.')
@@ -106,6 +112,15 @@ def reply(bridge, iid, intent):
         if control.halted or control.recovery or control.epoch != epoch:
             text = 'Режим работы изменился. Расписание не показано; события не изменены.'
             status = 'discarded'
+        from .assistant_policy import assistant_only
+        if assistant_only() and status != 'discarded':
+            from .personal_inbox import render as personal_render
+            # Keep provider errors explicit while still showing local owner records.
+            local = personal_render(bridge, session, period=intent['period'], limit=4)
+            local += '\n\n' + personal_render(bridge, session, 'reminder', period=intent['period'], limit=4)
+            if len(text) > 1800:
+                text = text[:1740] + '\nЧасть расписания; полный список в Google Calendar.'
+            text += '\n\n' + local[:2100]
         bridge.finish(session, iid, text)
         bridge.store.audit(session, 'telegram_google_agenda_read', 'owner', profile=bridge.profile,
                            inbox_id=iid, period=intent['period'], status=status,
