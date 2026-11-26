@@ -4,6 +4,20 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+26 November12:36UTC: PR124/sourcec25e2d3 INSTALLED with fresh exact owner approval.
+ONE stock apply exited0, both journals VERIFIED directly. Real Telegram button
+(document) and plain numbered request(photo) each produced one SENT file; exact
+returned bytes independently read back from Telegram and matched retained75/310
+byte copies. Same poller/container/image restart30.09s, no auto resend or new F1
+task/copy. Existing cross-release copies remain readable. Calendar agenda16s,
+unchanged event; five service/model/Calendar boundaries PASS, OPENepoch85,
+historicalactual4/reserved0/uncertain0. No paid AI, merge, deletion or quota increase.
+Protected PC pre/post encrypted backup/recovery custody independently verified.
+IAB direct TXT export/native phone download not proven; actual full-file Bot API
+readback supplies byte evidence, not a preview. Stage2 remains in progress.
+[Exact installation, acceptance, recovery and limits](handoff/JARVIS_ATTACHMENT_RETRIEVAL_2026-11-26.md).
+
+Historical preparation record (superseded by installation above):
 26 November: Draft PR124/sourcec25e2d30ec49bad7347cf3274714bbb520cffd3d
 owner attachment retrieval READY FOR REVIEW, NOT INSTALLED. Button or plain
 "Пришли файл №N" returns verified DB bytes through the existing delivery queue.

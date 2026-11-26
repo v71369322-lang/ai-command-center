@@ -99,3 +99,12 @@ copy, exact connection and no-retry uncertainty; no new service or paid AI.
 Not installed. Next step is separately approved exact release with actual two
 public fixture retrievals and restart/no-duplicate checks, followed by combined
 Stage2 voice/correction/task/reminder/calendar acceptance. Stage3 not started.
+
+26 November12:36UTC: PR124 installed after fresh exact approval; one apply, journals
+VERIFIED. Actual owner button + plain request returned existing document/photo;
+independent actual delivered-file Telegram readback matches original DB SHA256.
+Same-container restart no auto resend, no new F1 task or binary copies. Calendar
+agenda16s unchanged, paid calls0, encrypted pre/post PC custody verified. No further
+cleanup or quota change. Next remaining Stage2 result: combined real long voice,
+correction, personal task/idea/reminder and Calendar acceptance with explicit
+failure handling. No ASR quality/native phone download claim from attachment tests.
