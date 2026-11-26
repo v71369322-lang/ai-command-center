@@ -35,14 +35,23 @@ def parse_edit(message):
 
 def preview(value, *, corrected=False):
     from .assistant_policy import assistant_only
+    suspect = bool(re.search(r'\bна\s+(?:переноси|создавай|отправляй|меняй|удаляй|записывай)\b', value, re.I))
+    warning = ('\n\nПроверьте «на» перед действием: возможно, потерялось «не». Текст не исправлен.' if suspect else '')
     effect = ('\nПроверьте имена, дату, время и место. Кнопка сохранит личную запись; '
               'напоминание с датой и временем будет запланировано в Telegram. '
               'Запись встречи в Google потребует отдельного подтверждения. Платный AI и выполнение поручений не запускаются.'
               if assistant_only() else '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
               ' событие календаря, AI и выполнение не запускаются.')
-    return ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value
+    result = ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning
             + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
             + effect)
+    if len(canonical({'text': result}).encode()) > 6700:
+        # Keep every source character. Shorten instructions, never the dictation.
+        warning = '\n\nПроверьте «на»: могло потеряться «не».' if suspect else ''
+        tail = ('Правка — ответом. Кнопка сохранит запись/напоминание; Google — отдельно.' if assistant_only()
+                else 'Проверьте текст. Правка — ответом полным текстом. Кнопка сохранит запрос, без выполнения.')
+        result = (EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning + '\n\n' + tail
+    return result
 
 
 def keyboard(proposal_id):

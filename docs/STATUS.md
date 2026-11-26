@@ -4,14 +4,37 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November: combined long-voice check found two real gaps; Stage2 NOT passed.
-Exact deployed decoder transcribed public63.88s synthetic speech in3.803s,
-RSS558.79MiB/noOOM, but "не переноси" -> "на переноси" critical negation error.
-Existing mixed task/idea/reminder becomes one task title. No paid call/model change
-or mixed production task accepted. Local shared ingress guard prepared: keep
-mixed source intact in Inbox before domain routing; no guessed batch/actions.
-15 local cases/static checks PASS, two PG journey cases awaiting final CI.
-[Evidence, scope, repair and limits](handoff/JARVIS_MVP_VOICE_CHECK_2026-11-26.md).
+26 November development: reviewed mixed-message spans prepared after PR125.
+Owner can save individual supported points through observed buttons, preserving
+literal original/accepted voice and actual callback provenance. Ambiguous text
+stays pending; no synthetic owner updates or Calendar batch actions. Refresh and
+cross-card dedup reuse the existing audit/admission lock. Bounded suspect-negation
+warning added; ASR model/accuracy unchanged. Production remains bb944ff; no server
+access or release in this stage. [Scope and pending CI](handoff/JARVIS_MIXED_REVIEW_2026-11-26.md).
+
+26 November13:47UTC: PR125/sourcebb944ff INSTALLED with fresh exact owner approval.
+One stock apply exited0; both journals VERIFIED directly, owner Telegram resume
+confirmed OPENepoch89, no old-task restart or paid call. Actual mixed task/idea/
+reminder and meeting/idea inputs retained intact, no personal/F1/Calendar actions;
+separate task saved/completed in confectionery, existing Google agenda reads.
+Test sources reversibly archived. Cross-release prior task/idea/reminder retained,
+no repeat reminder. Protected pre/post PC backups and isolated audit restore verified.
+[Exact installation and remaining voice limits](handoff/JARVIS_MIXED_INBOX_INSTALL_2026-11-26.md).
+
+Historical preparation checkpoint (installation above supersedes NOT INSTALLED):
+26 November: combined voice acceptance remains incomplete. Draft PR125/source
+bb944ff passed final CI45826953730 (2926passed/1skipped; infra1014passed;
+speech job SUCCESS), NOT INSTALLED. Guard retains explicit mixed requests intact
+in Inbox rather than guessing separate actions. Long mixed sample currently
+attempts an over-limit title and is rejected; shorter samples can collapse.
+Actual individual Telegram task, project correction, idea and exactly-once reminder
+passed; reminder visible2s after due, disposable test records completed/archived.
+Calendar read PASS, no new event/write, paid AI or production change. Public63.88s
+synthetic GigaAM test:3.803s,558.79MiB, but critical "не переноси" became "на переноси".
+Existing local Whisper Small preserved the six labelled critical phrases but took
+73.51s on different hardware; one sample is insufficient to switch models.
+Stage2 NOT complete; automatic multi-item capture and real long/noisy owner voice
+acceptance remain open. [Evidence and release boundary](handoff/JARVIS_MVP_VOICE_CHECK_2026-11-26.md).
 
 26 November12:36UTC: PR124/sourcec25e2d3 INSTALLED with fresh exact owner approval.
 ONE stock apply exited0, both journals VERIFIED directly. Real Telegram button

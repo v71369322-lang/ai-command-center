@@ -1,5 +1,21 @@
 # Качество голосового ввода — этап2/6
 
+## 26 November — latest long public probe (no model change)
+
+Current production bb944ff uses the unchanged pinned GigaAM model after PR125.
+The probe below ran on predecessor c25e2d30. Public63.876s synthetic voice:
+3.803s offline decode/inference,558.79MiB peak, noOOM.4/91 word edits, but
+critical "не переноси" -> "на переноси"; quality acceptance FAILED. Existing
+local Whisper Small/int8/beam5 preserved all six labelled critical phrases,
+3/91 edits,73.51s inference and729MiB on Windows. Different hardware/platform;
+not a strict performance comparison or evidence for activation. Punctuation
+sequence differs for both. No new downloads, paid calls or runtime/model change.
+Real owner long/noisy voice remains untested. PR125 holds mixed requests safely;
+it does not improve recognition or split a message into multiple records.
+[Full evidence and final CI](../handoff/JARVIS_MVP_VOICE_CHECK_2026-11-26.md).
+
+Historical checkpoints below retain their original source pins.
+
 26 November2026 current checkpoint: production75776b0 uses the previously pinned
 GigaAM profile. Whisper/Base/Small results below are historical experiments, not
 current production settings. Google confirmed-meeting write was separately
