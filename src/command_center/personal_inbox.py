@@ -16,12 +16,43 @@ LABELS = {'task': 'Задача', 'idea': 'Идея', 'note': 'Заметка', 
 STATES = {'active': 'активна', 'deferred': 'отложена', 'delegated': 'делегирована',
           'waiting': 'в ожидании', 'blocked': 'заблокирована', 'done': 'выполнена'}
 MAX_RECORDS = 1000
+PROJECT_ALIASES = {'кондитерская': 'vanilla-sugar', 'кондитерской': 'vanilla-sugar',
+    'ваниль и сахар': 'vanilla-sugar', 'ванили и сахару': 'vanilla-sugar', 'ванилисахару': 'vanilla-sugar',
+    'автосервис': 'lnauto', 'автосервису': 'lnauto', 'capital lab': 'capital-lab',
+    'jarvis': 'command-center', 'джарвис': 'command-center', 'без проекта': None}
+
+
+def parse_view(value):
+    phrases = {'мои планы': {'undated': True}, 'что я планировал': {'undated': True},
+        'что без срока': {'undated': True}, 'дела без срока': {'undated': True},
+        'напомни, что я планировал': {'undated': True},
+        'напомни что я планировал': {'undated': True},
+        'что отложено': {'status': 'deferred'}, 'отложенные дела': {'status': 'deferred'},
+        'задачи на потом': {'status': 'deferred'}, 'напомни про отложенные дела': {'status': 'deferred'}}
+    if value in phrases:
+        return {'action': 'list', 'category': 'task', **phrases[value]}
+    match = re.fullmatch(r'(планы|задачи|дела|идеи|заметки|что отложено|отложенные дела|'
+                         r'что без срока|дела без срока|что я планировал) по (.+)', value)
+    if not match:
+        return None
+    if match[2] not in PROJECT_ALIASES:
+        return {'action': 'unknown_list_project'}
+    intent = {'action': 'list', 'category': {'идеи': 'idea', 'заметки': 'note'}.get(match[1], 'task'),
+              'project_id': PROJECT_ALIASES[match[2]]}
+    if match[1] in {'планы', 'что без срока', 'дела без срока', 'что я планировал'}:
+        intent['undated'] = True
+    if match[1] in {'что отложено', 'отложенные дела'}:
+        intent['status'] = 'deferred'
+    return intent
 
 
 def parse(value):
     """Deliberately bounded phrases; no model calls or guessed dates/categories."""
     text = ' '.join(value.strip().split()).rstrip('.!?')
     low = text.lower()
+    view = parse_view(low)
+    if view:
+        return view
     for kind, words in {'task': ('мои задачи', 'покажи задачи', 'список задач'),
                         'idea': ('мои идеи', 'покажи идеи'),
                         'note': ('мои заметки', 'покажи заметки'),
@@ -40,11 +71,11 @@ def parse(value):
                 'category': {'задача': 'task', 'идея': 'idea', 'заметка': 'note'}[match[1]]}
     match = re.fullmatch(r'(?:раздел|проект) №?([0-9]{1,16}):\s*(.+)', low)
     if match:
-        projects = {'кондитерская': 'vanilla-sugar', 'ваниль и сахар': 'vanilla-sugar',
-                    'автосервис': 'lnauto', 'capital lab': 'capital-lab', 'jarvis': 'command-center',
-                    'джарвис': 'command-center', 'без проекта': None}
-        return ({'action': 'project', 'number': match[1], 'project_id': projects[match[2]]}
-                if match[2] in projects else {'action': 'invalid_project'})
+        return ({'action': 'project', 'number': match[1], 'project_id': PROJECT_ALIASES[match[2]]}
+                if match[2] in PROJECT_ALIASES else {'action': 'invalid_project'})
+    match = re.fullmatch(r'(?:я )?планирую (.+)|на потом[: ,]+(.+)', text, re.I)
+    if match:
+        return {'action': 'create', 'category': 'task', 'title': match[1] or match[2], 'status': 'deferred'}
     if re.match(r'^напомни\b', low):
         if (re.search(r'\b(?:или|либо|если)\b', low)
                 or len(re.findall(r'\bв [0-2]?\d(?::[0-5]\d)?\b', low)) > 1):
@@ -140,20 +171,41 @@ def records(bridge, session, request_ids=None):
     return result
 
 
-def render(bridge, session, category='task', *, period=None, limit=12):
+def select_view(items, assignments, category, *, project_id='all', status=None, undated=False,
+                through=None, timezone='Europe/Moscow'):
+    result = [r for r in items if r['category'] == category and r['status'] != 'done']
+    if project_id != 'all':
+        result = [r for r in result if assignments.get(r['id'], {}).get('project_id') == project_id]
+    if status:
+        result = [r for r in result if r['status'] == status]
+    if undated:
+        result = [r for r in result if r['due_at'] is None]
+    if through:
+        result = [r for r in result if not r['due_at']
+                  or datetime.fromisoformat(r['due_at']).astimezone(ZoneInfo(timezone)).date() <= through]
+    return result
+
+
+def render(bridge, session, category='task', *, period=None, limit=12, project_id='all', status=None, undated=False):
     from .project_inbox import history, PROJECTS
     assigned, _ = history(session)
     labels = dict(PROJECTS)
-    items = list(records(bridge, session).values())
-    items = [r for r in items if r['category'] == category and r['status'] != 'done']
+    through, timezone = None, 'Europe/Moscow'
     if period is not None:
         from .attention_schedule import current
         timezone = current(session).get('timezone', 'Europe/Moscow')
         today = bridge.store.now(session).astimezone(ZoneInfo(timezone)).date()
-        end = today + timedelta(days=1 if period == 'tomorrow' else 6 if period == 'week' else 0)
-        items = [r for r in items if not r['due_at'] or datetime.fromisoformat(r['due_at']).date() <= end]
-    lines = [{'task': 'Личные задачи', 'idea': 'Банк идей', 'note': 'Заметки',
-              'reminder': 'Личные напоминания'}[category] + ':']
+        through = today + timedelta(days=1 if period == 'tomorrow' else 6 if period == 'week' else 0)
+    items = select_view(list(records(bridge, session).values()), assigned, category,
+        project_id=project_id, status=status, undated=undated, through=through, timezone=timezone)
+    title = {'task': 'Личные задачи', 'idea': 'Банк идей', 'note': 'Заметки', 'reminder': 'Личные напоминания'}[category]
+    if undated:
+        title = 'Дела без срока'
+    if status == 'deferred':
+        title = 'Отложенные дела'
+    if project_id != 'all':
+        title += ' · ' + labels.get(project_id, 'Не распределён')
+    lines = [title + ':']
     for r in items[-limit:]:
         project = labels.get(assigned.get(r['id'], {}).get('project_id'), 'Не распределён')
         when = ' · ' + r['due_at'] if r['due_at'] else ' · без срока'
@@ -174,7 +226,11 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
     if intent is None:
         return False
     if intent['action'] == 'list':
-        bridge.finish(session, iid, render(bridge, session, intent['category']))
+        options = {key: intent[key] for key in ('project_id', 'status', 'undated') if key in intent}
+        bridge.finish(session, iid, render(bridge, session, intent['category'], **options))
+        return True
+    if intent['action'] == 'unknown_list_project':
+        bridge.finish(session, iid, 'Раздел не распознан. Например: «Планы по кондитерской» или «Идеи по автосервису».')
         return True
     control = session.get(Control, 1)
     if control.halted or control.recovery:
@@ -243,7 +299,7 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
                           'Укажите будущую дату, время и текст поручения.')
             return True
     row.state = 'NEEDS_PLANNING'
-    document = {'title': title, 'category': intent['category'], 'status': 'active', 'due_at': due}
+    document = {'title': title, 'category': intent['category'], 'status': intent.get('status', 'active'), 'due_at': due}
     bridge.store.audit(session, CREATED, 'owner', profile=bridge.profile, request_id=iid,
         request_fingerprint=row.fingerprint, version=1, document=document, document_hash=digest(document))
     from .project_inbox import classify_locked, PROJECTS
@@ -256,6 +312,8 @@ def handle_locked(bridge, session, iid, value, *, received_at=None):
     saved = 'сохранено' if intent['category'] == 'reminder' else 'сохранена'
     label = dict(PROJECTS).get(project, 'Не распределён')
     text = f"{LABELS[document['category']]} {saved}: №{number}.\n{title}\nРаздел: {label}.{when}"
+    if document['status'] == 'deferred':
+        text += '\nСохранено на потом. Посмотреть: «Что отложено».'
     if intent['category'] == 'task':
         text += f'\nЗавершить: «Готово №{number}». Само поручение ещё не выполнено.'
     else:
