@@ -7,7 +7,7 @@ from command_center.store import Denied
 from command_center.telegram_voice_requests import transcription_contract
 from command_center.telegram_voice_transcripts import CORRECTED, PROPOSED, TITLE, propose
 from test_telegram_bridge import OWNER
-from test_telegram_task_status import authority
+from test_telegram_task_status import authority, response
 from test_telegram_voice_requests import bridge as bridge, transcript_callback, voice
 
 
@@ -175,10 +175,10 @@ def test_fragment_edit_keeps_raw_text_and_uses_existing_one_save_boundary(bridge
 def test_invalid_fragment_creates_no_correction_or_saved_request(bridge, store, value):
     service, fake = bridge
     _, proposal = prepared(service)
-    service.receive(reply(service, fake, proposal, value))
+    receipt = response(service, reply(service, fake, proposal, value))
     with store.transaction() as tx:
         assert tx.scalar(select(Audit).where(Audit.event['kind'].as_string() == CORRECTED)) is None
-    assert 'Правка не применена' in fake.sent[-1]['text']
+    assert 'Правка не применена' in receipt
     assert inbox(store, 'owner')['total_pending'] == 0
 
 
@@ -201,23 +201,28 @@ def test_fragment_result_cannot_exceed_existing_text_budget(bridge, store):
     _, proposal = prepared(service)
     value = 'Замени «15» на «' + 'x' * (2000 - len('Замени «15» на «»'.encode())) + '»'
     assert len(value.encode()) == 2000
-    assert service.receive(reply(service, fake, proposal, value))['state'] == 'DONE'
-    assert 'итоговый текст слишком длинный' in fake.sent[-1]['text']
+    receipt = response(service, reply(service, fake, proposal, value))
+    assert 'итоговый текст слишком длинный' in receipt
     with store.transaction() as tx:
         assert tx.scalar(select(Audit).where(Audit.event['kind'].as_string() == CORRECTED)) is None
 
 
-def test_fragment_previous_hash_tamper_is_refused(bridge, store):
+def test_fragment_previous_hash_tamper_is_refused(bridge, store, admin):
     service, fake = bridge
     _, proposal = prepared(service)
     service.receive(reply(service, fake, proposal, 'Замени «15» на «16»'))
     edit = corrected(store)
-    with store.transaction() as tx:
+    callback = transcript_callback(service, fake, edit['proposal_id'], uid=11)
+    assert inbox(store, 'owner')['total_pending'] == 0
+    # Fault injection uses the test admin, never weaker application permissions.
+    with admin.transaction() as tx:
         audit = tx.scalar(select(Audit).where(Audit.event['kind'].as_string() == CORRECTED))
         audit.event = {**audit.event, 'previous_text_hash': '0' * 64}
-    with pytest.raises(Denied):
-        service.receive(transcript_callback(service, fake, edit['proposal_id'], uid=11))
-    assert inbox(store, 'owner')['total_pending'] == 0
+    from command_center.telegram_voice_transcripts import _proposal
+    with pytest.raises(Denied, match='voice_correction_integrity'):
+        with store.transaction() as tx:
+            _proposal(service, tx, {'proposal_id': edit['proposal_id'],
+                'message_id': callback['callback_query']['message']['message_id']})
 
 
 
