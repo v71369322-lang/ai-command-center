@@ -1,5 +1,11 @@
 # Качество голосового ввода — этап2/6
 
+27 November correction usability candidate PR128: exact quoted fragment replacement
+on an observed owner Reply creates a new readback; original speech/model untouched.
+Full-text replies remain supported. No automatic save, inferred site spelling,
+punctuation repair or scheduling. This candidate is NOT INSTALLED; real voice
+quality remains open. [Scope and verification](../handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
+
 27 November real long-input observation: voice131179347,82seconds on installed
 4f51e270a0513f2c01ab1301e7796929ef8c5098. Intake17:50:35.205875UTC,
 start17:50:39.221734,proposal17:50:49.915390. Intake→proposal14.710s;
