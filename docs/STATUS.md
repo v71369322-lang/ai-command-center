@@ -4,6 +4,17 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+27 November17:50UTC: first real long owner voice131179347,82s, current4f51e27.
+Proposal14.710s after intake; Telegram SENT receipt21.904s after intake,message464.
+Raw1126UTF8bytes within existing2000byte contract; no truncation claimed from size
+alone. Requested negation and09:15 appear literally; original spoken ground truth
+not yet confirmed. Some wording/punctuation is questionable, weekday unspecified.
+No proposal correction/acceptance/decision; no save/Calendar action by operator.
+Paid_apiFalse. Semantic quality and item completeness WAITING OWNER CLARIFICATION;
+this is operational long-input evidence, not full voice-quality PASS.
+[Voice acceptance evidence](jarvis-2/VOICE_QUALITY.md).
+
+Historical preparation checkpoint (new long sample above supersedes waiting input):
 26 November17:51UTC: long voice acceptance preparation/read-only check.
 Production4f51e27 and both journals VERIFIED, voice fresh/IDLE. Actual Telegram
 history has4 voice requests,max8s,none>=30s; no new voice on current release.

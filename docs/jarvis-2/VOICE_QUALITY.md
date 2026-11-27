@@ -1,5 +1,21 @@
 # Качество голосового ввода — этап2/6
 
+27 November real long-input observation: voice131179347,82seconds on installed
+4f51e270a0513f2c01ab1301e7796929ef8c5098. Intake17:50:35.205875UTC,
+start17:50:39.221734,proposal17:50:49.915390. Intake→proposal14.710s;
+intake→SENT receipt21.904s,message464. This measures server receipt, not phone
+notification latency. Raw1126UTF8bytes; no failure/contract overflow observed.
+Literal requested negation/name and09:15 present; this alone does not establish
+correct acoustic recognition or complete item preservation. Full private business
+transcript and audio were not copied into Git or a public benchmark. UI readback
+contains questionable wording and punctuation; meeting weekday is unspecified.
+Wait for owner confirmation of intended source/site and migration wording before
+correction, and exact weekday before any meeting scheduling. No auto-correction,
+accept/save, Calendar action, provider/model change, deployment or paid call.
+Read-only proposal decision count0. Quality acceptance remains OPEN, not PASS.
+
+Historical preparation checkpoint (observation above supersedes missing input):
+
 26 November17:51UTC: actual production4f51e270a0513f2c01ab1301e7796929ef8c5098,
 both release journals VERIFIED. Voice heartbeat fresh/IDLE; final application CI
 45854503391 remains SUCCESS. Read-only metadata:4 real voice requests total,
