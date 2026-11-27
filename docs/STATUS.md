@@ -4,6 +4,19 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+27 November19:17UTC: PR128/c837c2e SERVER PACKAGE PREPARED, NOT INSTALLED.
+Fresh exact preparation approval only; stock source-built app/speech and inspect
+PASS, candidateb0c5037f/preparation5cc70880. Protected encrypted PC package verified,
+model/Calendar keys/scopes unchanged except source binding. Live4f51e27/both
+VERIFIED/OPENepoch97/five original IDs and starts unchanged; no paid or live sends.
+Backup quota free10889021B. Four superseded archives with exact matching protected
+PC copies and full isolated restores proposed for retention:21679134B; none deleted.
+Need NEW exact retention+installation approval; preserve latest/current/prior copies,
+no stale snapshot, quota bypass, blind apply retry or automatic old-reader rollback.
+Owner's meeting sample stays test-only and must not be scheduled. Stage2 incomplete.
+[Prepared pins, exact four-file list and recovery/install plan](handoff/JARVIS_VOICE_FRAGMENT_PREPARED_2026-11-27.md).
+
+Historical local implementation checkpoint (package preparation above is later):
 27 November final local stage: Draft PR128/sourcec837c2e READY FOR CODE REVIEW,
 NOT INSTALLED. CI46049662208 SUCCESS:3024passed/1skipped/1warning,
 infra1014passed/speech44passed; suites overlap. Head/merge tree identical.
