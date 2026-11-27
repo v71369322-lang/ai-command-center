@@ -4,6 +4,16 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
+27 November local correction stage: exact single-fragment Reply replacement prepared.
+Raw ASR unchanged; new owner version, no auto-save/Calendar action. Missing/repeated/
+malformed fragment and oversized result refuse. Existing observed owner/source and
+one-save integrity retained; full-text history remains compatible. Local16 unit
+cases PASS;7 new PostgreSQL cases/final CI pending. Production4f51e27 unchanged;
+no VPS/paid/model/deployment action. Owner's sample meeting is test-only: DO NOT
+schedule it. Site spelling remains unconfirmed, no inferred replacement.
+[Scope and pending verification](handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
+
+Historical observation (later owner clarifications above):
 27 November17:50UTC: first real long owner voice131179347,82s, current4f51e27.
 Proposal14.710s after intake; Telegram SENT receipt21.904s after intake,message464.
 Raw1126UTF8bytes within existing2000byte contract; no truncation claimed from size
