@@ -86,3 +86,29 @@ If a new app release changes source/image, this prepared probe must be re-prepar
 and approved against the new actual runtime; never bypass the exact preconditions.
 
 Source verification: https://huggingface.co/Systran/faster-whisper-small/blob/536b0662742c02347bc0e980a01041f333bce120/model.bin
+
+
+## Final verification checkpoint (supersedes pending CI above)
+
+Draft PR127, base codex/mixed-inbox-review at73647d0b66d6031ca566152b7be8eeb994ae1330.
+Final application HEAD4f51e270a0513f2c01ab1301e7796929ef8c5098;
+merge-ref25c5c4ee776e211d34f426e1fdf3ab1db876e6b3;
+identical tree95ddbf03cf55a8bfca3e903af2684e890ef20c85.
+CI45854503391 SUCCESS: synthetic and speech jobs completed successfully.
+Full suite3001passed/1skipped/1warning in550.10s; infra1014passed;
+speech44passed. Suites overlap and must not be summed. All three new PostgreSQL
+voice/mixed reminder cases passed. Final cloud verification ran against merge-ref.
+Static checks, image/container smoke, isolated restore and deployment prerequisites
+passed. This is synthetic Linux CI, not a VPS/rootless/phone acceptance.
+[CI run](https://github.com/v71369322-lang/ai-command-center/actions/runs/45854503391).
+
+Documentation checkpoint is on codex/spoken-minutes-verification, preserving the
+application HEAD and its final CI. PR remains Draft, unmerged and NOT INSTALLED.
+A next separately approved release should install only this exact source through
+stock prepare/inspect/approval/install/postcheck with protected pre/post backup,
+read-only reconciliation first and no blind apply retry. Verify numeric spoken
+minutes, invalid suffix refusal, source persistence/dedup and existing Calendar
+read without creating an unintended event. ASR model/profile stays unchanged.
+No production access or resource cleanup occurred in this stage. Existing prepared
+73647d0 ASR probe becomes stale after any source/image change; re-prepare before
+separate approval. General long/noisy owner voice acceptance and Stage2 remain open.

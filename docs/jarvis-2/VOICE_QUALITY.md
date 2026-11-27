@@ -1,10 +1,40 @@
 # Качество голосового ввода — этап2/6
 
-26November current production source73647d0 after exact PR126 installation.
-Actual text/button three-item acceptance passed, no new owner phone recording or
-ASR decode in that release. Model/accuracy/punctuation unchanged; prior long-probe
-negation error and real long/noisy acceptance gap remain. Preparation statements
-below retain their dated NOT INSTALLED meaning. [Installation](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+27 November real long-input observation: voice131179347,82seconds on installed
+4f51e270a0513f2c01ab1301e7796929ef8c5098. Intake17:50:35.205875UTC,
+start17:50:39.221734,proposal17:50:49.915390. Intake→proposal14.710s;
+intake→SENT receipt21.904s,message464. This measures server receipt, not phone
+notification latency. Raw1126UTF8bytes; no failure/contract overflow observed.
+Literal requested negation/name and09:15 present; this alone does not establish
+correct acoustic recognition or complete item preservation. Full private business
+transcript and audio were not copied into Git or a public benchmark. UI readback
+contains questionable wording and punctuation; meeting weekday is unspecified.
+Wait for owner confirmation of intended source/site and migration wording before
+correction, and exact weekday before any meeting scheduling. No auto-correction,
+accept/save, Calendar action, provider/model change, deployment or paid call.
+Read-only proposal decision count0. Quality acceptance remains OPEN, not PASS.
+
+Historical preparation checkpoint (observation above supersedes missing input):
+
+26 November17:51UTC: actual production4f51e270a0513f2c01ab1301e7796929ef8c5098,
+both release journals VERIFIED. Voice heartbeat fresh/IDLE; final application CI
+45854503391 remains SUCCESS. Read-only metadata:4 real voice requests total,
+maximum8seconds; none>=30seconds and no new voice decode on installed4f51e27.
+No raw audio, file IDs, transcript or owner content exported in this check.
+
+Long-owner-voice acceptance is WAITING FOR INPUT, not PASS. Ask owner to send one
+30–60second non-sensitive voice with2–3 points, a negation, name and explicit time.
+Do not infer spoken ground truth from ASR. Compare with owner-confirmed wording;
+check intake→start→proposal→SENT timing, literal preview/raw source, punctuation
+positions, names/negations/date/time and item completeness. Keep any wrong readback
+unaccepted, use existing Reply correction and verify raw/corrected separation.
+Only after readback is confirmed, use observed review buttons for disposable test
+records; no guessed Calendar write, fabricated owner Update or paid call.
+Quality/latency, operational save and phone notification evidence stay distinct.
+No model download/change, service/config change or release authorized by this check.
+[Installed release and limits](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
+
+Historical checkpoints below retain their dated source/installation meanings.
 
 ## 26 November — reviewed mixed-message candidate (not installed)
 
@@ -244,3 +274,25 @@ text rejects instead of silent truncation. These are not unlimited dictation.
 Verify words, negations, names and dates alongside punctuation positions and
 memory/latency before any model/window/contract change. No model download, extra
 process, audio transfer, paid call or production change was made in this inquiry.
+
+## 26 November follow-up: critical words and spoken reminder minutes
+
+Local public synthetic comparison reproduced GigaAM negation loss. Small/beam1
+omitted a meeting/name clause in the noisy held-out clip. Small/beam5 retained
+labelled critical occurrences but the120s stress took107.172s on this Windows PC,
+above the current90s budget. No model change is justified by these measurements;
+this is not VPS or real-road/owner acceptance. Punctuation remains imperfect.
+
+Evaluation now counts repeated critical phrases and checks punctuation word
+boundaries (schema2); human review remains mandatory. Separately, the reminder
+parser no longer drops numeric spoken minutes:9 часов15 минут ->09:15. Unsupported
+recognized clock tails refuse instead of silently becoming a whole hour. Raw voice
+and existing owner confirmation remain. Calendar parser unchanged.
+[Exact scope and verification](../handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+
+
+26 November: PR127/4f51e27 installed with exact approval. Live TEXT/buttons preserve
+numeric spoken-unit09:15, refuse75minutes, reject duplicate save and deliver one
+20:14 Telegram reminder. This validates deployed parsing/saving/delivery, NOT a
+new actual voice decode or improved acoustic/punctuation accuracy. Model unchanged.
+[Exact release and startup recovery](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).

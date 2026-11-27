@@ -9,6 +9,7 @@ from .models import Audit, Control, TelegramDelivery, TelegramInbox
 from .store import Denied, canonical, digest
 from .telegram_requests import capture_receipt
 from .telegram_voice_requests import INTAKE, verify_transcript
+from .voice_text_edit import replace_once
 
 PROPOSED = 'telegram_voice_transcript_proposed'
 ACCEPTED = 'telegram_voice_transcript_accepted'
@@ -43,7 +44,7 @@ def preview(value, *, corrected=False):
               if assistant_only() else '\nПроверьте имена, дату, время и место. Кнопка сохранит только запрос;'
               ' событие календаря, AI и выполнение не запускаются.')
     result = ((EDIT_TITLE if corrected else TITLE) + '\n\n' + value + warning
-            + '\n\nЧтобы исправить, ответьте на это сообщение полным правильным текстом.'
+            + '\n\nЧтобы исправить, ответьте полным правильным текстом или: Замени «старый фрагмент» на «новый».'
             + effect)
     if len(canonical({'text': result}).encode()) > 6700:
         # Keep every source character. Shorten instructions, never the dictation.
@@ -148,7 +149,38 @@ def _proposal(bridge, session, intent):
         if (event.get('actor') != 'owner' or not edited or not anchored or edited.state != 'DONE'
                 or edited.profile != bridge.profile or edited.fingerprint != digest(edited.intent)
                 or edited.fingerprint != event.get('owner_fingerprint')
-                or edited.intent.get('kind') != 'voice_edit' or edited.intent.get('text') != event['text']):
+                or edited.intent.get('kind') != 'voice_edit'):
+            raise Denied('telegram_voice_correction_integrity')
+        if event.get('edit_mode') is None:
+            if edited.intent.get('text') != event['text']:
+                raise Denied('telegram_voice_correction_integrity')
+        elif event.get('edit_mode') == 'replace_once':
+            previous = session.scalar(select(Audit).where(
+                Audit.event['kind'].as_string().in_((PROPOSED, CORRECTED)),
+                Audit.event['profile'].as_string() == bridge.profile,
+                Audit.event['proposal_id'].as_string() == event.get('previous_proposal_id')))
+            previous = previous.event if previous else None
+            old_delivery = previous and session.get(TelegramDelivery, previous.get('delivery_id'))
+            observed_parent = old_delivery and session.scalar(select(Audit.sequence).where(
+                Audit.event['kind'].as_string() == 'telegram_delivery_observed',
+                Audit.event['delivery_id'].as_string() == old_delivery.id,
+                Audit.event['message_id'].as_integer() == edited.intent.get('reply_message_id'),
+                Audit.event['state'].as_string() == 'SENT').limit(1))
+            if (not previous or not old_delivery or not observed_parent
+                    or old_delivery.profile != bridge.profile or old_delivery.state != 'SENT'
+                    or old_delivery.message_id != edited.intent.get('reply_message_id')
+                    or previous.get('voice_inbox_id') != event['voice_inbox_id']
+                    or previous.get('audio_sha256') != event['audio_sha256']
+                    or previous.get('text_hash') != digest(previous.get('text'))
+                    or previous.get('text_hash') != event.get('previous_text_hash')):
+                raise Denied('telegram_voice_correction_integrity')
+            try:
+                replacement = replace_once(edited.intent['text'], previous['text'])
+            except ValueError:
+                raise Denied('telegram_voice_correction_integrity') from None
+            if replacement is None or replacement != event['text']:
+                raise Denied('telegram_voice_correction_integrity')
+        else:
             raise Denied('telegram_voice_correction_integrity')
     bridge.check_text(event['text'])
     return event
@@ -208,18 +240,34 @@ def edit(bridge, iid, intent):
         if _closed_or_stale(bridge, session, iid, proposal):
             return
         bridge.check_text(intent['text'])
-        if intent['text'] == proposal['text']:
+        try:
+            replacement = replace_once(intent['text'], proposal['text'])
+        except ValueError:
+            bridge.finish(session, iid, 'Правка не применена: нужен один точно совпадающий фрагмент. '
+                          'Ответьте: Замени «старый фрагмент» на «новый» — или пришлите полный правильный текст. '
+                          'Новая версия и запись не созданы.')
+            return
+        value = replacement if replacement is not None else intent['text']
+        if len(value.encode()) > 2000:
+            bridge.finish(session, iid, 'Правка не применена: итоговый текст слишком длинный. '
+                          'Сократите текст или разделите поручение на два сообщения. '
+                          'Новая версия и запись не созданы.')
+            return
+        bridge.check_text(value)
+        if value == proposal['text']:
             bridge.finish(session, iid, 'Текст совпадает с карточкой. Новая версия не создана;'
                           ' сохраните запрос кнопкой в последней карточке.')
             return
         proposal_id = str(uuid5(NAMESPACE_URL, 'acc:voice-correction:' + iid))
-        delivery_id = bridge.finish(session, iid, preview(intent['text'], corrected=True), keyboard(proposal_id))
+        delivery_id = bridge.finish(session, iid, preview(value, corrected=True), keyboard(proposal_id))
         bridge.store.audit(session, CORRECTED, 'owner', profile=bridge.profile, proposal_id=proposal_id,
             previous_proposal_id=proposal['proposal_id'], voice_inbox_id=proposal['voice_inbox_id'],
             voice_fingerprint=proposal['voice_fingerprint'], audio_sha256=proposal['audio_sha256'],
-            text=intent['text'], text_hash=digest(intent['text']), owner_inbox_id=iid,
+            text=value, text_hash=digest(value), owner_inbox_id=iid,
             owner_fingerprint=row.fingerprint, delivery_id=delivery_id,
-            confirmed=False, task_created=False, project_selected=False)
+            confirmed=False, task_created=False, project_selected=False,
+            **({'edit_mode': 'replace_once', 'previous_text_hash': proposal['text_hash']}
+               if replacement is not None else {}))
 
 
 def decide(bridge, iid, intent):

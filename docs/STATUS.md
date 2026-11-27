@@ -4,15 +4,56 @@
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-26 November local voice stage: confirmed reminder parser discarded spoken minutes
-("9 часов 15 минут" ->09:00). Limited fix preserves09:15, refuses recognized
-ambiguous suffixes and leaves ASR/raw source unchanged. Evaluation also now counts
-repeated critical phrases and punctuation boundaries; schema2. Local58 selected
-tests PASS,3 PostgreSQL cases/final CI pending. Small/beam5 preserves critical
-labels on fresh noisy/stress synthetic clips but120s takes107s on Windows, over
-current90s budget; no model switch justified. Exact external probe prepared but
-NOT authorized/run. Production73647d0 unchanged; no VPS/paid/model activation.
-[Scope, measurements and pending verification](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+27 November local correction stage: exact single-fragment Reply replacement prepared.
+Raw ASR unchanged; new owner version, no auto-save/Calendar action. Missing/repeated/
+malformed fragment and oversized result refuse. Existing observed owner/source and
+one-save integrity retained; full-text history remains compatible. Local16 unit
+cases PASS;7 new PostgreSQL cases/final CI pending. Production4f51e27 unchanged;
+no VPS/paid/model/deployment action. Owner's sample meeting is test-only: DO NOT
+schedule it. Site spelling remains unconfirmed, no inferred replacement.
+[Scope and pending verification](handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
+
+Historical observation (later owner clarifications above):
+27 November17:50UTC: first real long owner voice131179347,82s, current4f51e27.
+Proposal14.710s after intake; Telegram SENT receipt21.904s after intake,message464.
+Raw1126UTF8bytes within existing2000byte contract; no truncation claimed from size
+alone. Requested negation and09:15 appear literally; original spoken ground truth
+not yet confirmed. Some wording/punctuation is questionable, weekday unspecified.
+No proposal correction/acceptance/decision; no save/Calendar action by operator.
+Paid_apiFalse. Semantic quality and item completeness WAITING OWNER CLARIFICATION;
+this is operational long-input evidence, not full voice-quality PASS.
+[Voice acceptance evidence](jarvis-2/VOICE_QUALITY.md).
+
+Historical preparation checkpoint (new long sample above supersedes waiting input):
+26 November17:51UTC: long voice acceptance preparation/read-only check.
+Production4f51e27 and both journals VERIFIED, voice fresh/IDLE. Actual Telegram
+history has4 voice requests,max8s,none>=30s; no new voice on current release.
+WAITING FOR OWNER30–60s SAMPLE; long/noisy quality is not accepted. No raw audio/
+transcript export, paid call, model/service/config change or new deployment.
+[Exact acceptance procedure and evidence limits](jarvis-2/VOICE_QUALITY.md).
+
+26 November17:16UTC: PR127/source4f51e27 INSTALLED after exact owner approval.
+One stock apply failed at initial Telegram startup (exit1/noOOM); no apply retry.
+Independent exact startup diagnostic passed, SAME target poller started once;
+full pre/postchecks PASS, stock exact reconcile exit0, both journals VERIFIED.
+Owner web resume OPENepoch97. Real mixed card saves09:15 with clean title,75minute
+suffix refused, duplicate blocked, due20:14 reminder sent once2.815s after due.
+Both public test reminders done; original source, prior records and Google read
+preserved. Protected pre/post PC backup custody and isolated restore PASS.
+No model change/paid API/Google write/merge. Stage2 remains incomplete.
+[Installation, startup repair and remaining limits](handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
+
+Historical preparation checkpoint (installation above supersedes NOT INSTALLED):
+26 November final local stage: Draft PR127/source4f51e270a0513f2c01ab1301e7796929ef8c5098
+READY FOR REVIEW, NOT INSTALLED. Final CI45854503391 SUCCESS:3001passed/1skipped/
+1warning, infra1014passed and speech44passed (overlapping suites, not summed).
+Merge25c5c4ee776e211d34f426e1fdf3ab1db876e6b3 has identical head/merge tree.
+Spoken numeric reminder minutes now preserve09:15 instead of silently09:00;
+unsupported recognized clock tails refuse. Three PostgreSQL regressions PASS.
+ASR evaluation counts repeated critical phrases and punctuation boundaries.
+No model switch: Small experiments have noisy omission or latency limitations.
+Production last verified73647d0 unchanged; no VPS/paid/model activation in this stage.
+[Final pins, measurements and remaining acceptance](handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
 
 26 November15:26UTC: PR126/source73647d0 INSTALLED after fresh exact owner approval.
 ONE stock apply exited0; both journals VERIFIED directly. Owner resume OPENepoch93,

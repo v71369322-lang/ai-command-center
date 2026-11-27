@@ -133,3 +133,26 @@ personal records, stale/duplicate refusal, same-container restart, parent archiv
 and exactly-one Telegram reminder verified. Google read preserved; no paid AI or
 new event. Stage2 remains incomplete: fresh long/noisy owner voice and general
 free-form mixed understanding are not proven. [Evidence](../handoff/JARVIS_MIXED_REVIEW_INSTALL_2026-11-26.md).
+
+## 26 November spoken-minute repair candidate
+
+PR127 fixes a confirmed reminder09:15 ->09:00 truncation for numeric spoken
+hour/minute units; unsupported clock tails refuse. Evaluation counts repeated
+critical words and punctuation positions. No ASR model activation: tested Small
+variants still have omission/latency limitations. Stage2 remains incomplete;
+real long/noisy owner voice and overall minimal-version acceptance stay open.
+Production last verified73647d0; no deployment in this local development stage.
+[Verification and limits](../handoff/JARVIS_ASR_LOCAL_2026-11-26.md).
+
+
+## 26 November PR127 installed checkpoint
+
+Exact approved4f51e27 installed; one failed first Telegram start repaired by
+starting the same exact container, then full checks and stock reconcile VERIFIED.
+Real Telegram supported spoken numeric09:15 preserved,75minutes refused, duplicate
+blocked and20:14 reminder delivered once2.815s after due; test records done.
+Existing Calendar read, prior records and protected backups/recovery verified.
+No ASR model/punctuation improvement or new real phone voice acceptance claimed.
+Stage2 remains incomplete: long/noisy owner speech and complete daily-flow acceptance.
+Before next release review backup headroom; cleanup/quota changes need exact approval.
+[Installation evidence](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
