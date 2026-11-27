@@ -250,7 +250,7 @@ def edit(bridge, iid, intent):
         value = replacement if replacement is not None else intent['text']
         if len(value.encode()) > 2000:
             bridge.finish(session, iid, 'Правка не применена: итоговый текст слишком длинный. '
-                          'Пришлите полный правильный текст до 2000 байт или разделите поручение. '
+                          'Сократите текст или разделите поручение на два сообщения. '
                           'Новая версия и запись не созданы.')
             return
         bridge.check_text(value)
