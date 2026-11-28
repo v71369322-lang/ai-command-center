@@ -1,5 +1,23 @@
 # Качество голосового ввода — этап2/6
 
+28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.
+Both journals VERIFIED; actual owner partial Reply creates correct new readback,
+raw preserved; unaccepted, test meeting NOT scheduled, paid calls0.
+Four approved superseded server backups removed21,679,134B; protected PC copies
+retained, fresh pre/post encrypted backups and isolated audit restores PASS.
+ONE apply failed, never repeated; stock reconcile succeeded after strict heartbeat
+preconditions. Two bounded same-container Telegram starts restored reception.
+Maintenance admission-lock timeouts remain a reliability risk requiring a narrow
+follow-up fix; current heartbeat fresh/OPENepoch101, permanent stability NOT claimed.
+[Installation, live evidence and remaining defect](../handoff/JARVIS_VOICE_FRAGMENT_INSTALL_2026-11-28.md).
+
+
+27 November correction usability candidate PR128: exact quoted fragment replacement
+on an observed owner Reply creates a new readback; original speech/model untouched.
+Full-text replies remain supported. No automatic save, inferred site spelling,
+punctuation repair or scheduling. This candidate is NOT INSTALLED; real voice
+quality remains open. [Scope and verification](../handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
+
 27 November real long-input observation: voice131179347,82seconds on installed
 4f51e270a0513f2c01ab1301e7796929ef8c5098. Intake17:50:35.205875UTC,
 start17:50:39.221734,proposal17:50:49.915390. Intake→proposal14.710s;

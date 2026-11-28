@@ -1,17 +1,51 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+28 November local reliability follow-up: bounded Telegram admission-entry retry
+implemented, NOT INSTALLED. Reuses existing exact timeout guard; no body/send/commit
+replay or global Store change.15offline boundary tests PASS; two new real PG cases
+await final CI because local Docker is unavailable. No server/paid/Calendar actions.
+[Scope and verification](handoff/JARVIS_TELEGRAM_ADMISSION_RETRY_2026-11-28.md).
+
+28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.
+Both journals VERIFIED; actual owner partial Reply creates correct new readback,
+raw preserved; unaccepted, test meeting NOT scheduled, paid calls0.
+Four approved superseded server backups removed21,679,134B; protected PC copies
+retained, fresh pre/post encrypted backups and isolated audit restores PASS.
+ONE apply failed, never repeated; stock reconcile succeeded after strict heartbeat
+preconditions. Two bounded same-container Telegram starts restored reception.
+Maintenance admission-lock timeouts remain a reliability risk requiring a narrow
+follow-up fix; current heartbeat fresh/OPENepoch101, permanent stability NOT claimed.
+[Installation, live evidence and remaining defect](handoff/JARVIS_VOICE_FRAGMENT_INSTALL_2026-11-28.md).
+
+
 **Общий маршрут: этап2 из6 — минимальная рабочая версия, ещё не завершён.**
 [Единый план и условия завершения](jarvis-2/ROADMAP.md). Ближайшая последовательность:
 быстрые ответы → настоящий голос→задача → запись Calendar → задачи/напоминания → общая приёмка.
 
-27 November local correction stage: exact single-fragment Reply replacement prepared.
-Raw ASR unchanged; new owner version, no auto-save/Calendar action. Missing/repeated/
-malformed fragment and oversized result refuse. Existing observed owner/source and
-one-save integrity retained; full-text history remains compatible. Local16 unit
-cases PASS;7 new PostgreSQL cases/final CI pending. Production4f51e27 unchanged;
-no VPS/paid/model/deployment action. Owner's sample meeting is test-only: DO NOT
-schedule it. Site spelling remains unconfirmed, no inferred replacement.
-[Scope and pending verification](handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
+27 November19:17UTC: PR128/c837c2e SERVER PACKAGE PREPARED, NOT INSTALLED.
+Fresh exact preparation approval only; stock source-built app/speech and inspect
+PASS, candidateb0c5037f/preparation5cc70880. Protected encrypted PC package verified,
+model/Calendar keys/scopes unchanged except source binding. Live4f51e27/both
+VERIFIED/OPENepoch97/five original IDs and starts unchanged; no paid or live sends.
+Backup quota free10889021B. Four superseded archives with exact matching protected
+PC copies and full isolated restores proposed for retention:21679134B; none deleted.
+Need NEW exact retention+installation approval; preserve latest/current/prior copies,
+no stale snapshot, quota bypass, blind apply retry or automatic old-reader rollback.
+Owner's meeting sample stays test-only and must not be scheduled. Stage2 incomplete.
+[Prepared pins, exact four-file list and recovery/install plan](handoff/JARVIS_VOICE_FRAGMENT_PREPARED_2026-11-27.md).
+
+Historical local implementation checkpoint (package preparation above is later):
+27 November final local stage: Draft PR128/sourcec837c2e READY FOR CODE REVIEW,
+NOT INSTALLED. CI46049662208 SUCCESS:3024passed/1skipped/1warning,
+infra1014passed/speech44passed; suites overlap. Head/merge tree identical.
+Exact single-fragment owner Reply creates a new checked version, raw ASR retained.
+All7 new PostgreSQL cases PASS; invalid/ambiguous/oversize corrections refuse,
+old cards blocked and one-save boundary preserved. No acoustic model improvement.
+Owner's sample meeting is test-only: DO NOT schedule it. No server/Telegram/paid/
+model/deployment action in this slice; production last verified4f51e27 unchanged.
+Next release first needs fresh backup capacity/retention reconciliation and exact
+preparation approval; do not reuse old install windows or remove copies silently.
+[Final evidence, failed-test repair and compatibility limits](handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
 
 Historical observation (later owner clarifications above):
 27 November17:50UTC: first real long owner voice131179347,82s, current4f51e27.

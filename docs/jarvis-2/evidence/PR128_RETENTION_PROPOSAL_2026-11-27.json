@@ -1,0 +1,81 @@
+{
+  "status": "PROPOSED_NOT_AUTHORIZED",
+  "source_revision": "c837c2e54961b72989fe47bf5505f32b01d8bb0e",
+  "previous_revision": "4f51e270a0513f2c01ab1301e7796929ef8c5098",
+  "previous_bundle": "ea3ca20867b99356ff5765802e7f69c04d2841a77f4710c7c8e8ca5867eaba49",
+  "candidate_bundle": "b0c5037f2450764648dd96b10f3f94871c0d3eb2653dac824c28c269373532d0",
+  "preparation_digest": "5cc70880e996740061378c000018f6752533fba63f9db5067399e733a2f6a3eb",
+  "private_plan_sha256": "09131b549f286830f6c0051f7e4bcee01cfcb3eb75dd2ad57c0ef869538c18af",
+  "directory": "/home/acc-control/f30/state/backups",
+  "remove_exact_files": [
+    {
+      "name": "backup_a4ce53782f764695a072fb2268728e74.enc",
+      "size": 5355092,
+      "sha256": "7b2c286e5f96b5727a93c8b45b9e67d4829bf5720f3cab1e291d0f21a1da5c86",
+      "bundle": "39909c8c7a8236efdad752b2fb24d91684f0c734ca9cb2548686a2838f5dcdc4",
+      "created_at": "2026-11-26T05:29:49.495157+00:00"
+    },
+    {
+      "name": "backup_47c0cd0dc484496c88206dc20c6b691e.enc",
+      "size": 5363452,
+      "sha256": "5cca8e3e0c7f7c547b09b3a49171ad2dcbf3ff1cba0e49cfd7463bc55189300c",
+      "bundle": "39909c8c7a8236efdad752b2fb24d91684f0c734ca9cb2548686a2838f5dcdc4",
+      "created_at": "2026-11-26T05:35:06.460703+00:00"
+    },
+    {
+      "name": "backup_b0f4751f83a547ee859b918e02a79a47.enc",
+      "size": 5442062,
+      "sha256": "3e7e8a8fce90168e10d6728383beac7957e72e8824814a33797cedd96d339e5c",
+      "bundle": "071acdc27f39cccd8511d73adb941974a883a2b766bce02ac081d991050a3686",
+      "created_at": "2026-11-26T08:19:20.629751+00:00"
+    },
+    {
+      "name": "backup_89cd52f6d367421882ce63ff0833cd62.enc",
+      "size": 5518528,
+      "sha256": "9c8be28ac88301f2a50541981ad9d9d8ee8de996f5bf429dcc4fc6e9961487ca",
+      "bundle": "fef264da8a588188f2597af7704725fd29fea381ba57375201047ec8be0f769b",
+      "created_at": "2026-11-26T10:48:20.441351+00:00"
+    }
+  ],
+  "bytes_to_free": 21679134,
+  "quota_before": 268435456,
+  "free_before": 10889021,
+  "free_after_if_approved": 32568155,
+  "latest_preserved": "backup_787020bb7d274706a658c864a0287067.enc",
+  "remaining_newest_per_bundle": [
+    {
+      "bundle": "39909c8c7a8236efdad752b2fb24d91684f0c734ca9cb2548686a2838f5dcdc4",
+      "name": "backup_8058d5f49dbe413ebb429c522f86bf11.enc"
+    },
+    {
+      "bundle": "071acdc27f39cccd8511d73adb941974a883a2b766bce02ac081d991050a3686",
+      "name": "backup_c0fa8d95f800453dac0792806b66e874.enc"
+    },
+    {
+      "bundle": "fef264da8a588188f2597af7704725fd29fea381ba57375201047ec8be0f769b",
+      "name": "backup_4f24caca50f54528acfb67d52357f248.enc"
+    },
+    {
+      "bundle": "0d5f8635a08fd47ee1ce536f32a599c42b567895019c0921aea6b01873313345",
+      "name": "backup_cbf5789699a848558844295183b01c7d.enc"
+    },
+    {
+      "bundle": "1191b4a466250292421e438007da88aa7438eb79ebef56802c75582adee2625d",
+      "name": "backup_8fd24723caf041fd93f05477fb49f4ca.enc"
+    },
+    {
+      "bundle": "1f6f0d3936e05f47d70f5b2d50476b967d5232b68a30061b1a40f84d2035e248",
+      "name": "backup_7122448426154819a8523f1dffe2c50a.enc"
+    },
+    {
+      "bundle": "ea3ca20867b99356ff5765802e7f69c04d2841a77f4710c7c8e8ca5867eaba49",
+      "name": "backup_787020bb7d274706a658c864a0287067.enc"
+    }
+  ],
+  "pc_ciphertext_and_decrypted_dump_checksums_verified": true,
+  "four_isolated_audit_restores_verified": true,
+  "deleted_files": 0,
+  "installation_authorized": false,
+  "retention_authorized": false,
+  "recovery": "All four exact encrypted originals retained in owner-only protected PC custody. Restore exclusive same-name file0600/acc-control via authenticated SFTP, verify ciphertext and dump checksums, never overwrite latest.json or restore over primary. Exact private copy paths in encrypted prepared package and operator inventory."
+}

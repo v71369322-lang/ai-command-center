@@ -830,3 +830,54 @@ def test_service_entrypoint_needs_no_api_owner_or_redis_keys(settings, tmp_path,
     monkeypatch.setenv("F1_DB_USER", "f1_admin")
     with pytest.raises(Denied, match="nonadmin"):
         service_settings()
+
+
+@pytest.mark.parametrize('phase', ['startup', 'poll'])
+def test_real_admission_timeout_recovers_without_duplicate_delivery(configured, store, monkeypatch, phase):
+    """Real PG 3s lock timeout, public mock Telegram only; no real API calls."""
+    from concurrent.futures import ThreadPoolExecutor
+    from command_center.telegram_service import TelegramStore
+
+    resilient = TelegramStore(store.settings)
+    locked, release = threading.Event(), threading.Event()
+    fake, waits = FakeBot(), []
+    fake.updates = [update(900, '/help')]
+    client = client_for(configured, fake)
+    def holder():
+        with store.transaction():
+            locked.set()
+            assert release.wait(20)
+    def after(method):
+        if phase == 'poll' and method == 'getUpdates':
+            start_lock()
+    def retry_delay(seconds):
+        waits.append(seconds)
+        release.set()
+        future.result(timeout=10)
+    def start_lock():
+        nonlocal future
+        if future is None:
+            future = pool.submit(holder)
+            assert locked.wait(5)
+    future = None
+    fake.after = after
+    monkeypatch.setattr('command_center.maintenance_admission.time.sleep', retry_delay)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            try:
+                if phase == 'startup':
+                    start_lock()
+                result = TelegramService(resilient, client, poll_seconds=0).run(max_cycles=1)
+                assert result['completed_cycles'] == 1
+                assert waits == [1] and len(fake.sent) == 1
+                assert len([c for c in fake.calls if c[0] == 'getUpdates']) == 1
+                with store.transaction() as session:
+                    store.check_audit(session)
+                    assert len(session.scalars(select(TelegramInbox)).all()) == 1
+                    events = session.scalars(select(Audit)).all()
+                    assert sum(e.event['kind'] == 'telegram_service_started' for e in events) == 1
+            finally:
+                release.set()
+    finally:
+        client.close()
+        resilient.engine.dispose()

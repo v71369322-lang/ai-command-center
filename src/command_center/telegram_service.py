@@ -11,9 +11,24 @@ import time
 from sqlalchemy import inspect, text, URL
 
 from .config import Settings, secret
+from .maintenance_admission import bounded_entry
 from .store import Denied, Store, digest
 from .telegram_bridge import TelegramBridge
 from .telegram_transport import ConfiguredTelegramHTTP, TelegramHTTPError, connection
+
+
+class TelegramStore(Store):
+    """Retry only admission entry; never replay a handler, send or commit."""
+
+    def transaction(self):
+        return bounded_entry(self, Store.transaction)
+
+
+def failure_code(error, store):
+    from .voice_worker import admission_busy
+    if store is not None and admission_busy(error, store):
+        return 'telegram_service_admission_timeout'
+    return 'telegram_service_failed_closed'
 
 
 def service_settings():
@@ -154,7 +169,7 @@ def main():
                               'revision': config.source_revision, 'connection_digest': digest(config.model_dump()),
                               'credentials_tested': False, 'network_contacted': False}))
             return
-        store = Store(service_settings())
+        store = TelegramStore(service_settings())
         client = ConfiguredTelegramHTTP(args.config, args.approved_connection, store.settings.source_revision)
         calendar = None
         if bool(args.calendar_config or args.calendar_script_config) != bool(args.approved_calendar):
@@ -179,9 +194,9 @@ def main():
         for signum in (signal.SIGTERM, signal.SIGINT):
             signal.signal(signum, lambda *_: stop.set())
         print(json.dumps(service.run(stop)))
-    except Exception:
+    except Exception as error:
         # No traceback containing credential-bearing URLs or secret-file values.
-        parser.exit(1, 'telegram_service_failed_closed; inspect protected configuration and audit\n')
+        parser.exit(1, failure_code(error, store) + '; inspect protected configuration and audit\n')
     finally:
         resources.close()
         if client:

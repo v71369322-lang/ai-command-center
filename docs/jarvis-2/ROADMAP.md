@@ -1,5 +1,17 @@
 # Jarvis 2.0 — единый маршрут к ежедневному использованию
 
+28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.
+Both journals VERIFIED; actual owner partial Reply creates correct new readback,
+raw preserved; unaccepted, test meeting NOT scheduled, paid calls0.
+Four approved superseded server backups removed21,679,134B; protected PC copies
+retained, fresh pre/post encrypted backups and isolated audit restores PASS.
+ONE apply failed, never repeated; stock reconcile succeeded after strict heartbeat
+preconditions. Two bounded same-container Telegram starts restored reception.
+Maintenance admission-lock timeouts remain a reliability risk requiring a narrow
+follow-up fix; current heartbeat fresh/OPENepoch101, permanent stability NOT claimed.
+[Installation, live evidence and remaining defect](../handoff/JARVIS_VOICE_FRAGMENT_INSTALL_2026-11-28.md).
+
+
 Источник — утверждённая владельцем концепция Jarvis2.0 и приоритеты её этапов.
 Текущее место: **этап2 из6, минимальная рабочая версия ещё не завершена**.
 Количество PR не является прогрессом продукта. Каждый отчёт должен называть
@@ -156,3 +168,13 @@ No ASR model/punctuation improvement or new real phone voice acceptance claimed.
 Stage2 remains incomplete: long/noisy owner speech and complete daily-flow acceptance.
 Before next release review backup headroom; cleanup/quota changes need exact approval.
 [Installation evidence](../handoff/JARVIS_SPOKEN_MINUTES_INSTALL_2026-11-26.md).
+
+
+## 27 November bounded voice-fragment correction candidate
+
+PR128 reuses owner Reply correction for one exact quoted fragment. Original ASR
+stays intact; new version needs separate confirmation, no auto-save/Calendar write.
+Missing/ambiguous/malformed and oversized edits refuse. No acoustic model change.
+Owner explicitly classified the sample meeting as a test: do not schedule it.
+Stage2 remains incomplete; this is correction usability, not ASR-quality acceptance.
+Final CI and source pins: [handoff](../handoff/JARVIS_VOICE_FRAGMENT_EDIT_2026-11-27.md).
