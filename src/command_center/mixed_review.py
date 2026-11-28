@@ -77,7 +77,7 @@ def schedule_pin(session):
 
 
 def items_for(value, received, schedule, now):
-    from .mixed_inbox import request_markers
+    from .mixed_inbox import request_markers, item_content
     from .personal_inbox import parse, due_at, project_hint
     positions = request_markers(value)
     if len(positions) < 2 or len(positions) > 8:
@@ -90,7 +90,7 @@ def items_for(value, received, schedule, now):
         return []
     items = []
     for start, end in zip(positions, positions[1:] + [len(value)]):
-        span = value[start:end]
+        span = item_content(value, start, end)
         intent = parse(span)
         document, project = None, None
         if intent and intent.get('action') == 'create' and 1 <= len(intent['title'].strip()) <= 500:
@@ -259,7 +259,9 @@ def decide(bridge, iid, intent):
             proposal_id=intent['proposal_id'], item=intent['item'], request_id=iid,
             request_fingerprint=row.fingerprint, text=text, text_hash=digest(text),
             source_id=source.id, span_hash=span_hash)
-        if not handle_locked(bridge, session, iid, text, received_at=source_time(session, source)):
+        from .mixed_inbox import item_content
+        content = item_content(value, item['start'], item['end'])
+        if not handle_locked(bridge, session, iid, content, received_at=source_time(session, source)):
             raise Denied('mixed_review_personal_not_created')
         # The stored record must match exactly what the owner saw before clicking.
         saved = records(bridge, session, [iid]).get(iid)

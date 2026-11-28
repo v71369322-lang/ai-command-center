@@ -1,5 +1,12 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+28 November local Stage2 slice: explicit “первое/второе/третье” and consecutive
+numbered lines reuse existing per-item mixed review. Original spans preserved,
+no automatic save/guessed dates or new authority. NOT INSTALLED; final CI pending.
+39 new offline +22 existing unit cases PASS; five new PG cases await CI because
+local Docker unavailable. No VPS/paid/model/Calendar actions in this slice.
+[Scope, examples and limits](handoff/JARVIS_ENUMERATED_REVIEW_2026-11-28.md).
+
 28 November14:54UTC: PR129/source8239478 INSTALLED, one stock apply exit0,
 both journals VERIFIED; no new-target repair/restart or reconcile required.
 Predecessor restored once under fresh exact grant before cutover. Actual owner web
