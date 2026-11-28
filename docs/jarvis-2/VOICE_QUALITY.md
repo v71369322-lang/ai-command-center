@@ -1,5 +1,18 @@
 # Качество голосового ввода — этап2/6
 
+28 November14:54UTC: PR129/source8239478 INSTALLED, one stock apply exit0,
+both journals VERIFIED; no new-target repair/restart or reconcile required.
+Predecessor restored once under fresh exact grant before cutover. Actual owner web
+resume OPENepoch105; real help6.232s and Google agenda15.270s intake→SENT, one send
+each, actual provider read PASS/no writes. Voice IDLE, prior pending raw/correction
+preserved, test meeting NOT scheduled, paid calls0. Exact three-file rotation
+16,861,697B complete; protected pre/post PC backups and isolated audit restores PASS.
+Final all five services running/noOOM/restart_count0; free backup quota8,689,002B.
+No permanent-uptime or fresh ASR-quality claim. Stage2 remains incomplete.
+[Installed version, live evidence and recovery](../handoff/JARVIS_TELEGRAM_ADMISSION_INSTALL_2026-11-28.md).
+
+Earlier checkpoints below retain their original dates:
+
 28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.
 Both journals VERIFIED; actual owner partial Reply creates correct new readback,
 raw preserved; unaccepted, test meeting NOT scheduled, paid calls0.
