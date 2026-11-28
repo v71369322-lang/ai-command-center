@@ -1,9 +1,12 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
 28 November local reliability follow-up: bounded Telegram admission-entry retry
-implemented, NOT INSTALLED. Reuses existing exact timeout guard; no body/send/commit
-replay or global Store change.15offline boundary tests PASS; two new real PG cases
-await final CI because local Docker is unavailable. No server/paid/Calendar actions.
+implemented, NOT INSTALLED. Draft PR129/source8239478, final CI46148204798 SUCCESS:
+3036passed/1skipped/1warning, infra1014passed/speech44passed (overlapping suites).
+Two real PG contention service cases PASS; same head/merge treee52db3d7.
+Exact bounded entry only, no body/send/commit replay or global Store change.
+No server/paid/Calendar actions. Fresh capacity reconciliation and exact release
+approval required before install; last backup quota free12,287,042B.
 [Scope and verification](handoff/JARVIS_TELEGRAM_ADMISSION_RETRY_2026-11-28.md).
 
 28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.
