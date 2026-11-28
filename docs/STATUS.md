@@ -1,5 +1,18 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+28 November14:21UTC: PR129/source8239478 SERVER PACKAGE PREPARED, NOT INSTALLED.
+BLOCKER: predecessor Telegramc837c2e stopped14:17:20UTC exit1/noOOM during preparation;
+no restart authorized/performed. Both journals VERIFIED does not mean healthy.
+Four other services running, same five IDs/StartedAt, voice/Calendar custody PASS.
+Candidate788296d4/preparation2d244095 stock inspected, encrypted PC package verified.
+Three older exact server archives proposed for rotation16,861,697B, protected PC
+copies match and all three isolated audit restores PASS; NONE DELETED. Free quota
+12,287,042B. New exact repair/retention/install approval required, no old window reuse.
+No paid call/Calendar action/stop/restart/merge/model change. Stage2 incomplete.
+[Prepared pins, exact files, observed failure and bounded recovery/install plan](handoff/JARVIS_TELEGRAM_ADMISSION_PREPARED_2026-11-28.md).
+
+Historical local implementation checkpoint (server preparation above is later):
+
 28 November local reliability follow-up: bounded Telegram admission-entry retry
 implemented, NOT INSTALLED. Draft PR129/source8239478, final CI46148204798 SUCCESS:
 3036passed/1skipped/1warning, infra1014passed/speech44passed (overlapping suites).
