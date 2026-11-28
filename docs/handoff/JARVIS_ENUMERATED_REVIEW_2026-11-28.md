@@ -31,7 +31,7 @@ unchanged; old revision cards still fail current-revision checks. Refresh/review
 cannot silently expand permissions. Voice still requires transcript review first,
 then per-item review. Raw/corrected text/audio provenance are unchanged.
 
-Local39 new offline cases and22 existing mixed-review unit cases PASS (61 total,
+Local42 new offline cases and22 existing mixed-review unit cases PASS (64 total,
 not additional independent suites). Ruff and generated contracts PASS. Five new
 PostgreSQL integration cases cover both typed formats, raw/corrected mock voice,
 raw span/audit/project preservation, individual clicks/deduplication, reconstructed

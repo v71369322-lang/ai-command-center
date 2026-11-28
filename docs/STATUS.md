@@ -3,7 +3,7 @@
 28 November local Stage2 slice: explicit “первое/второе/третье” and consecutive
 numbered lines reuse existing per-item mixed review. Original spans preserved,
 no automatic save/guessed dates or new authority. NOT INSTALLED; final CI pending.
-39 new offline +22 existing unit cases PASS; five new PG cases await CI because
+42 new offline +22 existing unit cases PASS; five new PG cases await CI because
 local Docker unavailable. No VPS/paid/model/Calendar actions in this slice.
 [Scope, examples and limits](handoff/JARVIS_ENUMERATED_REVIEW_2026-11-28.md).
 

@@ -112,3 +112,13 @@ def test_spoken_eight_item_bound_including_yo_variant(fourth):
     value = ' '.join(label + ' купить упаковку.' for label in labels)
     assert len(items_for(value, NOW, SCHEDULE, NOW)) == 8
     assert not enumeration(value + ' Девятое купить коробку.')
+
+
+@pytest.mark.parametrize('value', [
+    'Первое «не покупать» купить упаковку. Второе проверить склад.',
+    'Первое купить упаковку. Второе «без срока» напомни завтра в 9:15 позвонить.',
+    '“1. Купить упаковку.\n2. Проверить склад.”',
+])
+def test_quote_mask_cannot_swallow_original_words_into_heading_whitespace(value):
+    assert not enumeration(value)
+    assert item_content(value, 0, len(value)) == value

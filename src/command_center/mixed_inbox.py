@@ -44,6 +44,8 @@ def enumeration(value):
     matches = words or numbers
     if not 2 <= len(matches) <= 8 or value[:matches[0].start()].strip():
         return []
+    if any(value[m.start():m.end()] != text[m.start():m.end()] for m in matches):
+        return []  # Quoted content must never be consumed as heading whitespace.
     labels = ([ORDINALS.index(m[1].lower().replace('четвертое', 'четвёртое')) + 1 for m in words]
               if words else [int(m[1]) for m in numbers])
     if labels != list(range(1, len(matches) + 1)):
