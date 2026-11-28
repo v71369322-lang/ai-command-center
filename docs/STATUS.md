@@ -1,9 +1,45 @@
 # Jarvis 2.0 — текущая стратегия владельца
 
+28 November local Stage2 slice: explicit “первое/второе/третье” and consecutive
+numbered lines reuse existing per-item mixed review. Original spans preserved,
+no automatic save/guessed dates or new authority. NOT INSTALLED; final CI pending.
+42 new offline +22 existing unit cases PASS; five new PG cases await CI because
+local Docker unavailable. No VPS/paid/model/Calendar actions in this slice.
+[Scope, examples and limits](handoff/JARVIS_ENUMERATED_REVIEW_2026-11-28.md).
+
+28 November14:54UTC: PR129/source8239478 INSTALLED, one stock apply exit0,
+both journals VERIFIED; no new-target repair/restart or reconcile required.
+Predecessor restored once under fresh exact grant before cutover. Actual owner web
+resume OPENepoch105; real help6.232s and Google agenda15.270s intake→SENT, one send
+each, actual provider read PASS/no writes. Voice IDLE, prior pending raw/correction
+preserved, test meeting NOT scheduled, paid calls0. Exact three-file rotation
+16,861,697B complete; protected pre/post PC backups and isolated audit restores PASS.
+Final all five services running/noOOM/restart_count0; free backup quota8,689,002B.
+No permanent-uptime or fresh ASR-quality claim. Stage2 remains incomplete.
+[Installed version, live evidence and recovery](handoff/JARVIS_TELEGRAM_ADMISSION_INSTALL_2026-11-28.md).
+
+Historical preparation checkpoint (installation above is later):
+
+28 November14:21UTC: PR129/source8239478 SERVER PACKAGE PREPARED, NOT INSTALLED.
+BLOCKER: predecessor Telegramc837c2e stopped14:17:20UTC exit1/noOOM during preparation;
+no restart authorized/performed. Both journals VERIFIED does not mean healthy.
+Four other services running, same five IDs/StartedAt, voice/Calendar custody PASS.
+Candidate788296d4/preparation2d244095 stock inspected, encrypted PC package verified.
+Three older exact server archives proposed for rotation16,861,697B, protected PC
+copies match and all three isolated audit restores PASS; NONE DELETED. Free quota
+12,287,042B. New exact repair/retention/install approval required, no old window reuse.
+No paid call/Calendar action/stop/restart/merge/model change. Stage2 incomplete.
+[Prepared pins, exact files, observed failure and bounded recovery/install plan](handoff/JARVIS_TELEGRAM_ADMISSION_PREPARED_2026-11-28.md).
+
+Historical local implementation checkpoint (server preparation above is later):
+
 28 November local reliability follow-up: bounded Telegram admission-entry retry
-implemented, NOT INSTALLED. Reuses existing exact timeout guard; no body/send/commit
-replay or global Store change.15offline boundary tests PASS; two new real PG cases
-await final CI because local Docker is unavailable. No server/paid/Calendar actions.
+implemented, NOT INSTALLED. Draft PR129/source8239478, final CI46148204798 SUCCESS:
+3036passed/1skipped/1warning, infra1014passed/speech44passed (overlapping suites).
+Two real PG contention service cases PASS; same head/merge treee52db3d7.
+Exact bounded entry only, no body/send/commit replay or global Store change.
+No server/paid/Calendar actions. Fresh capacity reconciliation and exact release
+approval required before install; last backup quota free12,287,042B.
 [Scope and verification](handoff/JARVIS_TELEGRAM_ADMISSION_RETRY_2026-11-28.md).
 
 28 November12:33UTC: PR128/c837c2e INSTALLED after fresh exact owner approval.

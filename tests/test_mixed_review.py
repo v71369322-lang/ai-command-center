@@ -307,3 +307,82 @@ def test_integration_reviewed_voice_keeps_raw_and_saves_only_selected_literal_sp
         assert captured_text(tx, tx.get(TelegramInbox, service.profile + ':3')) == value[:proposal['items'][0]['end']]
         assert tx.scalar(select(Audit).where(Audit.event['kind'].as_string() == VOICE_PROPOSED)).event['text'] == value
     assert provider['calls'] == [] and provider['writes'] == 0
+
+
+@pytest.mark.parametrize('value', [
+    'Первое проверить склад по автосервису. Второе идея: новая коробка. Третье напомни завтра в 9:15 позвонить.',
+    '1. Проверить склад по автосервису.\n2. Идея: новая коробка.\n3. Напомни завтра в 9:15 позвонить.',
+])
+def test_integration_enumerated_items_keep_original_source_and_single_real_clicks(setup, store, monkeypatch, value):
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    service, fake, provider = setup
+    before = authority(store)
+    original = service.receive(message(1, value))
+    offered = review(store)
+    with store.transaction() as tx:
+        assert not records(service, tx)
+        assert captured_text(tx, tx.get(TelegramInbox, original['inbox_id'])) == value
+    for item, uid in [(1, 2), (2, 3), (3, 4), (1, 5)]:
+        event = click(service, fake, offered, item, uid)
+        service.receive(event)
+        service.receive(event)
+    restarted = TelegramBridge(store, service.client, OWNER, calendar_writer=service.calendar_writer)
+    with store.transaction() as tx:
+        store.check_audit(tx)
+        saved = records(restarted, tx)
+        assert len(saved) == 3
+        assert [saved[service.profile+':'+str(n)]['category'] for n in (2, 3, 4)] == ['task', 'idea', 'reminder']
+        assert saved[service.profile+':2']['title'].lower().startswith('проверить склад')
+        assert saved[service.profile+':3']['title'].startswith('новая коробка')
+        assert saved[service.profile+':4']['due_at'].endswith('T09:15:00+03:00')
+        for n, item in enumerate(offered['items'], 2):
+            assert captured_text(tx, tx.get(TelegramInbox, service.profile+':'+str(n))) == value[item['start']:item['end']]
+        assert len(list(tx.scalars(select(Audit).where(Audit.event['kind'].as_string()==ACCEPTED)))) == 3
+    assert authority(store) == before and provider['calls'] == [] and provider['writes'] == 0
+
+
+@pytest.mark.parametrize('owner_corrected', [False, True])
+def test_integration_enumerated_voice_needs_transcript_review_then_separate_item_click(setup, store, monkeypatch, owner_corrected):
+    from test_telegram_voice_corrections import reply, corrected
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    service, fake, provider = setup
+    before = authority(store)
+    value = 'Первое купить упаковку. Второе идея: новая коробка.'
+    original = service.receive(voice())
+    offered = propose(service, original['inbox_id'], {'audio_sha256':'a'*64, 'language':'ru',
+        'text':value, 'duration_seconds':10.0}, transcription_contract({'kind':'voice_request'},'a'*64))
+    with store.transaction() as tx:
+        assert not records(service, tx)
+    selected = offered['proposal_id']
+    if owner_corrected:
+        service.receive(reply(service, fake, offered, 'Замени «упаковку» на «бумагу»', uid=2))
+        selected = corrected(store)['proposal_id']
+        value = value.replace('упаковку', 'бумагу')
+    service.receive(transcript_callback(service, fake, selected, uid=3))
+    card = review(store)
+    with store.transaction() as tx:
+        assert not records(service, tx)
+    service.receive(click(service, fake, card, 1, 4))
+    with store.transaction() as tx:
+        store.check_audit(tx)
+        saved = records(service, tx)
+        assert len(saved)==1 and saved[service.profile+':4']['title'].startswith('купить')
+        assert captured_text(tx, tx.get(TelegramInbox,service.profile+':4')) == value[:card['items'][0]['end']]
+        raw = tx.scalar(select(Audit).where(Audit.event['kind'].as_string()==VOICE_PROPOSED)).event
+        assert raw['text']=='Первое купить упаковку. Второе идея: новая коробка.'
+        assert raw['audio_sha256']=='a'*64
+    assert authority(store)==before and provider['calls']==[] and provider['writes']==0
+
+
+def test_integration_enumerated_negation_cannot_be_saved_by_forged_slot(setup, store, monkeypatch):
+    monkeypatch.setenv('F1_ASSISTANT_ONLY', '1')
+    service, fake, provider = setup
+    service.receive(message(1, 'Первое купить упаковку. Второе не отправить письмо.'))
+    card = review(store)
+    event = click(service,fake,card,1,2)
+    event['callback_query']['data']=f"mi:{card['proposal_id']}:2"
+    service.receive(event)
+    with store.transaction() as tx:
+        assert not records(service,tx)
+        assert not tx.scalar(select(Audit).where(Audit.event['kind'].as_string()==ACCEPTED))
+    assert provider['calls']==[] and provider['writes']==0
